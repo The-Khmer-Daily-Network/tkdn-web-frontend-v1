@@ -62,7 +62,7 @@ export async function getCategories(): Promise<CategoryResponse> {
   } catch (error) {
     // Keep header/menu stable when API is unavailable in local dev.
     console.warn("Categories fetch failed, using empty fallback:", error);
-    return { categories: [] };
+    return { success: false, categories: [] };
   }
 }
 
