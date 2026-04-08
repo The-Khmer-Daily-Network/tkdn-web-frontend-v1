@@ -29,34 +29,6 @@ export default function UploadVideoModal({
     if (!file) return;
 
     setError(null);
-    const errors: string[] = [];
-
-    // Validate file type (common video formats)
-    const allowedTypes = [
-      "video/mp4",
-      "video/mpeg",
-      "video/quicktime",
-      "video/x-msvideo",
-      "video/webm",
-    ];
-    if (!allowedTypes.includes(file.type)) {
-      errors.push("The video must be in MP4, MPEG, MOV, AVI, or WebM format.");
-    }
-
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    if (file.size > maxSize) {
-      errors.push("The video must be less than 2MB.");
-    }
-
-    // If there are errors, show them all
-    if (errors.length > 0) {
-      setError(errors.join("\n"));
-      setSelectedFile(null);
-      setPreview(null);
-      return;
-    }
-
     setSelectedFile(file);
 
     // Create preview using FileReader (data URL)
@@ -201,17 +173,9 @@ export default function UploadVideoModal({
                       </span>
                       <span className="text-gray-500"> or drag and drop</span>
                     </div>
-                    <div className="mt-2 text-xs text-gray-500 space-y-0.5 text-center">
-                      <p>Note: The rule of upload content video.</p>
-                      <ul className="list-disc list-outside pl-5 inline-block text-left">
-                        <li>
-                          The video must be in MP4, MPEG, MOV, AVI, or WebM
-                          format.
-                        </li>
-                        <li>The video must be less than 2MB.</li>
-                        <li>You can upload 1 video at a time.</li>
-                      </ul>
-                    </div>
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      Note: File rules are validated by backend.
+                    </p>
                   </div>
                 )}
                 <input

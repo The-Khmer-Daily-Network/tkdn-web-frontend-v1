@@ -22,86 +22,11 @@ export default function UploadCoverModal({
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const REQUIRED_WIDTH = 850;
-  const REQUIRED_HEIGHT = 450;
-
   if (!isOpen) return null;
 
-  const getImageDimensions = async (
-    file: File,
-  ): Promise<{ width: number; height: number }> => {
-    // Prefer createImageBitmap when available (more reliable decoding)
-    if (typeof createImageBitmap === "function") {
-      const bitmap = await createImageBitmap(file);
-      const dims = { width: bitmap.width, height: bitmap.height };
-      bitmap.close();
-      return dims;
-    }
-
-    // Fallback for older browsers
-    return await new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error("decode_failed"));
-      };
-      img.src = url;
-    });
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Only JPG, PNG, and JPEG files are allowed");
-      setSelectedFile(null);
-      setPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    // Validate file size (max 2MB)
-    const maxSizeBytes = 2 * 1024 * 1024; // 2MB
-    if (file.size > maxSizeBytes) {
-      setError("File size must be less than 2MB.");
-      setSelectedFile(null);
-      setPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    // Validate dimensions (STRICT): must be exactly 850×450
-    let width: number;
-    let height: number;
-    try {
-      ({ width, height } = await getImageDimensions(file));
-    } catch {
-      setError(
-        "Could not decode this image to validate dimensions. Please re-export it as a standard JPG or PNG and try again.",
-      );
-      setSelectedFile(null);
-      setPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    if (width !== REQUIRED_WIDTH || height !== REQUIRED_HEIGHT) {
-      setError(
-        `Image size must be ${REQUIRED_WIDTH}px × ${REQUIRED_HEIGHT}px. (Current: ${width}px × ${height}px)`,
-      );
-      setSelectedFile(null);
-      setPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
 
     setError(null);
     setSelectedFile(file);
@@ -240,14 +165,9 @@ export default function UploadCoverModal({
                       </span>
                       <span className="text-gray-500"> or drag and drop</span>
                     </div>
-                    <div className="mt-2 text-xs text-gray-500 space-y-0.5 text-center">
-                      <p>Note: The rule of upload cover image.</p>
-                      <ul className="list-disc list-outside pl-5 inline-block text-left">
-                        <li>The image must be in JPG, PNG, JPEG format.</li>
-                        <li>The image must be less than 2MB.</li>
-                        <li>The image size must be 850px × 450px.</li>
-                      </ul>
-                    </div>
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      Note: File rules are validated by backend.
+                    </p>
                   </div>
                 )}
                 <input

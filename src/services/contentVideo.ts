@@ -139,26 +139,6 @@ export async function uploadContentVideo({
   try {
     const url = getApiUrl("/videos-content");
 
-    // Validate file type (common video formats)
-    const allowedTypes = [
-      "video/mp4",
-      "video/mpeg",
-      "video/quicktime",
-      "video/x-msvideo",
-      "video/webm",
-    ];
-    if (!allowedTypes.includes(video.type)) {
-      throw new Error(
-        "Only MP4, MPEG, MOV, AVI, and WebM video files are allowed",
-      );
-    }
-
-    // Validate file size (20MB max)
-    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
-    if (video.size > maxSize) {
-      throw new Error("File size must be less than 20MB");
-    }
-
     // Create FormData
     const formData = new FormData();
 

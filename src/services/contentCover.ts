@@ -182,18 +182,6 @@ export async function uploadContentCover({
   try {
     const url = getApiUrl("/content-cover");
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-    if (!allowedTypes.includes(image.type)) {
-      throw new Error("Only JPG, PNG, and JPEG files are allowed");
-    }
-
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-    if (image.size > maxSize) {
-      throw new Error("File size must be less than 2MB");
-    }
-
     // Create FormData
     const formData = new FormData();
 
