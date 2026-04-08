@@ -60,12 +60,9 @@ export async function getCategories(): Promise<CategoryResponse> {
 
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
-      );
-    }
-    throw error;
+    // Keep header/menu stable when API is unavailable in local dev.
+    console.warn("Categories fetch failed, using empty fallback:", error);
+    return { categories: [] };
   }
 }
 

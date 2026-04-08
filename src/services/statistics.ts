@@ -59,6 +59,28 @@ if (!API_BASE_URL) {
 let cachedStatisticsResponse: StatisticsResponse | null = null;
 let inFlightStatisticsPromise: Promise<StatisticsResponse> | null = null;
 
+function getFallbackStatisticsResponse(): StatisticsResponse {
+  return {
+    success: false,
+    data: {
+      id: 0,
+      facebook: 0,
+      youtube: 0,
+      tiktok: 0,
+      linkedin: 0,
+      website: 0,
+      instagram: 0,
+      website_male: 0,
+      website_female: 0,
+      articles_published: 0,
+      videos_published: 0,
+      user_demographic: null,
+      created_at: "",
+      updated_at: "",
+    },
+  };
+}
+
 /**
  * Get the full API URL with proper path
  */
@@ -108,9 +130,10 @@ export async function getStatistics(): Promise<StatisticsResponse> {
 
     return await inFlightStatisticsPromise;
   } catch (error) {
-    console.error("Error fetching statistics:", error);
-    cachedStatisticsResponse = null;
-    throw error;
+    console.warn("Statistics fetch failed, using zero-value fallback:", error);
+    const fallback = getFallbackStatisticsResponse();
+    cachedStatisticsResponse = fallback;
+    return fallback;
   } finally {
     inFlightStatisticsPromise = null;
   }

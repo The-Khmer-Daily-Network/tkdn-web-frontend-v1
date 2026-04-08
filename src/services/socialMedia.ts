@@ -53,7 +53,8 @@ export async function getSocialMedia(): Promise<SocialMediaResponse> {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error("Error fetching social media:", error);
-    throw error;
+    // Keep UI stable even when API/network/extensions break fetch in dev.
+    console.warn("Social media fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
   }
 }

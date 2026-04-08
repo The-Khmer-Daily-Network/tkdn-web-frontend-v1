@@ -68,12 +68,11 @@ export async function getAdvertisementImages(): Promise<AdvertisementImageRespon
 
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
-      );
-    }
-    throw error;
+    console.warn(
+      "Advertisement images fetch failed, using empty fallback:",
+      error,
+    );
+    return { success: false, data: [] };
   }
 }
 

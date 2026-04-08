@@ -52,12 +52,8 @@ export async function getNationalNews(): Promise<NewsResponse> {
     }
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
-      );
-    }
-    throw error;
+    console.warn("National news fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
   }
 }
 
@@ -79,12 +75,8 @@ export async function getInternationalNews(): Promise<NewsResponse> {
     }
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
-      );
-    }
-    throw error;
+    console.warn("International news fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
   }
 }
 
@@ -106,12 +98,8 @@ export async function getVideosNews(): Promise<NewsResponse> {
     }
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
-      );
-    }
-    throw error;
+    console.warn("Videos news fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
   }
 }
 
@@ -147,12 +135,8 @@ export async function getNews(categoryId?: number): Promise<NewsResponse> {
 
     return response.json();
   } catch (error) {
-    if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(
-        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
-      );
-    }
-    throw error;
+    console.warn("News fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
   }
 }
 

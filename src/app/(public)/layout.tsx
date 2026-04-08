@@ -76,7 +76,8 @@ export default function PublicLayout({
           "Instagram",
         ];
 
-        const apiDataMap = new Map();
+        const apiDataMap = new Map<string, SocialMedia>();
+        const matchedApiIndexes = new Set<number>();
         socialMediaResponse.data.forEach((item) => {
           const normalizedName = item.name.toLowerCase().trim();
           orderedPlatforms.forEach((platform) => {
@@ -89,9 +90,14 @@ export default function PublicLayout({
           });
         });
 
+        // Prefer our fixed order, but keep any extra API platforms appended.
         const mergedData = orderedPlatforms.map((platform, index) => {
           const apiItem = apiDataMap.get(platform.toLowerCase());
           if (apiItem) {
+            const apiIndex = socialMediaResponse.data.findIndex(
+              (d) => d === apiItem,
+            );
+            if (apiIndex >= 0) matchedApiIndexes.add(apiIndex);
             return { ...apiItem, id: index + 1 };
           }
           const defaultItem = defaultPlatforms.find(
@@ -100,7 +106,27 @@ export default function PublicLayout({
           return defaultItem || { id: index + 1, name: platform, link: "#" };
         });
 
-        setSocialMedia(mergedData);
+        const extras = socialMediaResponse.data
+          .map((item, idx) => ({ item, idx }))
+          .filter(({ idx }) => !matchedApiIndexes.has(idx))
+          .map(({ item }) => item)
+          // Deduplicate any extras that accidentally match by name
+          .filter((item) => {
+            const normalized = item.name.toLowerCase().trim();
+            return !orderedPlatforms.some((p) =>
+              normalized.includes(p.toLowerCase()),
+            );
+          });
+
+        const mergedWithExtras = [
+          ...mergedData,
+          ...extras.map((item, extraIdx) => ({
+            ...item,
+            id: mergedData.length + extraIdx + 1,
+          })),
+        ];
+
+        setSocialMedia(mergedWithExtras);
       } else {
         setSocialMedia(defaultPlatforms);
       }

@@ -225,7 +225,8 @@ export default function SocialMediaWidget({
           ];
 
           // Create a map of API data by normalized name
-          const apiDataMap = new Map();
+          const apiDataMap = new Map<string, SocialMedia>();
+          const matchedApiIndexes = new Set<number>();
           response.data.forEach((item) => {
             const normalizedName = item.name.toLowerCase().trim();
             orderedPlatforms.forEach((platform) => {
@@ -272,6 +273,8 @@ export default function SocialMediaWidget({
             );
 
             if (apiItem) {
+              const apiIndex = response.data.findIndex((d) => d === apiItem);
+              if (apiIndex >= 0) matchedApiIndexes.add(apiIndex);
               const link = apiItem.link || "";
               const hasIncompleteLink = checkIncompleteLink(link);
 
@@ -301,8 +304,30 @@ export default function SocialMediaWidget({
             };
           });
 
-          console.log("Merged Social Media:", mergedData);
-          setSocialMedia(mergedData);
+          // Keep any extra API platforms appended after the fixed order.
+          const extras = response.data
+            .map((item, idx) => ({ item, idx }))
+            .filter(({ idx }) => !matchedApiIndexes.has(idx))
+            .map(({ item }) => item)
+            .filter((item) => {
+              const normalized = item.name.toLowerCase().trim();
+              return !orderedPlatforms.some((p) =>
+                normalized.includes(p.toLowerCase()),
+              );
+            });
+
+          const mergedWithExtras = [
+            ...mergedData,
+            ...extras.map((item, extraIdx) => ({
+              ...item,
+              id: mergedData.length + extraIdx + 1,
+              link: item.link || "#",
+              isClickable: item.link ? !checkIncompleteLink(item.link) : false,
+            })),
+          ];
+
+          console.log("Merged Social Media:", mergedWithExtras);
+          setSocialMedia(mergedWithExtras);
         } else {
           // If API returns empty, use defaults
           console.log("No data from API, using defaults");
