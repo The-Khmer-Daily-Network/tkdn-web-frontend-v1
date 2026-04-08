@@ -1,0 +1,47 @@
+# The Khmer Daily Network - robots.txt
+# Updated for Google Search Console and Google News
+
+# All crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin and auth pages
+Disallow: /login
+Disallow: /dashboard
+Disallow: /articleManagement
+Disallow: /categoryManagement
+Disallow: /contentImages
+Disallow: /contentVideos
+Disallow: /covers
+Disallow: /newsroomTeam
+Disallow: /ourPartner
+Disallow: /publishers
+Disallow: /socialMedia
+Disallow: /videoManagement
+Disallow: /advertisement
+Disallow: /web
+Disallow: /test-cover-modal
+Disallow: /statistics
+Disallow: /api/
+
+# Googlebot specific rules - optimized for news indexing
+User-agent: Googlebot
+Allow: /
+Allow: /news/
+Allow: /home
+Allow: /about-us
+Allow: /video
+Allow: /latest
+Crawl-delay: 1
+
+# Googlebot News specific rules
+User-agent: Googlebot-News
+Allow: /
+Allow: /news/
+Disallow: /login
+Disallow: /dashboard
+Disallow: /api/
+
+# Sitemaps - Important for SEO and Google News
+Sitemap: https://thekhmerdailynetwork.com/sitemap.xml
+Sitemap: https://thekhmerdailynetwork.com/news-sitemap.xml

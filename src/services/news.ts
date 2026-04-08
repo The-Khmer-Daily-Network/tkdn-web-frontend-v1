@@ -1,0 +1,306 @@
+import type {
+  NewsResponse,
+  NewsCreateParams,
+  NewsUpdateParams,
+  NewsCreateResponse,
+  NewsUpdateResponse,
+  NewsDeleteResponse,
+} from "@/types/news";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  console.warn(
+    "NEXT_PUBLIC_API_BASE_URL is not defined in environment variables",
+  );
+}
+
+/**
+ * Get the full API URL with proper path
+ */
+function getApiUrl(path: string): string {
+  if (!API_BASE_URL) {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is not defined in environment variables",
+    );
+  }
+
+  // Remove trailing slash from API_BASE_URL if present
+  const baseUrl = API_BASE_URL.replace(/\/$/, "");
+  // Ensure path starts with /
+  const apiPath = path.startsWith("/") ? path : `/${path}`;
+
+  // Simply concatenate baseUrl and path since baseUrl already includes /api
+  return `${baseUrl}${apiPath}`;
+}
+
+/**
+ * Fetch latest national news (15 items)
+ */
+export async function getNationalNews(): Promise<NewsResponse> {
+  try {
+    const url = getApiUrl("/news/national");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "omit",
+      mode: "cors",
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch national news: ${response.status} ${response.statusText}. ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch latest international news (15 items)
+ */
+export async function getInternationalNews(): Promise<NewsResponse> {
+  try {
+    const url = getApiUrl("/news/international");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "omit",
+      mode: "cors",
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch international news: ${response.status} ${response.statusText}. ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch latest news videos (15 items)
+ */
+export async function getVideosNews(): Promise<NewsResponse> {
+  try {
+    const url = getApiUrl("/news/videos");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "omit",
+      mode: "cors",
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch videos: ${response.status} ${response.statusText}. ${errorText}`);
+    }
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        "Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.",
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch all news/articles
+ * @param categoryId - Optional category ID to filter news by category
+ */
+export async function getNews(categoryId?: number): Promise<NewsResponse> {
+  try {
+    let url = getApiUrl("/news");
+
+    // Add category_id query parameter if provided
+    if (categoryId !== undefined) {
+      url += `?category_id=${categoryId}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create a new news/article
+ */
+export async function createNews(
+  params: NewsCreateParams,
+): Promise<NewsCreateResponse> {
+  try {
+    const url = getApiUrl("/news");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(params),
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to create news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update a news/article
+ */
+export async function updateNews(
+  id: number,
+  params: NewsUpdateParams,
+): Promise<NewsUpdateResponse> {
+  try {
+    const url = getApiUrl(`/news/${id}`);
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(params),
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to update news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch a single news/article by ID
+ */
+export async function getNewsById(
+  id: number,
+): Promise<{ success: boolean; data: import("@/types/news").News }> {
+  try {
+    const url = getApiUrl(`/news/${id}`);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete a news/article
+ */
+export async function deleteNews(id: number): Promise<NewsDeleteResponse> {
+  try {
+    const url = getApiUrl(`/news/${id}`);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to delete news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}

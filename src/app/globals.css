@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* Khmer body: article text, image captions (AKbalthom) */
+  --font-khmer-body:
+    "AKbalthom Techno", var(--font-poppins), ui-sans-serif, system-ui,
+    sans-serif;
+  /* Khmer headings/titles only (Inter Khmer Looped from public/Khmer) */
+  --font-khmer-heading:
+    "Inter Khmer Looped", var(--font-khmer-body), ui-sans-serif, system-ui,
+    sans-serif;
+  --font-khmer: var(--font-khmer-body);
+}
+
+/* ─── AKbalthom Techno: article body & image captions (single weight) ─── */
+@font-face {
+  font-family: "AKbalthom Techno";
+  src:
+    local("AKbalthom Techno"),
+    url("/fonts/AKbalthom Techno.ttf") format("truetype");
+  font-display: swap;
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ─── Inter Khmer Looped: headers/titles only (variable font = bold works) ─── */
+@font-face {
+  font-family: "Inter Khmer Looped";
+  src: url("/Khmer/variable/InterKhmerLooped[wght].ttf") format("truetype");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Inter Khmer Looped";
+  src: url("/Khmer/variable/InterKhmerLooped-Italic[wght].ttf") format("truetype");
+  font-display: swap;
+  font-weight: 100 900;
+  font-style: italic;
+}
+
+/* Body/caption text: AKbalthom (article, image names) – allows synthetic bold when needed */
+.font-khmer,
+.font-khmer-body {
+  font-family: var(--font-khmer-body) !important;
+  font-synthesis: weight;
+}
+
+/* Headers/titles: Inter Khmer Looped (bold/semibold work via variable font) */
+.font-khmer-heading {
+  font-family: var(--font-khmer-heading) !important;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-khmer-body);
+  --font-mono: var(--font-geist-mono);
+  --font-poppins: var(--font-khmer-body);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-khmer-body);
+}
+
+* {
+  font-family: inherit;
+}
+
+@keyframes slideRight {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-slide-right {
+  animation: slideRight 20s linear infinite;
+}
+
+.animate-slide-right-responsive {
+  animation: slideRight 40s linear infinite;
+}
+
+/* Slower animation on smaller screens */
+@media (max-width: 639px) {
+  .animate-slide-right-responsive {
+    animation: slideRight 20s linear infinite;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .animate-slide-right-responsive {
+    animation: slideRight 30s linear infinite;
+  }
+}
