@@ -6,6 +6,10 @@ export interface User {
   role: string;
   created_at: string;
   updated_at: string;
+  /** When API provides them (optional today) */
+  first_name?: string;
+  last_name?: string;
+  profile_image_url?: string;
 }
 
 export interface UserResponse {
