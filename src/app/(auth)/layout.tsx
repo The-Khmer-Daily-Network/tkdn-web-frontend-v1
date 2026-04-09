@@ -11,7 +11,20 @@ export default function AuthLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isUserSME, loading, logout } = useAuth();
+  const { user, isAuthenticated, isUserSME, loading, logout } = useAuth();
+  const roleNormalized = user?.role?.trim().toUpperCase();
+  const isAdminOnly = roleNormalized === "ADMIN";
+  const adminAllowedRoutes = [
+    "/dashboard",
+    "/web",
+    "/socialMedia",
+    "/statistics",
+    "/guidelines",
+    "/videoManagement",
+    "/articleManagement",
+  ];
+  const isAllowedAdminRoute =
+    !!pathname && adminAllowedRoutes.some((route) => pathname.startsWith(route));
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -36,6 +49,39 @@ export default function AuthLayout({
   // Don't render the layout if not authenticated (redirect will happen)
   if (!isAuthenticated) {
     return null;
+  }
+
+  // "Admin" role should only access specific pages.
+  if (isAdminOnly && !isAllowedAdminRoute) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-gray-900">Access denied</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            This account can only access Analytics, Notification, Article
+            Management, and Video Management.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="cursor-pointer rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Go to Analytics
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                const redirectPath = encodeURIComponent(pathname || "/dashboard");
+                router.push(`/login?redirect=${redirectPath}`);
+              }}
+              className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Admin-only area: show a friendly access denied screen for non-admin users.
