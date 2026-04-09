@@ -11,7 +11,7 @@ export default function AuthLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isUserSME, loading, logout } = useAuth();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -36,6 +36,39 @@ export default function AuthLayout({
   // Don't render the layout if not authenticated (redirect will happen)
   if (!isAuthenticated) {
     return null;
+  }
+
+  // Admin-only area: show a friendly access denied screen for non-admin users.
+  // (In this codebase, `isUserSME` is the closest thing to an admin role.)
+  if (!isUserSME) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-gray-900">Access denied</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Your account does not have permission to access the admin dashboard.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={() => router.push("/")}
+              className="cursor-pointer rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Go home
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                const redirectPath = encodeURIComponent(pathname || "/dashboard");
+                router.push(`/login?redirect=${redirectPath}`);
+              }}
+              className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
