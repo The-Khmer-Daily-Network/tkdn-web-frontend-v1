@@ -6,11 +6,34 @@ import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/assets/TKDN_Logo/TKDN_Logo_Rectangle.jpg";
 import { useAuth } from "@/contexts/AuthContext";
+import type { User } from "@/types/auth";
+
+function getProfileDisplayName(user: User | null): string {
+  if (!user) return "Guest";
+  const first = user.first_name?.trim();
+  const last = user.last_name?.trim();
+  if (first || last) {
+    return [first, last].filter(Boolean).join(" ");
+  }
+  const u = user.username?.trim();
+  if (u?.includes(" ")) return u;
+  return u || "User";
+}
+
+function getInitialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase() || "?";
+}
 
 export default function SidebareAdmin() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isUserSME, logout } = useAuth();
+  const { user, isUserSME, logout } = useAuth();
+  const displayName = getProfileDisplayName(user);
+  const initials = getInitialsFromName(displayName);
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
 
@@ -387,30 +410,56 @@ export default function SidebareAdmin() {
         </ul>
       </nav>
 
-      {/* Logout Button at Bottom */}
+      {/* Profile + logout */}
       <div className="border-t border-gray-200 p-4">
-        <button
-          onClick={() => {
-            logout();
-            router.push("/login");
-          }}
-          className="flex justify-center w-full items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex items-center gap-3 rounded-md border border-gray-100 bg-gray-50/80 px-3 py-2.5">
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#273C8F] ring-2 ring-white">
+            {user?.profile_image_url ? (
+              <Image
+                src={user.profile_image_url}
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 object-cover"
+              />
+            ) : (
+              <span
+                className="flex h-full w-full items-center justify-center text-xs font-semibold text-white"
+                aria-hidden
+              >
+                {initials}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-900" title={displayName}>
+              {displayName}
+            </p>
+          </div>
+          <button
+            type="button"
+            title="Logout"
+            onClick={() => {
+              logout();
+              router.push("/login");
+            }}
+            className="cursor-pointer shrink-0 rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-            />
-          </svg>
-          <span>Logout</span>
-        </button>
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </aside>
   );
