@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Edit2,
@@ -15,6 +16,16 @@ import {
 import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
 import { getCategories } from "@/services/category";
 import { getPublishers } from "@/services/publisher";
+import {
+  deleteContentCover,
+  getContentCovers,
+  uploadContentCover,
+} from "@/services/contentCover";
+import {
+  deleteContentImage,
+  getContentImages,
+  uploadContentImage,
+} from "@/services/contentImage";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
 import type { Publisher } from "@/types/publisher";
@@ -34,6 +45,7 @@ interface NewsModalProps {
   news?: News | null;
   categories: Category[];
   publishers: Publisher[];
+  asPage?: boolean;
 }
 
 function NewsModal({
@@ -43,6 +55,7 @@ function NewsModal({
   news,
   categories,
   publishers,
+  asPage = false,
 }: NewsModalProps) {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [author, setAuthor] = useState("");
@@ -63,6 +76,24 @@ function NewsModal({
   const [endImageUrlInputs, setEndImageUrlInputs] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [middleImageUploading, setMiddleImageUploading] = useState(false);
+  const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
+    number | null
+  >(null);
+  const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
+  const [middleImagePendingFile, setMiddleImagePendingFile] =
+    useState<File | null>(null);
+  const [endImagePendingFiles, setEndImagePendingFiles] = useState<
+    Array<File | null>
+  >([null, null, null]);
+  const previewObjectUrlsRef = useRef<string[]>([]);
+  const originalCoverUrlRef = useRef<string | null>(null);
+  const originalMiddleImageUrlRef = useRef<string | null>(null);
+  const originalEndImageUrlsRef = useRef<Array<string | null>>([null, null, null]);
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -71,6 +102,13 @@ function NewsModal({
   const [isEndImageModalOpen, setIsEndImageModalOpen] = useState(false);
 
   useEffect(() => {
+    // Clear any pending local previews/files when switching item or opening.
+    previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    previewObjectUrlsRef.current = [];
+    setCoverPendingFile(null);
+    setMiddleImagePendingFile(null);
+    setEndImagePendingFiles([null, null, null]);
+
     if (news) {
       setCategoryId(news.category_id);
       setAuthor(news.author);
@@ -90,6 +128,13 @@ function NewsModal({
       setEndImages(
         news.end_images && news.end_images.length > 0 ? news.end_images : [],
       );
+      originalCoverUrlRef.current = news.cover ?? null;
+      originalMiddleImageUrlRef.current = news.middle_image_url ?? null;
+      originalEndImageUrlsRef.current = [
+        news.end_images?.[0]?.url ?? null,
+        news.end_images?.[1]?.url ?? null,
+        news.end_images?.[2]?.url ?? null,
+      ];
     } else {
       setCategoryId(null);
       setAuthor("");
@@ -106,9 +151,25 @@ function NewsModal({
       setMiddleVideoName(null);
       setEndImages([]);
       setEndImageUrlInputs([""]);
+      originalCoverUrlRef.current = null;
+      originalMiddleImageUrlRef.current = null;
+      originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
   }, [news, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      previewObjectUrlsRef.current = [];
+    };
+  }, []);
+
+  const queuePreviewUrl = (file: File): string => {
+    const url = URL.createObjectURL(file);
+    previewObjectUrlsRef.current.push(url);
+    return url;
+  };
 
   const handleAddContentBlock = () => {
     setContentBlocks([...contentBlocks, { subtitle: null, paragraph: "" }]);
@@ -134,12 +195,14 @@ function NewsModal({
     setCover(cover.image_url);
     setCoverName(null); // Don't auto-fill name, let user input it
     setCoverUrlInput(""); // Clear URL input when selecting from library
+    setCoverPendingFile(null);
   };
 
   const handleSelectMiddleImage = (image: ContentImage) => {
     setMiddleImageUrl(image.image_url);
     setMiddleImageName(null); // Don't auto-fill name, let user input it
     setMiddleImageUrlInput(""); // Clear URL input when selecting from library
+    setMiddleImagePendingFile(null);
     // Clear video when image is selected
     setMiddleVideoUrl(null);
     setMiddleVideoName(null);
@@ -158,6 +221,7 @@ function NewsModal({
       setEndImages([...endImages, { url: image.image_url, name: null }]); // Don't auto-fill name, let user input it
       // Clear URL inputs when selecting from library
       setEndImageUrlInputs([""]);
+      setEndImagePendingFiles([null, null, null]);
     }
   };
 
@@ -169,6 +233,7 @@ function NewsModal({
     setCoverUrlInput(url);
     if (url.trim()) {
       setCover(url.trim());
+      setCoverPendingFile(null);
     }
   };
 
@@ -176,6 +241,7 @@ function NewsModal({
     setMiddleImageUrlInput(url);
     if (url.trim()) {
       setMiddleImageUrl(url.trim());
+      setMiddleImagePendingFile(null);
       setMiddleVideoUrl(null);
       setMiddleVideoName(null);
     }
@@ -210,6 +276,62 @@ function NewsModal({
     setEndImages(validUrls.map((url) => ({ url, name: null })));
   };
 
+  const getUploadedImageUrl = (data: unknown): string | null => {
+    if (!data) return null;
+    if (Array.isArray(data)) {
+      const first = data[0] as { image_url?: string } | undefined;
+      return first?.image_url ?? null;
+    }
+    const single = data as { image_url?: string };
+    return single.image_url ?? null;
+  };
+
+  const handleSelectCoverFile = (file?: File) => {
+    if (!file) return;
+    setCoverPendingFile(file);
+    setCover(queuePreviewUrl(file));
+    setCoverUrlInput("");
+  };
+
+  const handleSelectMiddleImageFile = (file?: File) => {
+    if (!file) return;
+    setMiddleImagePendingFile(file);
+    setMiddleImageUrl(queuePreviewUrl(file));
+    setMiddleImageUrlInput("");
+    setMiddleVideoUrl(null);
+    setMiddleVideoName(null);
+  };
+
+  const handleSelectEndImageFile = (slot: number, file?: File) => {
+    if (!file) return;
+    setEndImagePendingFiles((prev) => {
+      const next = [...prev];
+      next[slot] = file;
+      return next;
+    });
+    setEndImages((prev) => {
+      const next = [...prev];
+      next[slot] = { url: queuePreviewUrl(file), name: next[slot]?.name ?? null };
+      return next;
+    });
+  };
+
+  const deleteCoverByUrlIfPresent = async (url: string) => {
+    const res = await getContentCovers();
+    const found = res.data.find((c) => c.image_url === url);
+    if (found) {
+      await deleteContentCover(found.id);
+    }
+  };
+
+  const deleteImageByUrlIfPresent = async (url: string) => {
+    const res = await getContentImages();
+    const found = res.data.find((c) => c.image_url === url);
+    if (found) {
+      await deleteContentImage(found.id);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -229,22 +351,100 @@ function NewsModal({
       setLoading(true);
       setError(null);
 
+      // Upload pending files ONLY when saving.
+      let finalCover = cover;
+      let finalMiddleImageUrl = middleImageUrl;
+      let finalEndImages: Array<EndImage | null> = [
+        endImages[0] ?? null,
+        endImages[1] ?? null,
+        endImages[2] ?? null,
+      ];
+
+      if (coverPendingFile) {
+        setCoverUploading(true);
+        const res = await uploadContentCover({ image: coverPendingFile });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("Cover upload succeeded but URL missing");
+        finalCover = imageUrl;
+      }
+
+      if (middleImagePendingFile) {
+        setMiddleImageUploading(true);
+        const res = await uploadContentImage({ image: middleImagePendingFile });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) {
+          throw new Error("Middle image upload succeeded but URL missing");
+        }
+        finalMiddleImageUrl = imageUrl;
+      }
+
+      for (let i = 0; i < 3; i++) {
+        const file = endImagePendingFiles[i];
+        if (!file) continue;
+        setEndImageUploadingIndex(i);
+        const res = await uploadContentImage({ image: file });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
+        finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
+      }
+
+      // If editing and media was replaced, delete old assets from content library (best-effort).
+      if (news) {
+        const oldCover = originalCoverUrlRef.current;
+        if (coverPendingFile && oldCover && finalCover && oldCover !== finalCover) {
+          try {
+            await deleteCoverByUrlIfPresent(oldCover);
+          } catch {
+            // best-effort delete only
+          }
+        }
+
+        const oldMiddle = originalMiddleImageUrlRef.current;
+        if (
+          middleImagePendingFile &&
+          oldMiddle &&
+          finalMiddleImageUrl &&
+          oldMiddle !== finalMiddleImageUrl
+        ) {
+          try {
+            await deleteImageByUrlIfPresent(oldMiddle);
+          } catch {
+            // best-effort delete only
+          }
+        }
+
+        for (let i = 0; i < 3; i++) {
+          const oldEnd = originalEndImageUrlsRef.current[i];
+          const newEnd = finalEndImages[i]?.url ?? null;
+          if (endImagePendingFiles[i] && oldEnd && newEnd && oldEnd !== newEnd) {
+            try {
+              await deleteImageByUrlIfPresent(oldEnd);
+            } catch {
+              // best-effort delete only
+            }
+          }
+        }
+      }
+
       const params: any = {
         category_id: categoryId || null,
         author: author.trim(),
         title: title.trim(),
-        cover: cover,
+        cover: finalCover,
         cover_name: coverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
         content_blocks: validBlocks,
-        end_images: endImages.length > 0 ? endImages : undefined,
+        end_images:
+          finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
+            ? finalEndImages.filter((img): img is EndImage => !!img?.url)
+            : undefined,
       };
 
       // For articles: only send middle_image_url, don't send middle_video_url at all
       // Backend will automatically clear middle_video_url when middle_image_url is present
       if (middleImageUrl) {
-        params.middle_image_url = middleImageUrl;
+        params.middle_image_url = finalMiddleImageUrl;
         params.middle_image_name = middleImageName;
       } else {
         // If no image, set to null to clear it
@@ -266,6 +466,9 @@ function NewsModal({
         err instanceof Error ? err.message : "Failed to save article";
       setError(errorMessage);
     } finally {
+      setCoverUploading(false);
+      setMiddleImageUploading(false);
+      setEndImageUploadingIndex(null);
       setLoading(false);
     }
   };
@@ -306,13 +509,25 @@ function NewsModal({
 
   return (
     <>
-      <div
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
-        onClick={onClose}
-      />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {!asPage && (
         <div
-          className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
+          onClick={onClose}
+        />
+      )}
+      <div
+        className={
+          asPage
+            ? "relative"
+            : "fixed inset-0 z-50 flex items-center justify-center p-4"
+        }
+      >
+        <div
+          className={
+            asPage
+              ? "bg-white rounded-lg border border-gray-200 w-full overflow-y-auto"
+              : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+          }
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
@@ -328,13 +543,18 @@ function NewsModal({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            {/* Basic Information Section */}
-            <div className="space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
+          >
+            {/* Left column: keep Details + Content Blocks together */}
+            <div className="min-w-0 space-y-6">
+              {/* Basic Information Section */}
+              <div className="space-y-4 min-w-0">
               <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
                 <div className="w-1 h-6 bg-blue-600 rounded"></div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Basic Information
+                  Details
                 </h3>
               </div>
 
@@ -405,8 +625,105 @@ function NewsModal({
               </div>
             </div>
 
-            {/* Images & Media Section - Three rows: Cover, Middle, End (3 columns) */}
-            <div className="space-y-4">
+              {/* Content Blocks Section */}
+              <div className="space-y-4 min-w-0">
+                <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Content Blocks <span className="text-red-500">*</span>
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddContentBlock}
+                    className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
+                    disabled={loading}
+                  >
+                    <Plus size={14} />
+                    Add Block
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {contentBlocks.map((block, index) => (
+                    <div
+                      key={index}
+                      className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                            <span className="text-xs font-semibold text-blue-600">
+                              {index + 1}
+                            </span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">
+                            Block {index + 1}
+                          </span>
+                        </div>
+                        {contentBlocks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveContentBlock(index)}
+                            className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
+                            disabled={loading}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2.5">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Subtitle{" "}
+                            <span className="text-gray-400 font-normal">
+                              (Optional)
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            value={block.subtitle || ""}
+                            onChange={(e) =>
+                              handleUpdateContentBlock(
+                                index,
+                                "subtitle",
+                                e.target.value || null,
+                              )
+                            }
+                            placeholder="Enter a subtitle for this block (optional)..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                            disabled={loading}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Content <span className="text-red-500">*</span>
+                          </label>
+                          <textarea
+                            value={block.paragraph}
+                            onChange={(e) =>
+                              handleUpdateContentBlock(
+                                index,
+                                "paragraph",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Enter the main content for this block..."
+                            rows={4}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                            disabled={loading}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Images & Media Section - right column (vertical column layout) */}
+            <div className="space-y-4 lg:border-l lg:border-gray-200 lg:pl-6 min-w-0">
               <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
                 <div className="w-1 h-6 bg-blue-600 rounded"></div>
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -414,113 +731,124 @@ function NewsModal({
                 </h3>
               </div>
 
-              {/* Row 1: Cover Image */}
+              {/* Cover Image */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Cover Image
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Left column: select from library OR enter URL */}
-                  <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
-                        Cover source
-                      </span>
-                      {cover && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCover(null);
-                            setCoverName(null);
-                            setCoverUrlInput("");
-                          }}
-                          className="cursor-pointer px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                          disabled={loading}
-                        >
-                          Remove
-                        </button>
-                      )}
+                {cover ? (
+                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="relative shrink-0">
+                      <img
+                        src={cover}
+                        alt="Cover"
+                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCover(null);
+                          setCoverName(null);
+                          setCoverUrlInput("");
+                        }}
+                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                        disabled={loading || coverUploading}
+                      >
+                        <X size={12} />
+                      </button>
                     </div>
-
-                    {cover ? (
-                      <div className="relative w-full aspect-100/53 rounded-lg overflow-hidden border border-gray-300 bg-white">
-                        <img
-                          src={cover}
-                          alt="Cover"
-                          className="w-full h-full object-cover"
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Image Name{" "}
+                          <span className="text-gray-400 font-normal">
+                            (Optional)
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={coverName || ""}
+                          onChange={(e) => setCoverName(e.target.value || null)}
+                          placeholder="Enter image name (optional)..."
+                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                          disabled={loading}
                         />
                       </div>
-                    ) : (
-                      <div className="w-full aspect-100/53 rounded-lg border-2 border-dashed border-gray-300 bg-white flex items-center justify-center">
-                        <div className="flex flex-col items-center text-center px-4">
-                          <ImageIcon className="w-6 h-6 text-gray-400 mb-2" />
-                          <p className="text-sm text-gray-600">
-                            No cover selected
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
+                      <button
+                        type="button"
+                        onClick={() => coverFileInputRef.current?.click()}
+                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
+                        disabled={loading || coverUploading}
+                      >
+                        {coverUploading ? "Uploading..." : "Change Image"}
+                      </button>
+                      <input
+                        ref={coverFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        className="hidden"
+                        onChange={(e) =>
+                          handleSelectCoverFile(e.target.files?.[0])
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
                     <button
                       type="button"
-                      onClick={() => setIsCoverModalOpen(true)}
-                      className="w-full cursor-pointer px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                      disabled={loading}
+                      onClick={() => coverFileInputRef.current?.click()}
+                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
+                      disabled={loading || coverUploading}
                     >
-                      Select from library
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
+                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">
+                          Select Cover Image
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Click to upload from your computer
+                        </p>
+                      </div>
                     </button>
-
+                    <input
+                      ref={coverFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="hidden"
+                      onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                    />
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-gray-300"></div>
                       <span className="text-xs text-gray-500">OR</span>
                       <div className="flex-1 border-t border-gray-300"></div>
                     </div>
-
                     <input
                       type="url"
                       value={coverUrlInput}
                       onChange={(e) => handleCoverUrlChange(e.target.value)}
-                      placeholder="Enter image URL"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                      placeholder="Enter image URL..."
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
                       disabled={loading}
                     />
                   </div>
-
-                  {/* Right column: image name only */}
-                  <div className="space-y-2 p-4 bg-white rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Image Name{" "}
-                      <span className="text-xs font-normal text-gray-500">
-                        (Optional)
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={coverName || ""}
-                      onChange={(e) => setCoverName(e.target.value || null)}
-                      placeholder="Enter image name..."
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Used as a display name for the cover image.
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Row 2: Middle Image */}
+              {/* Middle Image */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   Middle Image
                 </label>
                 {middleImageUrl ? (
-                  <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="relative shrink-0">
                       <img
                         src={middleImageUrl}
                         alt="Middle"
-                        className="w-20 h-20 object-cover rounded-lg border border-gray-300 shadow-sm"
+                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
                       />
                       <button
                         type="button"
@@ -529,410 +857,210 @@ function NewsModal({
                           setMiddleImageName(null);
                           setMiddleImageUrlInput("");
                         }}
-                        className="absolute -top-1.5 -right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading}
+                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                        disabled={loading || middleImageUploading}
                       >
-                        <X size={10} />
+                        <X size={12} />
                       </button>
                     </div>
-                    <div className="flex-1 min-w-[200px] flex items-center gap-3 flex-wrap">
-                      <input
-                        type="text"
-                        value={middleImageName || ""}
-                        onChange={(e) =>
-                          setMiddleImageName(e.target.value || null)
-                        }
-                        placeholder="Image name (optional)"
-                        className="flex-1 min-w-[140px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                        disabled={loading || !!middleVideoUrl}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsMiddleImageModalOpen(true)}
-                        className="cursor-pointer px-3 py-2 text-sm bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={loading || !!middleVideoUrl}
-                      >
-                        Change Image
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsMiddleImageModalOpen(true)}
-                      className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 px-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={loading || !!middleVideoUrl}
-                    >
-                      <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600 shrink-0" />
-                      <span className="text-sm font-medium text-gray-700">
-                        Select from library
-                      </span>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <input
-                        type="url"
-                        value={middleImageUrlInput}
-                        onChange={(e) =>
-                          handleMiddleImageUrlChange(e.target.value)
-                        }
-                        placeholder="Enter image URL"
-                        className="flex-1 min-w-[180px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={loading || !!middleVideoUrl}
-                      />
-                      <input
-                        type="text"
-                        value={middleImageName || ""}
-                        onChange={(e) =>
-                          setMiddleImageName(e.target.value || null)
-                        }
-                        placeholder="Image name (optional)"
-                        className="flex-1 min-w-[140px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={loading || !!middleVideoUrl}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Row 3: End Images (max 3 columns in one row) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-700">
-                    End Images{" "}
-                    <span className="text-gray-500 font-normal">(Max 3)</span>
-                  </label>
-                  {endImages.length < 3 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEndImageModalOpen(true)}
-                      className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
-                      disabled={loading}
-                    >
-                      <Plus size={12} />
-                      Add from library
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Column 1 */}
-                  <div className="min-w-0">
-                    {endImages[0] ? (
-                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-                        <div className="relative group aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
-                          <img
-                            src={endImages[0].url}
-                            alt={endImages[0].name || "End 1"}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleRemoveEndImage(0);
-                            }}
-                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                            disabled={loading}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={endImages[0].name || ""}
-                          onChange={(e) => {
-                            const updated = [...endImages];
-                            updated[0] = {
-                              ...updated[0],
-                              name: e.target.value || null,
-                            };
-                            setEndImages(updated);
-                          }}
-                          placeholder="Name (optional)"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-3 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50/50 space-y-2">
-                        <input
-                          type="url"
-                          value={endImageUrlInputs[0] || ""}
-                          onChange={(e) =>
-                            handleEndImageUrlChange(0, e.target.value)
-                          }
-                          placeholder="Enter image URL"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                        {endImageUrlInputs.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEndImageUrl(0)}
-                            className="text-xs text-red-600 hover:underline"
-                            disabled={loading}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {/* Column 2 */}
-                  <div className="min-w-0">
-                    {endImages[1] ? (
-                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-                        <div className="relative group aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
-                          <img
-                            src={endImages[1].url}
-                            alt={endImages[1].name || "End 2"}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleRemoveEndImage(1);
-                            }}
-                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                            disabled={loading}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={endImages[1].name || ""}
-                          onChange={(e) => {
-                            const updated = [...endImages];
-                            updated[1] = {
-                              ...updated[1],
-                              name: e.target.value || null,
-                            };
-                            setEndImages(updated);
-                          }}
-                          placeholder="Name (optional)"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-3 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50/50 space-y-2">
-                        <input
-                          type="url"
-                          value={endImageUrlInputs[1] ?? ""}
-                          onChange={(e) =>
-                            handleEndImageUrlChange(1, e.target.value)
-                          }
-                          placeholder="Enter image URL"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                        {endImageUrlInputs.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEndImageUrl(1)}
-                            className="text-xs text-red-600 hover:underline"
-                            disabled={loading}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {/* Column 3 */}
-                  <div className="min-w-0">
-                    {endImages[2] ? (
-                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-                        <div className="relative group aspect-square rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
-                          <img
-                            src={endImages[2].url}
-                            alt={endImages[2].name || "End 3"}
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleRemoveEndImage(2);
-                            }}
-                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                            disabled={loading}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={endImages[2].name || ""}
-                          onChange={(e) => {
-                            const updated = [...endImages];
-                            updated[2] = {
-                              ...updated[2],
-                              name: e.target.value || null,
-                            };
-                            setEndImages(updated);
-                          }}
-                          placeholder="Name (optional)"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-3 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50/50 space-y-2">
-                        <input
-                          type="url"
-                          value={endImageUrlInputs[2] ?? ""}
-                          onChange={(e) =>
-                            handleEndImageUrlChange(2, e.target.value)
-                          }
-                          placeholder="Enter image URL"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                        {endImageUrlInputs.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEndImageUrl(2)}
-                            className="text-xs text-red-600 hover:underline"
-                            disabled={loading}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {endImages.length < 3 && (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 border-t border-gray-300"></div>
-                    <span className="text-xs text-gray-500">
-                      OR add via URL in a column above
-                    </span>
-                    <div className="flex-1 border-t border-gray-300"></div>
-                  </div>
-                )}
-                {endImageUrlInputs.length < 3 && endImages.length < 3 && (
-                  <button
-                    type="button"
-                    onClick={handleAddEndImageUrl}
-                    className="w-full px-3 py-2 text-xs border border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-gray-600"
-                    disabled={loading}
-                  >
-                    + Add another URL slot
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Content Blocks Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Content Blocks <span className="text-red-500">*</span>
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddContentBlock}
-                  className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
-                  disabled={loading}
-                >
-                  <Plus size={14} />
-                  Add Block
-                </button>
-              </div>
-              <div className="space-y-3">
-                {contentBlocks.map((block, index) => (
-                  <div
-                    key={index}
-                    className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                          <span className="text-xs font-semibold text-blue-600">
-                            {index + 1}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-700">
-                          Block {index + 1}
-                        </span>
-                      </div>
-                      {contentBlocks.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveContentBlock(index)}
-                          className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
-                          disabled={loading}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-2.5">
+                    <div className="flex-1 min-w-0 space-y-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Subtitle{" "}
+                          Image Name{" "}
                           <span className="text-gray-400 font-normal">
                             (Optional)
                           </span>
                         </label>
                         <input
                           type="text"
-                          value={block.subtitle || ""}
+                          value={middleImageName || ""}
                           onChange={(e) =>
-                            handleUpdateContentBlock(
-                              index,
-                              "subtitle",
-                              e.target.value || null,
-                            )
+                            setMiddleImageName(e.target.value || null)
                           }
-                          placeholder="Enter a subtitle for this block (optional)..."
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                          placeholder="Enter image name (optional)..."
+                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
                           disabled={loading}
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Content <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                          value={block.paragraph}
-                          onChange={(e) =>
-                            handleUpdateContentBlock(
-                              index,
-                              "paragraph",
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Enter the main content for this block..."
-                          rows={4}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                          required
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => middleImageFileInputRef.current?.click()}
+                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
+                        disabled={loading || middleImageUploading}
+                      >
+                        {middleImageUploading ? "Uploading..." : "Change Image"}
+                      </button>
+                      <input
+                        ref={middleImageFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        className="hidden"
+                        onChange={(e) =>
+                          handleSelectMiddleImageFile(e.target.files?.[0])
+                        }
+                      />
                     </div>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => middleImageFileInputRef.current?.click()}
+                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
+                      disabled={loading || middleImageUploading}
+                    >
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
+                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-700 mb-1">
+                          Select Middle Image
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Click to upload from your computer
+                        </p>
+                      </div>
+                    </button>
+                    <input
+                      ref={middleImageFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleSelectMiddleImageFile(e.target.files?.[0])
+                      }
+                    />
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 border-t border-gray-300"></div>
+                      <span className="text-xs text-gray-500">OR</span>
+                      <div className="flex-1 border-t border-gray-300"></div>
+                    </div>
+                    <input
+                      type="url"
+                      value={middleImageUrlInput}
+                      onChange={(e) => handleMiddleImageUrlChange(e.target.value)}
+                      placeholder="Enter image URL..."
+                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* End Images (stacked slots) */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  End Images{" "}
+                  <span className="text-xs font-normal text-gray-500">
+                    (Max 3)
+                  </span>
+                </label>
+                <div className="space-y-3">
+                  {[0, 1, 2].map((slotIndex) => {
+                    const img = endImages[slotIndex];
+                    const isUploading = endImageUploadingIndex === slotIndex;
+                    return (
+                      <div key={slotIndex} className="space-y-2">
+                        {img ? (
+                          <>
+                            <div className="relative group">
+                              <div className="relative aspect-square rounded-lg border border-gray-300 overflow-hidden bg-gray-100">
+                                <img
+                                  src={img.url}
+                                  alt={img.name || `End ${slotIndex + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveEndImage(slotIndex)}
+                                  className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
+                                  disabled={loading || isUploading}
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Name{" "}
+                                <span className="text-gray-400 font-normal">
+                                  (Optional)
+                                </span>
+                              </label>
+                              <input
+                                type="text"
+                                value={img.name || ""}
+                                onChange={(e) => {
+                                  const updated = [...endImages];
+                                  updated[slotIndex] = {
+                                    ...updated[slotIndex],
+                                    name: e.target.value || null,
+                                  };
+                                  setEndImages(updated);
+                                }}
+                                placeholder="Enter name (optional)..."
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                                disabled={loading || isUploading}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                endImageFileInputRefs.current[slotIndex]?.click()
+                              }
+                              className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
+                              disabled={loading || isUploading}
+                            >
+                              <div className="flex flex-col items-center">
+                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
+                                  <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
+                                </div>
+                                <p className="text-xs font-medium text-gray-700 mb-0.5">
+                                  {isUploading
+                                    ? "Uploading..."
+                                    : `Select End Image ${slotIndex + 1}`}
+                                </p>
+                                {!isUploading && (
+                                  <p className="text-[11px] text-gray-500">
+                                    Click to upload from your computer
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg"
+                              className="hidden"
+                              ref={(el) => {
+                                endImageFileInputRefs.current[slotIndex] = el;
+                              }}
+                              onChange={(e) =>
+                                handleSelectEndImageFile(
+                                  slotIndex,
+                                  e.target.files?.[0],
+                                )
+                              }
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="order-4 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
             {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <div className="order-5 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
@@ -980,6 +1108,9 @@ function NewsModal({
 }
 
 export default function ArticleManagement() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [articles, setArticles] = useState<News[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [publishers, setPublishers] = useState<Publisher[]>([]);
@@ -988,13 +1119,15 @@ export default function ArticleManagement() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modal states
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<News | null>(null);
-
   // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
   const hasFetchedRef = useRef(false);
+  const mode = searchParams.get("mode");
+  const editId = Number(searchParams.get("id"));
+  const isCreatePage = mode === "create";
+  const isEditPage = mode === "edit" && Number.isFinite(editId);
+  const selectedArticle = isEditPage
+    ? articles.find((article) => article.id === editId) || null
+    : null;
 
   useEffect(() => {
     // Prevent duplicate calls in React Strict Mode (development)
@@ -1075,13 +1208,15 @@ export default function ArticleManagement() {
   };
 
   const handleCreateArticle = () => {
-    setSelectedArticle(null);
-    setIsCreateModalOpen(true);
+    router.push(`${pathname}?mode=create`);
   };
 
   const handleEditArticle = (article: News) => {
-    setSelectedArticle(article);
-    setIsEditModalOpen(true);
+    router.push(`${pathname}?mode=edit&id=${article.id}`);
+  };
+
+  const closeEditorPage = () => {
+    router.push(pathname);
   };
 
   const handleDelete = async (id: number) => {
@@ -1144,6 +1279,25 @@ export default function ArticleManagement() {
     );
   }
   
+
+  if (isCreatePage || isEditPage) {
+    return (
+      <div className="h-screen overflow-y-auto p-4">
+        <NewsModal
+          isOpen
+          asPage
+          onClose={closeEditorPage}
+          onSuccess={async () => {
+            await fetchData();
+            closeEditorPage();
+          }}
+          news={isEditPage ? selectedArticle : null}
+          categories={categories}
+          publishers={publishers}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen flex flex-col">
@@ -1372,26 +1526,6 @@ export default function ArticleManagement() {
         )}
       </div>
 
-      {/* Modals */}
-      <NewsModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={fetchData}
-        categories={categories}
-        publishers={publishers}
-      />
-
-      <NewsModal
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false);
-          setSelectedArticle(null);
-        }}
-        onSuccess={fetchData}
-        news={selectedArticle}
-        categories={categories}
-        publishers={publishers}
-      />
     </div>
   );
 }
