@@ -33,6 +33,8 @@ export default function SidebareAdmin() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isUserSME, logout } = useAuth();
+  const roleNormalized = user?.role?.trim().toUpperCase();
+  const isAdminOnly = roleNormalized === "ADMIN";
   const displayName = getProfileDisplayName(user);
   const initials = getInitialsFromName(displayName);
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -114,6 +116,91 @@ export default function SidebareAdmin() {
       {/* Navigation Menu */}
       <nav className="flex-1 overflow-y-auto p-4">
         <ul className="space-y-2">
+          {isAdminOnly ? (
+            <>
+              <li>
+                <button
+                  onClick={() => setDashboardOpen(!dashboardOpen)}
+                  className="cursor-pointer w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  <span>Analytics</span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${
+                      dashboardOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+                {dashboardOpen && (
+                  <ul className="ml-4 mt-2 space-y-1">
+                    <li>
+                      <Link
+                        href="/dashboard"
+                        className={getLinkClasses("/dashboard", true)}
+                      >
+                        Dashboard
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/web" className={getLinkClasses("/web", true)}>
+                        Web
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        href="/socialMedia"
+                        className={getLinkClasses("/socialMedia", true)}
+                      >
+                        Social Media
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        href="/statistics"
+                        className={getLinkClasses("/statistics", true)}
+                      >
+                        Statistics
+                      </Link>
+                    </li>
+                  </ul>
+                )}
+              </li>
+              <li>
+                <Link
+                  href="/articleManagement"
+                  className={getLinkClasses("/articleManagement")}
+                >
+                  Article Management
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/videoManagement"
+                  className={getLinkClasses("/videoManagement")}
+                >
+                  Video Management
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/guidelines"
+                  className={getLinkClasses("/guidelines")}
+                >
+                  Notification
+                </Link>
+              </li>
+            </>
+          ) : (
+            <>
           {/* Dashboard with Dropdown */}
           <li>
             <button
@@ -195,7 +282,7 @@ export default function SidebareAdmin() {
           {/* Guidelines (UI only for now) */}
           <li>
             <Link href="/guidelines" className={getLinkClasses("/guidelines")}>
-              Guidelines
+              Notification
             </Link>
           </li>
 
@@ -447,6 +534,8 @@ export default function SidebareAdmin() {
               </>
             )}
           </li>
+            </>
+          )}
         </ul>
       </nav>
 
