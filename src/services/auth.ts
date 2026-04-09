@@ -138,8 +138,10 @@ export function isAuthenticated(): boolean {
 }
 
 /**
- * Check if user has SME role
+ * Check if user can access admin features.
+ * Keeps backward-compat name because many components still call isSME().
  */
 export function isSME(user: User | null): boolean {
-  return user?.role === "SME";
+  const role = user?.role?.trim().toUpperCase();
+  return role === "SME" || role === "ADMIN" || role === "SUPER_ADMIN";
 }
