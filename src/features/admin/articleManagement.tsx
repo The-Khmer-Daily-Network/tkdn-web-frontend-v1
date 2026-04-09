@@ -16,8 +16,16 @@ import {
 import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
 import { getCategories } from "@/services/category";
 import { getPublishers } from "@/services/publisher";
-import { uploadContentCover } from "@/services/contentCover";
-import { uploadContentImage } from "@/services/contentImage";
+import {
+  deleteContentCover,
+  getContentCovers,
+  uploadContentCover,
+} from "@/services/contentCover";
+import {
+  deleteContentImage,
+  getContentImages,
+  uploadContentImage,
+} from "@/services/contentImage";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
 import type { Publisher } from "@/types/publisher";
@@ -73,6 +81,16 @@ function NewsModal({
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
   >(null);
+  const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
+  const [middleImagePendingFile, setMiddleImagePendingFile] =
+    useState<File | null>(null);
+  const [endImagePendingFiles, setEndImagePendingFiles] = useState<
+    Array<File | null>
+  >([null, null, null]);
+  const previewObjectUrlsRef = useRef<string[]>([]);
+  const originalCoverUrlRef = useRef<string | null>(null);
+  const originalMiddleImageUrlRef = useRef<string | null>(null);
+  const originalEndImageUrlsRef = useRef<Array<string | null>>([null, null, null]);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -84,6 +102,13 @@ function NewsModal({
   const [isEndImageModalOpen, setIsEndImageModalOpen] = useState(false);
 
   useEffect(() => {
+    // Clear any pending local previews/files when switching item or opening.
+    previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    previewObjectUrlsRef.current = [];
+    setCoverPendingFile(null);
+    setMiddleImagePendingFile(null);
+    setEndImagePendingFiles([null, null, null]);
+
     if (news) {
       setCategoryId(news.category_id);
       setAuthor(news.author);
@@ -103,6 +128,13 @@ function NewsModal({
       setEndImages(
         news.end_images && news.end_images.length > 0 ? news.end_images : [],
       );
+      originalCoverUrlRef.current = news.cover ?? null;
+      originalMiddleImageUrlRef.current = news.middle_image_url ?? null;
+      originalEndImageUrlsRef.current = [
+        news.end_images?.[0]?.url ?? null,
+        news.end_images?.[1]?.url ?? null,
+        news.end_images?.[2]?.url ?? null,
+      ];
     } else {
       setCategoryId(null);
       setAuthor("");
@@ -119,9 +151,25 @@ function NewsModal({
       setMiddleVideoName(null);
       setEndImages([]);
       setEndImageUrlInputs([""]);
+      originalCoverUrlRef.current = null;
+      originalMiddleImageUrlRef.current = null;
+      originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
   }, [news, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      previewObjectUrlsRef.current = [];
+    };
+  }, []);
+
+  const queuePreviewUrl = (file: File): string => {
+    const url = URL.createObjectURL(file);
+    previewObjectUrlsRef.current.push(url);
+    return url;
+  };
 
   const handleAddContentBlock = () => {
     setContentBlocks([...contentBlocks, { subtitle: null, paragraph: "" }]);
@@ -147,12 +195,14 @@ function NewsModal({
     setCover(cover.image_url);
     setCoverName(null); // Don't auto-fill name, let user input it
     setCoverUrlInput(""); // Clear URL input when selecting from library
+    setCoverPendingFile(null);
   };
 
   const handleSelectMiddleImage = (image: ContentImage) => {
     setMiddleImageUrl(image.image_url);
     setMiddleImageName(null); // Don't auto-fill name, let user input it
     setMiddleImageUrlInput(""); // Clear URL input when selecting from library
+    setMiddleImagePendingFile(null);
     // Clear video when image is selected
     setMiddleVideoUrl(null);
     setMiddleVideoName(null);
@@ -171,6 +221,7 @@ function NewsModal({
       setEndImages([...endImages, { url: image.image_url, name: null }]); // Don't auto-fill name, let user input it
       // Clear URL inputs when selecting from library
       setEndImageUrlInputs([""]);
+      setEndImagePendingFiles([null, null, null]);
     }
   };
 
@@ -182,6 +233,7 @@ function NewsModal({
     setCoverUrlInput(url);
     if (url.trim()) {
       setCover(url.trim());
+      setCoverPendingFile(null);
     }
   };
 
@@ -189,6 +241,7 @@ function NewsModal({
     setMiddleImageUrlInput(url);
     if (url.trim()) {
       setMiddleImageUrl(url.trim());
+      setMiddleImagePendingFile(null);
       setMiddleVideoUrl(null);
       setMiddleVideoName(null);
     }
@@ -233,63 +286,49 @@ function NewsModal({
     return single.image_url ?? null;
   };
 
-  const handleUploadCover = async (file?: File) => {
+  const handleSelectCoverFile = (file?: File) => {
     if (!file) return;
-    try {
-      setCoverUploading(true);
-      setError(null);
-      const res = await uploadContentCover({ image: file });
-      const imageUrl = getUploadedImageUrl(res.data);
-      if (!imageUrl) throw new Error("Upload succeeded but image URL is missing");
-      setCover(imageUrl);
-      setCoverUrlInput("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload cover");
-    } finally {
-      setCoverUploading(false);
-      if (coverFileInputRef.current) coverFileInputRef.current.value = "";
+    setCoverPendingFile(file);
+    setCover(queuePreviewUrl(file));
+    setCoverUrlInput("");
+  };
+
+  const handleSelectMiddleImageFile = (file?: File) => {
+    if (!file) return;
+    setMiddleImagePendingFile(file);
+    setMiddleImageUrl(queuePreviewUrl(file));
+    setMiddleImageUrlInput("");
+    setMiddleVideoUrl(null);
+    setMiddleVideoName(null);
+  };
+
+  const handleSelectEndImageFile = (slot: number, file?: File) => {
+    if (!file) return;
+    setEndImagePendingFiles((prev) => {
+      const next = [...prev];
+      next[slot] = file;
+      return next;
+    });
+    setEndImages((prev) => {
+      const next = [...prev];
+      next[slot] = { url: queuePreviewUrl(file), name: next[slot]?.name ?? null };
+      return next;
+    });
+  };
+
+  const deleteCoverByUrlIfPresent = async (url: string) => {
+    const res = await getContentCovers();
+    const found = res.data.find((c) => c.image_url === url);
+    if (found) {
+      await deleteContentCover(found.id);
     }
   };
 
-  const handleUploadMiddleImage = async (file?: File) => {
-    if (!file) return;
-    try {
-      setMiddleImageUploading(true);
-      setError(null);
-      const res = await uploadContentImage({ image: file });
-      const imageUrl = getUploadedImageUrl(res.data);
-      if (!imageUrl) throw new Error("Upload succeeded but image URL is missing");
-      setMiddleImageUrl(imageUrl);
-      setMiddleImageUrlInput("");
-      setMiddleVideoUrl(null);
-      setMiddleVideoName(null);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to upload middle image",
-      );
-    } finally {
-      setMiddleImageUploading(false);
-      if (middleImageFileInputRef.current) middleImageFileInputRef.current.value = "";
-    }
-  };
-
-  const handleUploadEndImageAt = async (slot: number, file?: File) => {
-    if (!file) return;
-    try {
-      setEndImageUploadingIndex(slot);
-      setError(null);
-      const res = await uploadContentImage({ image: file });
-      const imageUrl = getUploadedImageUrl(res.data);
-      if (!imageUrl) throw new Error("Upload succeeded but image URL is missing");
-      const updated = [...endImages];
-      updated[slot] = { url: imageUrl, name: updated[slot]?.name ?? null };
-      setEndImages(updated);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload end image");
-    } finally {
-      setEndImageUploadingIndex(null);
-      const input = endImageFileInputRefs.current[slot];
-      if (input) input.value = "";
+  const deleteImageByUrlIfPresent = async (url: string) => {
+    const res = await getContentImages();
+    const found = res.data.find((c) => c.image_url === url);
+    if (found) {
+      await deleteContentImage(found.id);
     }
   };
 
@@ -312,25 +351,100 @@ function NewsModal({
       setLoading(true);
       setError(null);
 
+      // Upload pending files ONLY when saving.
+      let finalCover = cover;
+      let finalMiddleImageUrl = middleImageUrl;
+      let finalEndImages: Array<EndImage | null> = [
+        endImages[0] ?? null,
+        endImages[1] ?? null,
+        endImages[2] ?? null,
+      ];
+
+      if (coverPendingFile) {
+        setCoverUploading(true);
+        const res = await uploadContentCover({ image: coverPendingFile });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("Cover upload succeeded but URL missing");
+        finalCover = imageUrl;
+      }
+
+      if (middleImagePendingFile) {
+        setMiddleImageUploading(true);
+        const res = await uploadContentImage({ image: middleImagePendingFile });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) {
+          throw new Error("Middle image upload succeeded but URL missing");
+        }
+        finalMiddleImageUrl = imageUrl;
+      }
+
+      for (let i = 0; i < 3; i++) {
+        const file = endImagePendingFiles[i];
+        if (!file) continue;
+        setEndImageUploadingIndex(i);
+        const res = await uploadContentImage({ image: file });
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
+        finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
+      }
+
+      // If editing and media was replaced, delete old assets from content library (best-effort).
+      if (news) {
+        const oldCover = originalCoverUrlRef.current;
+        if (coverPendingFile && oldCover && finalCover && oldCover !== finalCover) {
+          try {
+            await deleteCoverByUrlIfPresent(oldCover);
+          } catch {
+            // best-effort delete only
+          }
+        }
+
+        const oldMiddle = originalMiddleImageUrlRef.current;
+        if (
+          middleImagePendingFile &&
+          oldMiddle &&
+          finalMiddleImageUrl &&
+          oldMiddle !== finalMiddleImageUrl
+        ) {
+          try {
+            await deleteImageByUrlIfPresent(oldMiddle);
+          } catch {
+            // best-effort delete only
+          }
+        }
+
+        for (let i = 0; i < 3; i++) {
+          const oldEnd = originalEndImageUrlsRef.current[i];
+          const newEnd = finalEndImages[i]?.url ?? null;
+          if (endImagePendingFiles[i] && oldEnd && newEnd && oldEnd !== newEnd) {
+            try {
+              await deleteImageByUrlIfPresent(oldEnd);
+            } catch {
+              // best-effort delete only
+            }
+          }
+        }
+      }
+
       const params: any = {
         category_id: categoryId || null,
         author: author.trim(),
         title: title.trim(),
-        cover: cover,
+        cover: finalCover,
         cover_name: coverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
         content_blocks: validBlocks,
         end_images:
-          endImages.filter((img): img is EndImage => !!img?.url).length > 0
-            ? endImages.filter((img): img is EndImage => !!img?.url)
+          finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
+            ? finalEndImages.filter((img): img is EndImage => !!img?.url)
             : undefined,
       };
 
       // For articles: only send middle_image_url, don't send middle_video_url at all
       // Backend will automatically clear middle_video_url when middle_image_url is present
       if (middleImageUrl) {
-        params.middle_image_url = middleImageUrl;
+        params.middle_image_url = finalMiddleImageUrl;
         params.middle_image_name = middleImageName;
       } else {
         // If no image, set to null to clear it
@@ -352,6 +466,9 @@ function NewsModal({
         err instanceof Error ? err.message : "Failed to save article";
       setError(errorMessage);
     } finally {
+      setCoverUploading(false);
+      setMiddleImageUploading(false);
+      setEndImageUploadingIndex(null);
       setLoading(false);
     }
   };
@@ -670,7 +787,9 @@ function NewsModal({
                         type="file"
                         accept="image/png,image/jpeg,image/jpg"
                         className="hidden"
-                        onChange={(e) => handleUploadCover(e.target.files?.[0])}
+                        onChange={(e) =>
+                          handleSelectCoverFile(e.target.files?.[0])
+                        }
                       />
                     </div>
                   </div>
@@ -699,7 +818,7 @@ function NewsModal({
                       type="file"
                       accept="image/png,image/jpeg,image/jpg"
                       className="hidden"
-                      onChange={(e) => handleUploadCover(e.target.files?.[0])}
+                      onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
                     />
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-gray-300"></div>
@@ -777,7 +896,7 @@ function NewsModal({
                         accept="image/png,image/jpeg,image/jpg"
                         className="hidden"
                         onChange={(e) =>
-                          handleUploadMiddleImage(e.target.files?.[0])
+                          handleSelectMiddleImageFile(e.target.files?.[0])
                         }
                       />
                     </div>
@@ -808,7 +927,7 @@ function NewsModal({
                       accept="image/png,image/jpeg,image/jpg"
                       className="hidden"
                       onChange={(e) =>
-                        handleUploadMiddleImage(e.target.files?.[0])
+                        handleSelectMiddleImageFile(e.target.files?.[0])
                       }
                     />
                     <div className="flex items-center gap-2">
@@ -919,7 +1038,7 @@ function NewsModal({
                                 endImageFileInputRefs.current[slotIndex] = el;
                               }}
                               onChange={(e) =>
-                                handleUploadEndImageAt(
+                                handleSelectEndImageFile(
                                   slotIndex,
                                   e.target.files?.[0],
                                 )
