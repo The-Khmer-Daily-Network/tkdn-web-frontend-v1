@@ -3,6 +3,7 @@ export interface User {
   gmail: string;
   password: string;
   username: string;
+  nickname?: string;
   role: string;
   created_at: string;
   updated_at: string;

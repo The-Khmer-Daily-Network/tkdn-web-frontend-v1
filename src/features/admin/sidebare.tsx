@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Logo from "@/assets/TKDN_Logo/TKDN_Logo_Rectangle.jpg";
 import { useAuth } from "@/contexts/AuthContext";
+import { updateUserPassword } from "@/services/auth";
 import type { User } from "@/types/auth";
 
 function getProfileDisplayName(user: User | null): string {
@@ -32,7 +33,7 @@ function getInitialsFromName(name: string): string {
 export default function SidebareAdmin() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isUserSME, logout } = useAuth();
+  const { user, isUserSME, logout, refreshUser } = useAuth();
   const roleNormalized = user?.role?.trim().toUpperCase();
   const isAdminOnly = roleNormalized === "ADMIN";
   const displayName = getProfileDisplayName(user);
@@ -42,6 +43,57 @@ export default function SidebareAdmin() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
+
+  const openEditProfileModal = () => {
+    setProfileError(null);
+    setProfileSuccess(null);
+    setNewPassword("");
+    setConfirmPassword("");
+    setIsProfileModalOpen(true);
+  };
+
+  const closeEditProfileModal = () => {
+    if (profileSaving) return;
+    setIsProfileModalOpen(false);
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) {
+      setProfileError("No active user found.");
+      return;
+    }
+    if (!newPassword.trim()) {
+      setProfileError("Password is required.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setProfileError("Password confirmation does not match.");
+      return;
+    }
+
+    try {
+      setProfileSaving(true);
+      setProfileError(null);
+      setProfileSuccess(null);
+      await updateUserPassword(user.id, newPassword.trim());
+      refreshUser();
+      setProfileSuccess("Password updated successfully.");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setProfileError(
+        error instanceof Error ? error.message : "Failed to update password.",
+      );
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -559,7 +611,7 @@ export default function SidebareAdmin() {
             <button
               onClick={() => {
                 setProfileOpen(false);
-                setIsProfileModalOpen(true);
+                openEditProfileModal();
               }}
               className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-sm text-[#273C8F] hover:bg-blue-50 rounded-md transition-colors"
             >
@@ -612,7 +664,7 @@ export default function SidebareAdmin() {
             <div
               className="fixed inset-0 bg-black/30 backdrop-blur-sm"
               style={{ zIndex: 10000 }}
-              onClick={() => setIsProfileModalOpen(false)}
+              onClick={closeEditProfileModal}
             />
             <div
               className="fixed inset-0 flex items-center justify-center p-4"
@@ -626,24 +678,130 @@ export default function SidebareAdmin() {
                   <h3 className="text-lg font-semibold text-[#1D2229]">
                     Edit Profile
                   </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    This UI is ready, but the API is not implemented yet.
-                  </p>
                 </div>
-                <div className="px-5 py-4">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Password change endpoint is not available in TKDN backend
-                    yet. When it’s ready, we’ll wire this screen to it.
+                <form onSubmit={handlePasswordUpdate} className="px-5 py-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Gmail
+                    </label>
+                    <input
+                      type="text"
+                      value={user?.gmail || ""}
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                    />
                   </div>
-                </div>
-                <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
-                  <button
-                    onClick={() => setIsProfileModalOpen(false)}
-                    className="cursor-pointer px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    Close
-                  </button>
-                </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={user?.username || ""}
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        value={user?.first_name || ""}
+                        disabled
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        value={user?.last_name || ""}
+                        disabled
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Nickname
+                    </label>
+                    <input
+                      type="text"
+                      value={user?.nickname || displayName}
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Role
+                    </label>
+                    <input
+                      type="text"
+                      value={user?.role || ""}
+                      disabled
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-700"
+                    />
+                  </div>
+                  <div className="pt-2 border-t border-gray-100">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900"
+                      disabled={profileSaving}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900"
+                      disabled={profileSaving}
+                    />
+                  </div>
+                  {profileError && (
+                    <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                      {profileError}
+                    </p>
+                  )}
+                  {profileSuccess && (
+                    <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                      {profileSuccess}
+                    </p>
+                  )}
+                  <div className="pt-2 border-t border-gray-200 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={closeEditProfileModal}
+                      className="cursor-pointer px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      disabled={profileSaving}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="submit"
+                      className="cursor-pointer px-4 py-2 text-sm rounded-md bg-[#273C8F] text-white hover:bg-[#1f3072] disabled:opacity-60"
+                      disabled={profileSaving}
+                    >
+                      {profileSaving ? "Saving..." : "Update Password"}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </>,

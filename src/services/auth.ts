@@ -131,6 +131,15 @@ export function getStoredUser(): User | null {
 }
 
 /**
+ * Persist user to localStorage (used after profile updates)
+ */
+export function setStoredUser(user: User): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("currentUser", JSON.stringify(user));
+  }
+}
+
+/**
  * Check if user is authenticated
  */
 export function isAuthenticated(): boolean {
@@ -144,4 +153,54 @@ export function isAuthenticated(): boolean {
 export function isSME(user: User | null): boolean {
   const role = user?.role?.trim().toUpperCase();
   return role === "SME" || role === "ADMIN" || role === "SUPER_ADMIN";
+}
+
+/**
+ * Update only the current user's password.
+ */
+export async function updateUserPassword(
+  userId: number,
+  password: string,
+): Promise<User> {
+  const url = getApiUrl(`/user/${userId}`);
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    credentials: "omit",
+    mode: "cors",
+    body: JSON.stringify({ password }),
+  });
+
+  const raw = await response.text();
+  let parsed: unknown = null;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    // Keep raw for error below
+  }
+
+  if (!response.ok) {
+    const message =
+      parsed && typeof parsed === "object" && "message" in parsed
+        ? String((parsed as { message?: unknown }).message ?? "Failed to update password")
+        : `Failed to update password: ${response.status} ${response.statusText}. ${raw}`;
+    throw new Error(message);
+  }
+
+  const payload = parsed as { success?: boolean; data?: User; message?: string } | null;
+  if (!payload?.data) {
+    throw new Error("Password updated but invalid user payload returned");
+  }
+
+  const stored = getStoredUser();
+  const mergedUser: User = {
+    ...(stored ?? payload.data),
+    ...payload.data,
+    password: payload.data.password || password,
+  };
+  setStoredUser(mergedUser);
+  return mergedUser;
 }
