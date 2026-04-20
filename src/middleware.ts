@@ -22,6 +22,14 @@ function getRateLimitKey(request: NextRequest): string {
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Clean expired records inline to avoid background timers in middleware runtime.
+  for (const [key, value] of rateLimitMap.entries()) {
+    if (now > value.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+
   const record = rateLimitMap.get(ip);
 
   if (!record || now > record.resetTime) {
@@ -41,16 +49,6 @@ function checkRateLimit(ip: string): boolean {
   record.count++;
   return true;
 }
-
-// Clean up old entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of rateLimitMap.entries()) {
-    if (now > record.resetTime) {
-      rateLimitMap.delete(ip);
-    }
-  }
-}, RATE_LIMIT.windowMs);
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -131,14 +129,9 @@ export function middleware(request: NextRequest) {
 // Configure which routes the middleware runs on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - sitemap.xml (sitemap file - must return pure XML)
-     * - robots.txt (robots file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    // Run middleware only where rate limiting is applied.
+    "/api/:path*",
+    "/home/:path*",
+    "/news/:path*",
   ],
 };
