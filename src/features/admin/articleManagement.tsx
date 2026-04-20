@@ -1318,7 +1318,7 @@ export default function ArticleManagement() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {error && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">{error}</p>
@@ -1338,7 +1338,7 @@ export default function ArticleManagement() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-hidden">
             {/* Table Header */}
             <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
               <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
