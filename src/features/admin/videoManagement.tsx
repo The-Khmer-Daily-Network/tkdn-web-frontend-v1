@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
 import { getCategories } from "@/services/category";
-import { getPublishers } from "@/services/publisher";
 import {
   deleteContentCover,
   getContentCovers,
@@ -34,13 +33,13 @@ import {
 } from "@/services/contentVideo";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
-import type { Publisher } from "@/types/publisher";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
 import VideoSelectorModal from "@/components/admin/VideoSelectorModal";
 import ImageSelectorModal from "@/components/admin/ImageSelectorModal";
 import type { ContentCover } from "@/types/contentCover";
 import type { ContentVideo } from "@/types/contentVideo";
 import type { ContentImage } from "@/types/contentImage";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -50,7 +49,7 @@ interface NewsModalProps {
   onSuccess: () => void;
   news?: News | null;
   categories: Category[];
-  publishers: Publisher[];
+  currentUsername: string;
   asPage?: boolean;
 }
 
@@ -60,7 +59,7 @@ function NewsModal({
   onSuccess,
   news,
   categories,
-  publishers,
+  currentUsername,
   asPage = false,
 }: NewsModalProps) {
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -138,7 +137,7 @@ function NewsModal({
       ];
     } else {
       setCategoryId(null);
-      setAuthor("");
+      setAuthor(currentUsername);
       setTitle("");
       setCover(null);
       setCoverName(null);
@@ -155,7 +154,7 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
-  }, [news, isOpen]);
+  }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
     return () => {
@@ -480,29 +479,6 @@ function NewsModal({
     });
   });
 
-  // Create author options from publishers (similar to category dropdown)
-  const authorOptions = useMemo(() => {
-    const options: Array<{ value: string; label: string }> = publishers.map(
-      (pub) => {
-        const fullName = `${pub.first_name} ${pub.last_name}`;
-        return {
-          value: fullName,
-          label: `${fullName} (${pub.nickname})`,
-        };
-      },
-    );
-
-    // Add current author if it doesn't exist in publishers (for custom authors when editing)
-    if (author && !options.find((opt) => opt.value === author)) {
-      options.push({
-        value: author,
-        label: author,
-      });
-    }
-
-    return options;
-  }, [publishers, author]);
-
   if (!isOpen) return null;
 
   return (
@@ -605,20 +581,14 @@ function NewsModal({
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Author <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={author || ""}
-                    onChange={(e) => setAuthor(e.target.value)}
+                    readOnly
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled={loading}
+                    disabled
                     required
-                  >
-                    <option value="">Select author</option>
-                    {authorOptions.map((option, index) => (
-                      <option key={index} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
             </div>
@@ -1110,11 +1080,11 @@ function NewsModal({
 
 export default function VideoManagement() {
   const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [articles, setArticles] = useState<News[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -1144,8 +1114,10 @@ export default function VideoManagement() {
     try {
       setLoading(true);
       setError(null);
-      const [newsResponse, categoriesResponse, publishersResponse] =
-        await Promise.all([getNews(), getCategories(), getPublishers()]);
+      const [newsResponse, categoriesResponse] = await Promise.all([
+        getNews(),
+        getCategories(),
+      ]);
 
       // Filter articles: middle_video_url is not null
       const filteredArticles = newsResponse.data.filter(
@@ -1161,7 +1133,6 @@ export default function VideoManagement() {
 
       setArticles(sortedArticles);
       setCategories(categoriesResponse.categories);
-      setPublishers(publishersResponse.data);
       setCurrentPage(1); // Reset to first page when data is fetched
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -1293,7 +1264,7 @@ export default function VideoManagement() {
           }}
           news={isEditPage ? selectedArticle : null}
           categories={categories}
-          publishers={publishers}
+          currentUsername={user?.username?.trim() || ""}
         />
       </div>
     );

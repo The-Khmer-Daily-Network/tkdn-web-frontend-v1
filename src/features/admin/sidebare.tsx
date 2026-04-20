@@ -399,40 +399,6 @@ export default function SidebareAdmin() {
             )}
           </li>
 
-          {/* Publisher - No Dropdown - SME Only */}
-          <li className="relative group">
-            {isUserSME ? (
-              <Link
-                href="/publishers"
-                className={getLinkClasses("/publishers")}
-              >
-                Publishers
-              </Link>
-            ) : (
-              <>
-                <div className={getLinkClasses("/publishers", false, true)}>
-                  Publishers
-                </div>
-                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                    />
-                  </svg>
-                  <span className="text-sm">Your role not allow</span>
-                </div>
-              </>
-            )}
-          </li>
-
           {/* Advertisement - No Dropdown - SME Only */}
           <li className="relative group">
             {isUserSME ? (
