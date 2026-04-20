@@ -282,7 +282,7 @@ export default function HeaderSidebar({
           {/* Right Side - Navigation – Inter Khmer Looped, text-base */}
           <nav
             className="hidden lg:flex items-center gap-6"
-            style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
+            style={{ fontFamily: '"Hanuman", sans-serif' }}
           >
             <Link
               href="/latest"
@@ -550,7 +550,7 @@ export default function HeaderSidebar({
                                 }
                               }}
                             >
-                              <span style={{ fontFamily: "AKbalthom Techno" }}>
+                              <span style={{ fontFamily: "Hanuman" }}>
                                 {category.name}
                               </span>
                             </Link>
@@ -580,7 +580,7 @@ export default function HeaderSidebar({
                                           >
                                             <span
                                               style={{
-                                                fontFamily: "AKbalthom Techno",
+                                                fontFamily: "Hanuman",
                                               }}
                                             >
                                               {subcategory.name}
@@ -604,7 +604,7 @@ export default function HeaderSidebar({
                                           >
                                             <span
                                               style={{
-                                                fontFamily: "AKbalthom Techno",
+                                                fontFamily: "Hanuman",
                                               }}
                                             >
                                               {subcategory.name}
@@ -641,7 +641,7 @@ export default function HeaderSidebar({
                                         >
                                           <span
                                             style={{
-                                              fontFamily: "AKbalthom Techno",
+                                              fontFamily: "Hanuman",
                                             }}
                                           >
                                             {subcategory.name}

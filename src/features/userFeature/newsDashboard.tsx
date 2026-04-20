@@ -249,7 +249,7 @@ export default function NewsDashboard({
                 {mainArticle.category && (
                   <span
                     className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
+                    style={{ fontFamily: "Hanuman" }}
                   >
                     {mainArticle.category.name}
                   </span>
@@ -259,7 +259,7 @@ export default function NewsDashboard({
                 </p>
                 <h1
                   className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                  style={{ fontFamily: "AKbalthom Techno" }}
+                  style={{ fontFamily: "Hanuman" }}
                 >
                   {mainArticle.title}
                 </h1>
@@ -291,7 +291,7 @@ export default function NewsDashboard({
                   {mainArticle.category && (
                     <span
                       className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-3 underline-offset-5 uppercase"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {mainArticle.category.name}
                     </span>
@@ -303,7 +303,7 @@ export default function NewsDashboard({
                 <div className="space-y-2">
                   <h1
                     className="text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
-                    style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
+                    style={{ fontFamily: '"Hanuman", sans-serif' }}
                   >
                     {mainArticle.title}
                   </h1>
@@ -312,7 +312,7 @@ export default function NewsDashboard({
                   mainArticle.content_blocks.length > 0 && (
                     <p
                       className="text-xs text-gray-700 line-clamp-3"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {mainArticle.content_blocks[0].paragraph}
                     </p>
@@ -353,7 +353,7 @@ export default function NewsDashboard({
                   {article.category && (
                     <span
                       className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {article.category.name}
                     </span>
@@ -363,7 +363,7 @@ export default function NewsDashboard({
                   </p>
                   <h2
                     className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                    style={{ fontFamily: "AKbalthom Techno" }}
+                    style={{ fontFamily: "Hanuman" }}
                   >
                     {article.title}
                   </h2>

@@ -277,28 +277,28 @@ export default function VideoDashboard() {
                     {mainVideo.category && (
                       <span
                         className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {mainVideo.category.name}
                       </span>
                     )}
                     <p
                       className="text-xs text-gray-500 font-medium"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {formatDate(mainVideo.date_time_post)}
                     </p>
                   </div>
                   <h2
                     className="text-2xl lg:text-3xl font-bold text-[#1D2229] leading-tight"
-                    style={{ fontFamily: "AKbalthom Techno" }}
+                    style={{ fontFamily: "Hanuman" }}
                   >
                     {mainVideo.title}
                   </h2>
                   {mainVideo.subtitle && (
                     <p
                       className="text-base text-gray-700 line-clamp-3"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {mainVideo.subtitle}
                     </p>
@@ -307,7 +307,7 @@ export default function VideoDashboard() {
                     mainVideo.content_blocks.length > 0 && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {mainVideo.content_blocks[0].paragraph}
                       </p>
@@ -374,21 +374,21 @@ export default function VideoDashboard() {
                       {video.category && (
                         <span
                           className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {video.category.name}
                         </span>
                       )}
                       <p
                         className="text-xs text-gray-500"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {formatDate(video.date_time_post)}
                       </p>
                     </div>
                     <h3
                       className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {video.title}
                     </h3>
@@ -405,7 +405,7 @@ export default function VideoDashboard() {
         <div className="space-y-6">
           <h2
             className="text-xl font-bold text-[#1D2229]"
-            style={{ fontFamily: "AKbalthom Techno" }}
+            style={{ fontFamily: "Hanuman" }}
           >
             More Videos
           </h2>
@@ -463,28 +463,28 @@ export default function VideoDashboard() {
                       {video.category && (
                         <span
                           className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {video.category.name}
                         </span>
                       )}
                       <p
                         className="text-xs text-gray-500 font-medium"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {formatDate(video.date_time_post)}
                       </p>
                     </div>
                     <h3
                       className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {video.title}
                     </h3>
                     {video.subtitle && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {video.subtitle}
                       </p>

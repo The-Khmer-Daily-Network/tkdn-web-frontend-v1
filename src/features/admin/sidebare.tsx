@@ -558,7 +558,7 @@ export default function SidebareAdmin() {
       </nav>
 
       {/* Profile at Bottom (match v2 flow) */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-4 relative">
         <button
           onClick={() => setProfileOpen((prev) => !prev)}
           className="cursor-pointer w-full flex items-center justify-between gap-2 px-3 py-2 text-left rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -590,9 +590,7 @@ export default function SidebareAdmin() {
             </div>
           </div>
           <svg
-            className={`w-4 h-4 text-gray-500 transition-transform ${
-              profileOpen ? "rotate-180" : ""
-            }`}
+            className="w-4 h-4 text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -601,13 +599,13 @@ export default function SidebareAdmin() {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M19 9l-7 7-7-7"
+              d={profileOpen ? "M19 9l-7 7-7-7" : "M5 15l7-7 7 7"}
             />
           </svg>
         </button>
 
         {profileOpen && (
-          <div className="mt-2 space-y-1">
+          <div className="absolute left-4 right-4 bottom-full mb-2 space-y-1 rounded-md border border-gray-200 bg-white p-1 shadow-md">
             <button
               onClick={() => {
                 setProfileOpen(false);

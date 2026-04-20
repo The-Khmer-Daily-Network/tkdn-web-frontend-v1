@@ -768,7 +768,7 @@ export default function NewsPageContent({
               {singleNews.category && (
                 <span
                   className="text-sm font-bold text-[#1D2229] uppercase"
-                  style={{ fontFamily: "AKbalthom Techno" }}
+                  style={{ fontFamily: "Hanuman" }}
                 >
                   {singleNews.category.name}
                 </span>
@@ -792,7 +792,7 @@ export default function NewsPageContent({
           {/* Main Title – Inter Khmer Looped Black from public/Khmer */}
           <h1
             className="text-xl md:text-2xl lg:text-3xl font-black text-[#1D2229] leading-snug"
-            style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
+            style={{ fontFamily: '"Hanuman", sans-serif' }}
           >
             {singleNews.title}
           </h1>
@@ -801,7 +801,7 @@ export default function NewsPageContent({
           {singleNews.subtitle && (
             <p
               className="text-xl text-gray-700 mt-4"
-              style={{ fontFamily: "AKbalthom Techno" }}
+              style={{ fontFamily: "Hanuman" }}
             >
               {singleNews.subtitle}
             </p>
@@ -828,7 +828,7 @@ export default function NewsPageContent({
               {singleNews.cover_name && (
                 <p
                   className="text-sm text-gray-600 mt-2 italic"
-                  style={{ fontFamily: "AKbalthom Techno" }}
+                  style={{ fontFamily: "Hanuman" }}
                 >
                   {singleNews.cover_name}
                 </p>
@@ -853,7 +853,7 @@ export default function NewsPageContent({
                       {block.subtitle && (
                         <h2
                           className="text-2xl font-bold text-[#1D2229] mt-8 mb-6"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {block.subtitle}
                         </h2>
@@ -865,7 +865,7 @@ export default function NewsPageContent({
                           <p
                             key={paraIndex}
                             className="text-base text-gray-800 leading-relaxed"
-                            style={{ fontFamily: "AKbalthom Techno" }}
+                            style={{ fontFamily: "Hanuman" }}
                           >
                             {paragraph.trim()}
                           </p>
@@ -1104,7 +1104,7 @@ export default function NewsPageContent({
           <div className="border-b border-gray-200 pb-4">
             <h1
               className="text-2xl font-bold text-[#1D2229]"
-              style={{ fontFamily: "AKbalthom Techno" }}
+              style={{ fontFamily: "Hanuman" }}
             >
               {category.name}
             </h1>
@@ -1174,7 +1174,7 @@ export default function NewsPageContent({
                       {article.category && (
                         <span
                           className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {article.category.name}
                         </span>
@@ -1182,7 +1182,7 @@ export default function NewsPageContent({
                       <p
                         className="text-xs max-[481px]:text-[10px] font-medium"
                         style={{
-                          fontFamily: "AKbalthom Techno",
+                          fontFamily: "Hanuman",
                           color: "rgba(29, 34, 41, 0.6784)",
                         }}
                       >
@@ -1191,14 +1191,14 @@ export default function NewsPageContent({
                     </div>
                     <h2
                       className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm max-[481px]:text-xs text-gray-600 line-clamp-2 mt-1"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {article.subtitle}
                       </p>
@@ -1207,7 +1207,7 @@ export default function NewsPageContent({
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm max-[481px]:text-xs text-gray-600 line-clamp-2 mt-1"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {article.content_blocks[0].paragraph}
                         </p>
@@ -1255,7 +1255,7 @@ export default function NewsPageContent({
                     {article.category && (
                       <span
                         className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {article.category.name}
                       </span>
@@ -1265,14 +1265,14 @@ export default function NewsPageContent({
                     </p>
                     <h2
                       className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {article.subtitle}
                       </p>
@@ -1281,7 +1281,7 @@ export default function NewsPageContent({
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm text-gray-700 line-clamp-3"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {article.content_blocks[0].paragraph}
                         </p>

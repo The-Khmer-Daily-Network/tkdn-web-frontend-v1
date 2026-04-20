@@ -369,7 +369,7 @@ export default function CategoryPage() {
           <div className="border-b border-gray-200 pb-4">
             <h1
               className="text-2xl font-bold text-[#1D2229]"
-              style={{ fontFamily: "AKbalthom Techno" }}
+              style={{ fontFamily: "Hanuman" }}
             >
               {category.name}
             </h1>
@@ -449,7 +449,7 @@ export default function CategoryPage() {
                       {article.category && (
                         <span
                           className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {article.category.name}
                         </span>
@@ -457,7 +457,7 @@ export default function CategoryPage() {
                       <p
                         className="text-xs max-[481px]:text-[10px] font-medium"
                         style={{
-                          fontFamily: "AKbalthom Techno",
+                          fontFamily: "Hanuman",
                           color: "rgba(29, 34, 41, 0.6784)",
                         }}
                       >
@@ -466,7 +466,7 @@ export default function CategoryPage() {
                     </div>
                     <h2
                       className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {article.title}
                     </h2>
@@ -513,7 +513,7 @@ export default function CategoryPage() {
                     {article.category && (
                       <span
                         className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {article.category.name}
                       </span>
@@ -523,14 +523,14 @@ export default function CategoryPage() {
                     </p>
                     <h2
                       className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "AKbalthom Techno" }}
+                      style={{ fontFamily: "Hanuman" }}
                     >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {article.subtitle}
                       </p>
@@ -539,7 +539,7 @@ export default function CategoryPage() {
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm text-gray-700 line-clamp-3"
-                          style={{ fontFamily: "AKbalthom Techno" }}
+                          style={{ fontFamily: "Hanuman" }}
                         >
                           {article.content_blocks[0].paragraph}
                         </p>

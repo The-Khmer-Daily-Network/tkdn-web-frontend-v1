@@ -121,7 +121,7 @@ export default function NationalFeature({
     <div className="w-full">
       <h2
         className="text-xl font-bold text-[#E34C33] mb-3"
-        style={{ fontFamily: "AKbalthom Techno" }}
+        style={{ fontFamily: "Hanuman" }}
       >
         National News
       </h2>
@@ -149,7 +149,7 @@ export default function NationalFeature({
                 {article.category && (
                   <span
                     className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
+                    style={{ fontFamily: "Hanuman" }}
                   >
                     {article.category.name}
                   </span>
@@ -157,7 +157,7 @@ export default function NationalFeature({
                 <p
                   className="text-xs max-[481px]:text-[10px] font-medium"
                   style={{
-                    fontFamily: "AKbalthom Techno",
+                    fontFamily: "Hanuman",
                     color: "rgba(29, 34, 41, 0.6784)",
                   }}
                 >
@@ -166,7 +166,7 @@ export default function NationalFeature({
               </div>
               <h2
                 className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed"
-                style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
+                style={{ fontFamily: '"Hanuman", sans-serif' }}
               >
                 {article.title}
               </h2>
@@ -174,7 +174,7 @@ export default function NationalFeature({
                 <p
                   className="hidden min-[639px]:block text-sm text-gray-600 line-clamp-2 overflow-hidden mt-1"
                   style={{
-                    fontFamily: "AKbalthom Techno",
+                    fontFamily: "Hanuman",
                     display: "-webkit-box",
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: "vertical",

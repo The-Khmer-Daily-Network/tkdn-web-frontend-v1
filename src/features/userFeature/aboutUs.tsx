@@ -593,13 +593,13 @@ export default function AboutUs() {
                     >
                       <h3
                         className="text-base font-semibold text-gray-900 mb-0.5 leading-tight text-center"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {member.first_name} {member.last_name}
                       </h3>
                       <p
                         className="text-xs text-gray-600 leading-tight text-center"
-                        style={{ fontFamily: "AKbalthom Techno" }}
+                        style={{ fontFamily: "Hanuman" }}
                       >
                         {member.position}
                       </p>

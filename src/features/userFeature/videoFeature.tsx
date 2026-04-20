@@ -126,7 +126,7 @@ export default function VideoFeature({
     <div className="w-full">
       <h2
         className="text-xl font-bold text-[#E34C33] mb-3"
-        style={{ fontFamily: "AKbalthom Techno" }}
+        style={{ fontFamily: "Hanuman" }}
       >
         News Video
       </h2>
@@ -162,7 +162,7 @@ export default function VideoFeature({
                 {video.category && (
                   <span
                     className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-3 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
+                    style={{ fontFamily: "Hanuman" }}
                   >
                     {video.category.name}
                   </span>
@@ -170,7 +170,7 @@ export default function VideoFeature({
                 <p
                   className="text-xs font-medium"
                   style={{
-                    fontFamily: "AKbalthom Techno",
+                    fontFamily: "Hanuman",
                     color: "rgba(29, 34, 41, 0.6784)",
                   }}
                 >
@@ -179,14 +179,14 @@ export default function VideoFeature({
               </div>
               <h2
                 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight"
-                style={{ fontFamily: "AKbalthom Techno" }}
+                style={{ fontFamily: "Hanuman" }}
               >
                 {video.title}
               </h2>
               {video.content_blocks && video.content_blocks.length > 0 && (
                 <p
                   className="text-sm text-gray-600 line-clamp-2"
-                  style={{ fontFamily: "AKbalthom Techno" }}
+                  style={{ fontFamily: "Hanuman" }}
                 >
                   {video.content_blocks[0].paragraph}
                 </p>
