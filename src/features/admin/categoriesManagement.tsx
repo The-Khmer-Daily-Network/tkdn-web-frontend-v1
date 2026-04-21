@@ -84,7 +84,7 @@ function CategoryModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-md"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
               {category ? "Edit" : "Create"} {isSubCategory ? "Sub" : ""}{" "}
@@ -94,7 +94,7 @@ function CategoryModal({
               onClick={onClose}
               disabled={loading}
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               ×
             </button>
           </div>
@@ -127,14 +127,14 @@ function CategoryModal({
                 onClick={onClose}
                 disabled={loading}
                 className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !name.trim()}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+            >
                 {loading ? "Saving..." : category ? "Update" : "Create"}
               </button>
             </div>
@@ -157,7 +157,7 @@ export default function CategoriesManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<
     Category | SubCategory | null
-  >(null);
+>(null);
   const [selectedParentId, setSelectedParentId] = useState<number | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
     new Set(),
@@ -253,7 +253,7 @@ export default function CategoriesManagement() {
         <button
           onClick={fetchCategories}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -271,7 +271,7 @@ export default function CategoriesManagement() {
           <button
             onClick={handleCreateMainCategory}
             className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
+        >
             <Plus size={16} />
             Add Main Category
           </button>
@@ -293,7 +293,7 @@ export default function CategoriesManagement() {
               <button
                 onClick={handleCreateMainCategory}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Category
               </button>
             </div>
@@ -308,7 +308,7 @@ export default function CategoriesManagement() {
                 <div
                   key={category.id}
                   className="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-                >
+              >
                   {/* Main Category */}
                   <div className="flex items-center justify-between p-3">
                     <div className="flex items-center gap-2 flex-1">
@@ -316,7 +316,7 @@ export default function CategoriesManagement() {
                         <button
                           onClick={() => toggleExpand(category.id)}
                           className="cursor-pointer p-1 hover:bg-gray-100 rounded transition-colors"
-                        >
+                      >
                           {isExpanded ? (
                             <ChevronUp size={18} className="text-gray-600" />
                           ) : (
@@ -338,14 +338,14 @@ export default function CategoriesManagement() {
                         onClick={() => handleCreateSubCategory(category.id)}
                         className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         title="Add Sub Category"
-                      >
+                    >
                         <Plus size={16} />
                       </button>
                       <button
                         onClick={() => handleEditCategory(category)}
                         className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         title="Edit Category"
-                      >
+                    >
                         <Edit2 size={16} />
                       </button>
                       <button
@@ -361,7 +361,7 @@ export default function CategoriesManagement() {
                             ? "Cannot delete: has subcategories"
                             : "Delete Category"
                         }
-                      >
+                    >
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -374,7 +374,7 @@ export default function CategoriesManagement() {
                         <div
                           key={subcategory.id}
                           className="flex items-center justify-between p-3 pl-10 border-b border-gray-100 last:border-b-0"
-                        >
+                      >
                           <span className="text-gray-700">
                             {subcategory.name}
                           </span>
@@ -383,7 +383,7 @@ export default function CategoriesManagement() {
                               onClick={() => handleEditCategory(subcategory)}
                               className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                               title="Edit Sub Category"
-                            >
+                          >
                               <Edit2 size={16} />
                             </button>
                             <button
@@ -393,7 +393,7 @@ export default function CategoriesManagement() {
                               disabled={deletingId === subcategory.id}
                               className="cursor-pointer p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Delete Sub Category"
-                            >
+                          >
                               <Trash2 size={16} />
                             </button>
                           </div>

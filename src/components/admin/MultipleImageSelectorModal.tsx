@@ -150,7 +150,7 @@ export default function MultipleImageSelectorModal({
               <button
                 onClick={handleUpload}
                 className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
-              >
+            >
                 <Plus size={14} />
                 Upload Image
               </button>
@@ -158,7 +158,7 @@ export default function MultipleImageSelectorModal({
                 onClick={onClose}
                 className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                 aria-label="Close"
-              >
+            >
                 <X size={18} />
               </button>
             </div>
@@ -178,7 +178,7 @@ export default function MultipleImageSelectorModal({
                 <button
                   onClick={fetchImages}
                   className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-xs"
-                >
+              >
                   Retry
                 </button>
               </div>
@@ -191,7 +191,7 @@ export default function MultipleImageSelectorModal({
                   <button
                     onClick={handleUpload}
                     className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
-                  >
+                >
                     Upload Your First Image
                   </button>
                 </div>
@@ -214,7 +214,7 @@ export default function MultipleImageSelectorModal({
                             : "border-gray-200 cursor-pointer"
                       }`}
                       onClick={() => !isDisabled && handleImageClick(image)}
-                    >
+                  >
                       <div className="relative aspect-square bg-gray-100 shrink-0">
                         <Image
                           src={image.image_url}
@@ -264,7 +264,7 @@ export default function MultipleImageSelectorModal({
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
                     className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                >
                     <ChevronLeft size={14} />
                     Previous
                   </button>
@@ -288,7 +288,7 @@ export default function MultipleImageSelectorModal({
                             <span
                               key={page}
                               className="px-1.5 text-gray-500 text-xs"
-                            >
+                          >
                               ...
                             </span>
                           );
@@ -305,7 +305,7 @@ export default function MultipleImageSelectorModal({
                               ? "bg-blue-600 text-white"
                               : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                           }`}
-                        >
+                      >
                           {page}
                         </button>
                       );
@@ -316,7 +316,7 @@ export default function MultipleImageSelectorModal({
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === paginatedData.totalPages}
                     className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
+                >
                     Next
                     <ChevronRight size={14} />
                   </button>
@@ -330,7 +330,7 @@ export default function MultipleImageSelectorModal({
                 onClick={handleConfirm}
                 disabled={selectedImages.length === 0}
                 className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
-              >
+            >
                 <Check size={16} />
                 Confirm Selection ({selectedImages.length}/{MAX_SELECTION})
               </button>

@@ -174,7 +174,7 @@ export default function SidebareAdmin() {
                 <button
                   onClick={() => setDashboardOpen(!dashboardOpen)}
                   className="cursor-pointer w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
-                >
+              >
                   <span>Analytics</span>
                   <svg
                     className={`w-4 h-4 transition-transform ${
@@ -183,7 +183,7 @@ export default function SidebareAdmin() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                  >
+                >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -198,7 +198,7 @@ export default function SidebareAdmin() {
                       <Link
                         href="/dashboard"
                         className={getLinkClasses("/dashboard", true)}
-                      >
+                    >
                         Dashboard
                       </Link>
                     </li>
@@ -211,7 +211,7 @@ export default function SidebareAdmin() {
                       <Link
                         href="/socialMedia"
                         className={getLinkClasses("/socialMedia", true)}
-                      >
+                    >
                         Social Media
                       </Link>
                     </li>
@@ -219,7 +219,7 @@ export default function SidebareAdmin() {
                       <Link
                         href="/statistics"
                         className={getLinkClasses("/statistics", true)}
-                      >
+                    >
                         Statistics
                       </Link>
                     </li>
@@ -230,7 +230,7 @@ export default function SidebareAdmin() {
                 <Link
                   href="/articleManagement"
                   className={getLinkClasses("/articleManagement")}
-                >
+              >
                   Article Management
                 </Link>
               </li>
@@ -238,7 +238,7 @@ export default function SidebareAdmin() {
                 <Link
                   href="/videoManagement"
                   className={getLinkClasses("/videoManagement")}
-                >
+              >
                   Video Management
                 </Link>
               </li>
@@ -246,7 +246,7 @@ export default function SidebareAdmin() {
                 <Link
                   href="/guidelines"
                   className={getLinkClasses("/guidelines")}
-                >
+              >
                   Notification
                 </Link>
               </li>
@@ -258,7 +258,7 @@ export default function SidebareAdmin() {
             <button
               onClick={() => setDashboardOpen(!dashboardOpen)}
               className="cursor-pointer w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
-            >
+          >
               <span>Analytics</span>
               <svg
                 className={`w-4 h-4 transition-transform ${
@@ -267,7 +267,7 @@ export default function SidebareAdmin() {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-              >
+            >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -282,7 +282,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/dashboard"
                     className={getLinkClasses("/dashboard", true)}
-                  >
+                >
                     Dashboard
                   </Link>
                 </li>
@@ -295,7 +295,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/socialMedia"
                     className={getLinkClasses("/socialMedia", true)}
-                  >
+                >
                     Social Media
                   </Link>
                 </li>
@@ -303,7 +303,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/statistics"
                     className={getLinkClasses("/statistics", true)}
-                  >
+                >
                     Statistics
                   </Link>
                 </li>
@@ -316,7 +316,7 @@ export default function SidebareAdmin() {
             <Link
               href="/articleManagement"
               className={getLinkClasses("/articleManagement")}
-            >
+          >
               Article Management
             </Link>
           </li>
@@ -326,7 +326,7 @@ export default function SidebareAdmin() {
             <Link
               href="/videoManagement"
               className={getLinkClasses("/videoManagement")}
-            >
+          >
               Video Management
             </Link>
           </li>
@@ -343,7 +343,7 @@ export default function SidebareAdmin() {
             <button
               onClick={() => setMediaLibraryOpen(!mediaLibraryOpen)}
               className="w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
-            >
+          >
               <span>Media Library</span>
               <svg
                 className={`w-4 h-4 transition-transform ${
@@ -352,7 +352,7 @@ export default function SidebareAdmin() {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-              >
+            >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -367,7 +367,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/covers"
                     className={getLinkClasses("/covers", true)}
-                  >
+                >
                     Covers
                   </Link>
                 </li>
@@ -375,7 +375,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/contentImages"
                     className={getLinkClasses("/contentImages", true)}
-                  >
+                >
                     Content Images
                   </Link>
                 </li>
@@ -383,7 +383,7 @@ export default function SidebareAdmin() {
                   <Link
                     href="/contentVideos"
                     className={getLinkClasses("/contentVideos", true)}
-                  >
+                >
                     Content Videos
                   </Link>
                 </li>
@@ -397,7 +397,7 @@ export default function SidebareAdmin() {
               <Link
                 href="/activityLog"
                 className={getLinkClasses("/activityLog")}
-              >
+            >
                 Activity Log
               </Link>
             </li>
@@ -409,7 +409,7 @@ export default function SidebareAdmin() {
               <Link
                 href="/userManagement"
                 className={getLinkClasses("/userManagement")}
-              >
+            >
                 User Management
               </Link>
             </li>
@@ -421,14 +421,14 @@ export default function SidebareAdmin() {
               <Link
                 href="/categoryManagement"
                 className={getLinkClasses("/categoryManagement")}
-              >
+            >
                 Categories Management
               </Link>
             ) : (
               <>
                 <div
                   className={getLinkClasses("/categoryManagement", false, true)}
-                >
+              >
                   Categories Management
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
@@ -437,7 +437,7 @@ export default function SidebareAdmin() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                  >
+                >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -457,7 +457,7 @@ export default function SidebareAdmin() {
               <Link
                 href="/advertisement"
                 className={getLinkClasses("/advertisement")}
-              >
+            >
                 Advertisement
               </Link>
             ) : (
@@ -471,7 +471,7 @@ export default function SidebareAdmin() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                  >
+                >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -491,7 +491,7 @@ export default function SidebareAdmin() {
               <Link
                 href="/newsroomTeam"
                 className={getLinkClasses("/newsroomTeam")}
-              >
+            >
                 Newsroom Team
               </Link>
             ) : (
@@ -505,7 +505,7 @@ export default function SidebareAdmin() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                  >
+                >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -525,7 +525,7 @@ export default function SidebareAdmin() {
               <Link
                 href="/ourPartner"
                 className={getLinkClasses("/ourPartner")}
-              >
+            >
                 Partners
               </Link>
             ) : (
@@ -539,7 +539,7 @@ export default function SidebareAdmin() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
-                  >
+                >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -562,7 +562,7 @@ export default function SidebareAdmin() {
         <button
           onClick={() => setProfileOpen((prev) => !prev)}
           className="cursor-pointer w-full flex items-center justify-between gap-2 px-3 py-2 text-left rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
-        >
+      >
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#273C8F] ring-2 ring-white">
               {user?.profile_image_url ? (
@@ -577,7 +577,7 @@ export default function SidebareAdmin() {
                 <span
                   className="flex h-full w-full items-center justify-center text-xs font-semibold text-white"
                   aria-hidden
-                >
+              >
                   {initials}
                 </span>
               )}
@@ -594,7 +594,7 @@ export default function SidebareAdmin() {
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-          >
+        >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -612,13 +612,13 @@ export default function SidebareAdmin() {
                 openEditProfileModal();
               }}
               className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-sm text-[#273C8F] hover:bg-blue-50 rounded-md transition-colors"
-            >
+          >
               <svg
                 className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-              >
+            >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -635,13 +635,13 @@ export default function SidebareAdmin() {
                 router.push("/login");
               }}
               className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
-            >
+          >
               <svg
                 className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-              >
+            >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -667,11 +667,11 @@ export default function SidebareAdmin() {
             <div
               className="fixed inset-0 flex items-center justify-center p-4"
               style={{ zIndex: 10010 }}
-            >
+          >
               <div
                 className="w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200"
                 onClick={(e) => e.stopPropagation()}
-              >
+            >
                 <div className="px-5 py-4 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-[#1D2229]">
                     Edit Profile
@@ -788,14 +788,14 @@ export default function SidebareAdmin() {
                       onClick={closeEditProfileModal}
                       className="cursor-pointer px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                       disabled={profileSaving}
-                    >
+                  >
                       Close
                     </button>
                     <button
                       type="submit"
                       className="cursor-pointer px-4 py-2 text-sm rounded-md bg-[#273C8F] text-white hover:bg-[#1f3072] disabled:opacity-60"
                       disabled={profileSaving}
-                    >
+                  >
                       {profileSaving ? "Saving..." : "Update Password"}
                     </button>
                   </div>

@@ -170,7 +170,7 @@ function NewsroomTeamModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               {teamMember ? "Edit" : "Create"} Newsroom Team Member
@@ -179,7 +179,7 @@ function NewsroomTeamModal({
               onClick={onClose}
               disabled={loading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -249,7 +249,7 @@ function NewsroomTeamModal({
                     onClick={() => setShowImageSelector(!showImageSelector)}
                     className="cursor-pointer px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
                     disabled={loading}
-                  >
+                >
                     {showImageSelector ? "Hide" : "Select"} Image
                   </button>
                   <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2">
@@ -287,7 +287,7 @@ function NewsroomTeamModal({
                                 ? "border-blue-500 ring-2 ring-blue-200"
                                 : "border-gray-200 hover:border-blue-300"
                             }`}
-                          >
+                        >
                             <img
                               src={image.image_url}
                               alt={image.name}
@@ -335,7 +335,7 @@ function NewsroomTeamModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            >
                 Cancel
               </button>
               <button
@@ -347,7 +347,7 @@ function NewsroomTeamModal({
                   !position.trim()
                 }
                 className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+            >
                 {loading ? "Saving..." : teamMember ? "Update" : "Create"}
               </button>
             </div>
@@ -435,7 +435,7 @@ export default function Newsroom() {
         <button
           onClick={fetchTeamMembers}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -453,7 +453,7 @@ export default function Newsroom() {
           <button
             onClick={handleCreateTeamMember}
             className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
+        >
             <Plus size={16} />
             Add Team Member
           </button>
@@ -475,7 +475,7 @@ export default function Newsroom() {
               <button
                 onClick={handleCreateTeamMember}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Team Member
               </button>
             </div>
@@ -486,7 +486,7 @@ export default function Newsroom() {
               <div
                 key={member.id}
                 className="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-              >
+            >
                 {member.image_url && (
                   <div className="w-[250px] h-[300px] bg-gray-100 overflow-hidden mx-auto">
                     <img
@@ -510,7 +510,7 @@ export default function Newsroom() {
                     <button
                       onClick={() => handleEditTeamMember(member)}
                       className="cursor-pointer flex-1 px-3 py-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors text-sm font-medium"
-                    >
+                  >
                       <Edit2 size={14} className="inline mr-1" />
                       Edit
                     </button>
@@ -518,7 +518,7 @@ export default function Newsroom() {
                       onClick={() => handleDelete(member.id)}
                       disabled={deletingId === member.id}
                       className="cursor-pointer flex-1 px-3 py-1.5 text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                    >
+                  >
                       <Trash2 size={14} className="inline mr-1" />
                       Delete
                     </button>

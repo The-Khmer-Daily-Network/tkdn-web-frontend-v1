@@ -94,7 +94,7 @@ function LoginContent() {
             <label
               htmlFor="gmail"
               className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          >
               Email
             </label>
             <input
@@ -112,7 +112,7 @@ function LoginContent() {
             <label
               htmlFor="password"
               className="block text-sm font-medium text-gray-700 mb-1"
-            >
+          >
               Password
             </label>
             <input
@@ -130,7 +130,7 @@ function LoginContent() {
             type="submit"
             disabled={loading}
             className="w-full bg-[#273C8F] text-white py-2 px-4 rounded-md hover:bg-[#1e2d6f] focus:outline-none focus:ring-2 focus:ring-[#273C8F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+        >
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
@@ -150,7 +150,7 @@ export default function LoginPage() {
           </div>
         </div>
       }
-    >
+  >
       <LoginContent />
     </Suspense>
   );

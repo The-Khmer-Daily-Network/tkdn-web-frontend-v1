@@ -156,7 +156,7 @@ function SearchContent() {
                 key={article.id}
                 href={`/news/${article.id}`}
                 className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
-              >
+            >
                 {/* Article Image */}
                 {article.cover && (
                   <div className="relative w-full h-[200px] rounded-xl overflow-hidden bg-gray-200 group">
@@ -233,7 +233,7 @@ export default function SearchPage() {
           </div>
         </>
       }
-    >
+  >
       <SearchContent />
     </Suspense>
   );

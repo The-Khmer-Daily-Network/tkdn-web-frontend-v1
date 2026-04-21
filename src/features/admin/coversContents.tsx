@@ -119,7 +119,7 @@ export default function CoversContents() {
         <button
           onClick={fetchCovers}
           className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -139,7 +139,7 @@ export default function CoversContents() {
               type="button"
               onClick={handleUpload}
               className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-            >
+          >
               <Plus size={16} />
               Upload Cover
             </button>
@@ -179,7 +179,7 @@ export default function CoversContents() {
             type="button"
             onClick={handleUpload}
             className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
-          >
+        >
             <Plus size={14} />
             Upload Cover
           </button>
@@ -193,7 +193,7 @@ export default function CoversContents() {
             <div
               key={cover.id}
               className="relative group rounded-md overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
-            >
+          >
               <div className="relative aspect-square bg-gray-100 shrink-0">
                 <Image
                   src={cover.image_url}
@@ -208,7 +208,7 @@ export default function CoversContents() {
                   disabled={deletingId === cover.id}
                   className="cursor-pointer absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                   aria-label="Delete image"
-                >
+              >
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -233,7 +233,7 @@ export default function CoversContents() {
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
               className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+          >
               <ChevronLeft size={14} />
               Previous
             </button>
@@ -270,7 +270,7 @@ export default function CoversContents() {
                         ? "bg-blue-600 text-white"
                         : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                     }`}
-                  >
+                >
                     {page}
                   </button>
                 );
@@ -281,7 +281,7 @@ export default function CoversContents() {
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === paginatedData.totalPages}
               className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+          >
               Next
               <ChevronRight size={14} />
             </button>

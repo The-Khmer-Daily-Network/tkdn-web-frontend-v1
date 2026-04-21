@@ -20,7 +20,7 @@ export default function TestCoverModal() {
     useState<ContentImage | null>(null);
   const [selectedMultipleImages, setSelectedMultipleImages] = useState<
     ContentImage[]
-  >([]);
+>([]);
   const [selectedVideo, setSelectedVideo] = useState<ContentVideo | null>(null);
 
   return (
@@ -40,7 +40,7 @@ export default function TestCoverModal() {
           <button
             onClick={() => setIsCoverModalOpen(true)}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
+        >
             Open Cover Selector Modal
           </button>
 
@@ -78,7 +78,7 @@ export default function TestCoverModal() {
           <button
             onClick={() => setIsSingleImageModalOpen(true)}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-          >
+        >
             Select Middle Content Image
           </button>
 
@@ -116,7 +116,7 @@ export default function TestCoverModal() {
           <button
             onClick={() => setIsMultipleImageModalOpen(true)}
             className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
-          >
+        >
             Select Additional Images
           </button>
 
@@ -155,7 +155,7 @@ export default function TestCoverModal() {
           <button
             onClick={() => setIsVideoModalOpen(true)}
             className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-          >
+        >
             Open Video Selector Modal
           </button>
 

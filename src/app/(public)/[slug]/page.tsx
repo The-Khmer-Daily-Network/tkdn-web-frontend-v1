@@ -276,7 +276,7 @@ export default function CategoryPage() {
               <div
                 key={index}
                 className="flex flex-col space-y-3 animate-pulse"
-              >
+            >
                 {/* Article Image Skeleton */}
                 <div className="relative w-full h-[200px] rounded-[10px] bg-gray-200"></div>
 
@@ -369,8 +369,8 @@ export default function CategoryPage() {
           <div className="border-b border-gray-200 pb-4">
             <h1
               className="text-2xl font-bold text-[#1D2229]"
-              style={{ fontFamily: "Hanuman" }}
-            >
+             
+          >
               {category.name}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
@@ -417,7 +417,7 @@ export default function CategoryPage() {
                   key={article.id}
                   href={`/news/${article.id}`}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
-                >
+              >
                   {/* Article Image - Smaller on mobile (max-400px) */}
                   <div className="relative max-[400px]:w-[150px] max-[400px]:h-[90px] w-[200px] h-[120px] shrink-0 rounded-lg overflow-hidden bg-gray-200 group">
                     {article.cover && (
@@ -449,25 +449,24 @@ export default function CategoryPage() {
                       {article.category && (
                         <span
                           className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {article.category.name}
                         </span>
                       )}
                       <p
                         className="text-xs max-[481px]:text-[10px] font-medium"
                         style={{
-                          fontFamily: "Hanuman",
                           color: "rgba(29, 34, 41, 0.6784)",
                         }}
-                      >
+                    >
                         {formatDate(article.date_time_post)}
                       </p>
                     </div>
                     <h2
                       className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "Hanuman" }}
-                    >
+                     
+                  >
                       {article.title}
                     </h2>
                   </div>
@@ -482,7 +481,7 @@ export default function CategoryPage() {
                   key={article.id}
                   href={`/news/${article.id}`}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
-                >
+              >
                   {/* Article Image */}
                   {article.cover && (
                     <div className="relative w-full h-[200px] rounded-xl overflow-hidden bg-gray-200 group">
@@ -513,8 +512,8 @@ export default function CategoryPage() {
                     {article.category && (
                       <span
                         className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                        style={{ fontFamily: "Hanuman" }}
-                      >
+                       
+                    >
                         {article.category.name}
                       </span>
                     )}
@@ -523,15 +522,15 @@ export default function CategoryPage() {
                     </p>
                     <h2
                       className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "Hanuman" }}
-                    >
+                     
+                  >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "Hanuman" }}
-                      >
+                       
+                    >
                         {article.subtitle}
                       </p>
                     )}
@@ -539,8 +538,8 @@ export default function CategoryPage() {
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm text-gray-700 line-clamp-3"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {article.content_blocks[0].paragraph}
                         </p>
                       )}

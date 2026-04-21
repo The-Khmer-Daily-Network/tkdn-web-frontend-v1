@@ -214,7 +214,7 @@ export default function VideoSelectorModal({
               <button
                 onClick={handleUpload}
                 className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
-              >
+            >
                 <Plus size={14} />
                 Upload Video
               </button>
@@ -222,7 +222,7 @@ export default function VideoSelectorModal({
                 onClick={onClose}
                 className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                 aria-label="Close"
-              >
+            >
                 <X size={18} />
               </button>
             </div>
@@ -242,7 +242,7 @@ export default function VideoSelectorModal({
                 <button
                   onClick={fetchVideos}
                   className="px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-xs"
-                >
+              >
                   Retry
                 </button>
               </div>
@@ -255,7 +255,7 @@ export default function VideoSelectorModal({
                   <button
                     onClick={handleUpload}
                     className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
-                  >
+                >
                     Upload Your First Video
                   </button>
                 </div>
@@ -266,7 +266,7 @@ export default function VideoSelectorModal({
                   <div
                     key={video.id}
                     className="relative group rounded-md overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
-                  >
+                >
                     <div className="relative aspect-square bg-gray-100 shrink-0 overflow-hidden">
                       {/* Select Button - Top Right */}
                       <button
@@ -276,7 +276,7 @@ export default function VideoSelectorModal({
                         }}
                         className="absolute top-1.5 right-1.5 z-20 bg-blue-600 text-white px-2 py-1 rounded-md text-[10px] font-medium hover:bg-blue-700 transition-colors shadow-md opacity-0 group-hover:opacity-100 flex items-center gap-1"
                         aria-label="Select video"
-                      >
+                    >
                         <Check size={12} />
                         Select
                       </button>
@@ -318,7 +318,7 @@ export default function VideoSelectorModal({
                                 onClick={(e) => handlePlayVideo(video.id, e)}
                                 className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors cursor-pointer z-10 pointer-events-auto"
                                 aria-label="Play video"
-                              >
+                            >
                                 <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors pointer-events-none">
                                   <Play
                                     size={20}
@@ -334,7 +334,7 @@ export default function VideoSelectorModal({
                                 onClick={(e) => handlePlayVideo(video.id, e)}
                                 className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors cursor-pointer z-10 pointer-events-auto"
                                 aria-label="Pause video"
-                              >
+                            >
                                 <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors opacity-0 group-hover:opacity-100 pointer-events-none">
                                   <div className="w-5 h-5 flex items-center justify-center">
                                     <div className="w-1 h-3 bg-gray-900 mr-0.5"></div>
@@ -368,7 +368,7 @@ export default function VideoSelectorModal({
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
+              >
                   <ChevronLeft size={14} />
                   Previous
                 </button>
@@ -392,7 +392,7 @@ export default function VideoSelectorModal({
                           <span
                             key={page}
                             className="px-1.5 text-gray-500 text-xs"
-                          >
+                        >
                             ...
                           </span>
                         );
@@ -409,7 +409,7 @@ export default function VideoSelectorModal({
                             ? "bg-blue-600 text-white"
                             : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                         }`}
-                      >
+                    >
                         {page}
                       </button>
                     );
@@ -420,7 +420,7 @@ export default function VideoSelectorModal({
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === paginatedData.totalPages}
                   className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
+              >
                   Next
                   <ChevronRight size={14} />
                 </button>

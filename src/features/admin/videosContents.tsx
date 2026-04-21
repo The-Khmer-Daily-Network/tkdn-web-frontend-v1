@@ -213,7 +213,7 @@ export default function VideosContents() {
         <button
           onClick={fetchVideos}
           className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -233,7 +233,7 @@ export default function VideosContents() {
               type="button"
               onClick={handleUpload}
               className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-            >
+          >
               <Plus size={16} />
               Upload Video
             </button>
@@ -273,7 +273,7 @@ export default function VideosContents() {
             type="button"
             onClick={handleUpload}
             className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
-          >
+        >
             <Plus size={14} />
             Upload Video
           </button>
@@ -287,7 +287,7 @@ export default function VideosContents() {
             <div
               key={video.id}
               className="relative group rounded-md overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
-            >
+          >
               <div className="relative aspect-square bg-gray-100 shrink-0 overflow-hidden">
                 {videoErrors[video.id] ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gray-200">
@@ -335,7 +335,7 @@ export default function VideosContents() {
                         onClick={(e) => handlePlayVideo(video.id, e)}
                         className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors cursor-pointer z-10 pointer-events-auto"
                         aria-label="Play video"
-                      >
+                    >
                         <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors pointer-events-none">
                           <Play
                             size={20}
@@ -350,7 +350,7 @@ export default function VideosContents() {
                         onClick={(e) => handlePlayVideo(video.id, e)}
                         className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors cursor-pointer z-10 pointer-events-auto"
                         aria-label="Pause video"
-                      >
+                    >
                         <div className="bg-white/90 rounded-full p-2 hover:bg-white transition-colors opacity-0 group-hover:opacity-100 pointer-events-none">
                           <div className="w-5 h-5 flex items-center justify-center">
                             <div className="w-1 h-3 bg-gray-900 mr-0.5"></div>
@@ -369,7 +369,7 @@ export default function VideosContents() {
                   disabled={deletingId === video.id}
                   className="cursor-pointer absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg z-20"
                   aria-label="Delete video"
-                >
+              >
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -394,7 +394,7 @@ export default function VideosContents() {
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
               className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+          >
               <ChevronLeft size={14} />
               Previous
             </button>
@@ -431,7 +431,7 @@ export default function VideosContents() {
                         ? "bg-blue-600 text-white"
                         : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                     }`}
-                  >
+                >
                     {page}
                   </button>
                 );
@@ -442,7 +442,7 @@ export default function VideosContents() {
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === paginatedData.totalPages}
               className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+          >
               Next
               <ChevronRight size={14} />
             </button>

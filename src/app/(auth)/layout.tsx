@@ -65,7 +65,7 @@ export default function AuthLayout({
             <button
               onClick={() => router.push("/dashboard")}
               className="cursor-pointer rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
+          >
               Go to Analytics
             </button>
             <button
@@ -75,7 +75,7 @@ export default function AuthLayout({
                 router.push(`/login?redirect=${redirectPath}`);
               }}
               className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-            >
+          >
               Logout
             </button>
           </div>
@@ -98,7 +98,7 @@ export default function AuthLayout({
             <button
               onClick={() => router.push("/")}
               className="cursor-pointer rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
+          >
               Go home
             </button>
             <button
@@ -108,7 +108,7 @@ export default function AuthLayout({
                 router.push(`/login?redirect=${redirectPath}`);
               }}
               className="cursor-pointer rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-            >
+          >
               Logout
             </button>
           </div>
@@ -126,7 +126,7 @@ export default function AuthLayout({
         <div
           className="mx-auto min-h-screen bg-gray-50"
           style={{ maxWidth: "1440px", width: "clamp(1000px, 100%, 1440px)" }}
-        >
+      >
           <div className="">{children}</div>
         </div>
       </main>

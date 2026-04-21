@@ -26,7 +26,7 @@ const TikTokIcon = ({
     strokeLinecap="round"
     strokeLinejoin="round"
     xmlns="http://www.w3.org/2000/svg"
-  >
+>
     <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
   </svg>
 );
@@ -389,7 +389,7 @@ export default function SocialMediaWidget({
     <div
       className="w-full h-full rounded-[10px] overflow-hidden flex flex-col"
       style={{ boxShadow: "0 0 0 rgba(0, 0, 0, 0.00)" }}
-    >
+  >
       {/* Header - Dark Blue */}
       <div className="bg-[#273C8F] px-3 py-2.5 flex-shrink-0">
         <h3 className="text-white font-bold text-base max-[1023px]:text-base min-[1024px]:max-[1091px]:text-xs min-[1092px]:text-sm">
@@ -496,7 +496,7 @@ export default function SocialMediaWidget({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center w-full hover:opacity-80 transition-opacity cursor-pointer py-0.5"
-                >
+              >
                   {content}
                 </a>
               );
@@ -505,7 +505,7 @@ export default function SocialMediaWidget({
                 <div
                   key={`${social.id || index}-${social.name}-${index}`}
                   className="flex items-center w-full py-0.5"
-                >
+              >
                   {content}
                 </div>
               );

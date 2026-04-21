@@ -84,13 +84,13 @@ function NewsModal({
   const [middleVideoUploading, setMiddleVideoUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
-  >(null);
+>(null);
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleVideoPendingFile, setMiddleVideoPendingFile] =
     useState<File | null>(null);
   const [endImagePendingFiles, setEndImagePendingFiles] = useState<
     Array<File | null>
-  >([null, null, null]);
+>([null, null, null]);
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleVideoUrlRef = useRef<string | null>(null);
@@ -495,7 +495,7 @@ function NewsModal({
             ? "relative"
             : "fixed inset-0 z-100 flex items-center justify-center p-4"
         }
-      >
+    >
         <div
           className={
             asPage
@@ -503,7 +503,7 @@ function NewsModal({
               : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           }
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Video Article
@@ -512,7 +512,7 @@ function NewsModal({
               onClick={onClose}
               disabled={loading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -520,7 +520,7 @@ function NewsModal({
           <form
             onSubmit={handleSubmit}
             className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
-          >
+        >
             {/* Left column: keep Details + Content Blocks together */}
             <div className="min-w-0 space-y-6">
               {/* Basic Information Section */}
@@ -567,7 +567,7 @@ function NewsModal({
                     }
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
                     disabled={loading}
-                  >
+                >
                     <option value="">Select category</option>
                     {allCategories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
@@ -607,7 +607,7 @@ function NewsModal({
                     onClick={handleAddContentBlock}
                     className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
                     disabled={loading}
-                  >
+                >
                     <Plus size={14} />
                     Add Block
                   </button>
@@ -617,7 +617,7 @@ function NewsModal({
                     <div
                       key={index}
                       className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
-                    >
+                  >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
@@ -635,7 +635,7 @@ function NewsModal({
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                          >
+                        >
                             Remove
                           </button>
                         )}
@@ -721,7 +721,7 @@ function NewsModal({
                         }}
                         className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                         disabled={loading || coverUploading}
-                      >
+                    >
                         <X size={12} />
                       </button>
                     </div>
@@ -747,7 +747,7 @@ function NewsModal({
                         onClick={() => coverFileInputRef.current?.click()}
                         className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
                         disabled={loading || coverUploading}
-                      >
+                    >
                         {coverUploading ? "Uploading..." : "Change Image"}
                       </button>
                       <input
@@ -768,7 +768,7 @@ function NewsModal({
                       onClick={() => coverFileInputRef.current?.click()}
                       className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                       disabled={loading || coverUploading}
-                    >
+                  >
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                           <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
@@ -827,7 +827,7 @@ function NewsModal({
                         }}
                         className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                         disabled={loading || middleVideoUploading}
-                      >
+                    >
                         <X size={12} />
                       </button>
                     </div>
@@ -855,7 +855,7 @@ function NewsModal({
                         onClick={() => middleVideoFileInputRef.current?.click()}
                         className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
                         disabled={loading || middleVideoUploading}
-                      >
+                    >
                         {middleVideoUploading ? "Uploading..." : "Change Video"}
                       </button>
                       <input
@@ -876,7 +876,7 @@ function NewsModal({
                       onClick={() => middleVideoFileInputRef.current?.click()}
                       className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                       disabled={loading || middleVideoUploading}
-                    >
+                  >
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                           <VideoIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
@@ -943,7 +943,7 @@ function NewsModal({
                                   onClick={() => handleRemoveEndImage(slotIndex)}
                                   className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
                                   disabled={loading || isUploading}
-                                >
+                              >
                                   <X size={10} />
                                 </button>
                               </div>
@@ -981,7 +981,7 @@ function NewsModal({
                               }
                               className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                               disabled={loading || isUploading}
-                            >
+                          >
                               <div className="flex flex-col items-center">
                                 <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                                   <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
@@ -1035,7 +1035,7 @@ function NewsModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
-              >
+            >
                 Cancel
               </button>
               <button
@@ -1044,7 +1044,7 @@ function NewsModal({
                   loading || !title.trim() || !author.trim() || !middleVideoUrl
                 }
                 className="cursor-pointer px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
-              >
+            >
                 {loading
                   ? "Saving..."
                   : news
@@ -1244,7 +1244,7 @@ export default function VideoManagement() {
         <button
           onClick={fetchData}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -1281,7 +1281,7 @@ export default function VideoManagement() {
           <button
             onClick={handleCreateArticle}
             className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
+        >
             <Plus size={16} />
             Add Video Article
           </button>
@@ -1303,7 +1303,7 @@ export default function VideoManagement() {
               <button
                 onClick={handleCreateArticle}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Video Article
               </button>
             </div>
@@ -1329,7 +1329,7 @@ export default function VideoManagement() {
                 <div
                   key={article.id}
                   className="px-6 py-4 hover:bg-gray-50 transition-colors"
-                >
+              >
                   <div className="grid grid-cols-12 gap-4 items-center">
                     {/* Number */}
                     <div className="col-span-1 text-center">
@@ -1408,7 +1408,7 @@ export default function VideoManagement() {
                           onClick={() => handleEditArticle(article)}
                           className="cursor-pointer p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
-                        >
+                      >
                           <Edit2 size={18} />
                         </button>
                         <button
@@ -1416,7 +1416,7 @@ export default function VideoManagement() {
                           disabled={deletingId === article.id}
                           className="cursor-pointer p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete"
-                        >
+                      >
                           <Trash2 size={18} />
                         </button>
                       </div>
@@ -1439,7 +1439,7 @@ export default function VideoManagement() {
                   value={ITEMS_PER_PAGE}
                   disabled
                   className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
-                >
+              >
                   <option value={15}>15</option>
                 </select>
               </div>
@@ -1458,7 +1458,7 @@ export default function VideoManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="First page"
-                >
+              >
                   <ChevronsLeft size={16} />
                 </button>
 
@@ -1468,7 +1468,7 @@ export default function VideoManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Previous page"
-                >
+              >
                   <ChevronLeft size={16} />
                 </button>
 
@@ -1478,7 +1478,7 @@ export default function VideoManagement() {
                   disabled={currentPage === paginatedData.totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Next page"
-                >
+              >
                   <ChevronRight size={16} />
                 </button>
 
@@ -1488,7 +1488,7 @@ export default function VideoManagement() {
                   disabled={currentPage === paginatedData.totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Last page"
-                >
+              >
                   <ChevronsRight size={16} />
                 </button>
               </div>

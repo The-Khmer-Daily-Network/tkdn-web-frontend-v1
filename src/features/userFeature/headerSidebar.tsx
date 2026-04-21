@@ -165,7 +165,7 @@ export default function HeaderSidebar({
   return (
     <header
       className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[30px]"}`}
-    >
+  >
       <div className="w-full h-[65px] bg-white border-b border-gray-200 rounded-b-[30px] shadow-sm transition-shadow duration-200 hover:shadow-md">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
           {/* Left Side - Logo and Search */}
@@ -206,7 +206,7 @@ export default function HeaderSidebar({
                       "rgba(29, 34, 41, 0.0314)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
-                >
+              >
                   <span>Search News "Khmer Daily Network"</span>
                   <div
                     className="flex items-center justify-center rounded-full shrink-0"
@@ -215,7 +215,7 @@ export default function HeaderSidebar({
                       width: "60px",
                       height: "38px",
                     }}
-                  >
+                >
                     <Search size={14} color="white" />
                   </div>
                 </button>
@@ -224,7 +224,7 @@ export default function HeaderSidebar({
                   onSubmit={handleSearchSubmit}
                   className="w-full"
                   style={{ width: "350px" }}
-                >
+              >
                   <div
                     className="flex items-center justify-between h-[40px] rounded-[50px] transition-all duration-200 font-poppins"
                     style={{
@@ -236,7 +236,7 @@ export default function HeaderSidebar({
                       paddingLeft: "16px",
                       paddingRight: "1px",
                     }}
-                  >
+                >
                     <input
                       ref={searchInputRef}
                       type="text"
@@ -270,7 +270,7 @@ export default function HeaderSidebar({
                         width: "60px",
                         height: "38px",
                       }}
-                    >
+                  >
                       <Search size={14} color="white" />
                     </button>
                   </div>
@@ -282,8 +282,8 @@ export default function HeaderSidebar({
           {/* Right Side - Navigation – Inter Khmer Looped, text-base */}
           <nav
             className="hidden lg:flex items-center gap-6"
-            style={{ fontFamily: '"Hanuman", sans-serif' }}
-          >
+            
+        >
             <Link
               href="/latest"
               className={`transition-colors text-base ${
@@ -291,7 +291,7 @@ export default function HeaderSidebar({
                   ? "text-[#E34C33] font-semibold"
                   : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
               }`}
-            >
+          >
               LATEST
             </Link>
             <Link
@@ -301,7 +301,7 @@ export default function HeaderSidebar({
                   ? "text-[#E34C33] font-semibold"
                   : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
               }`}
-            >
+          >
               NATIONAL
             </Link>
             <Link
@@ -311,7 +311,7 @@ export default function HeaderSidebar({
                   ? "text-[#E34C33] font-semibold"
                   : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
               }`}
-            >
+          >
               INTERNATIONAL
             </Link>
             <Link
@@ -325,7 +325,7 @@ export default function HeaderSidebar({
                 e.preventDefault();
                 router.push("/video");
               }}
-            >
+          >
               VIDEO
             </Link>
             <div
@@ -345,11 +345,11 @@ export default function HeaderSidebar({
                   hoverTimeoutRef.current = null;
                 }, 200);
               }}
-            >
+          >
               <a
                 href="#"
                 className="flex items-center gap-0 text-[#1D2229] hover:text-[#E34C33] transition-colors font-semibold text-base"
-              >
+            >
                 MORE
                 <ChevronDown
                   size={16}
@@ -376,7 +376,7 @@ export default function HeaderSidebar({
                   aboutUsTimeoutRef.current = null;
                 }, 200);
               }}
-            >
+          >
               <a
                 href="/about-us"
                 className={`flex items-center gap-0 text-base transition-colors ${
@@ -384,7 +384,7 @@ export default function HeaderSidebar({
                     ? "text-[#E34C33] font-semibold"
                     : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
                 }`}
-              >
+            >
                 ABOUT US
                 <ChevronDown
                   size={16}
@@ -403,12 +403,12 @@ export default function HeaderSidebar({
                     marginTop: "8px",
                     borderRadius: "30px",
                   }}
-                >
+              >
                   <div className="py-2">
                     <Link
                       href="/about-us"
                       className="block px-4 py-2 text-base transition-colors text-[#E34C33] font-semibold hover:bg-gray-50"
-                    >
+                  >
                       About Us
                     </Link>
                     <ul className="border-t border-gray-100">
@@ -418,7 +418,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           Facebook
                         </a>
                       </li>
@@ -428,7 +428,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           YouTube
                         </a>
                       </li>
@@ -438,7 +438,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           TikTok
                         </a>
                       </li>
@@ -448,7 +448,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           X
                         </a>
                       </li>
@@ -458,7 +458,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           Instagram
                         </a>
                       </li>
@@ -468,7 +468,7 @@ export default function HeaderSidebar({
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block px-4 py-2 text-base transition-colors text-gray-600 hover:text-[#E34C33] hover:bg-gray-50"
-                        >
+                      >
                           Website
                         </a>
                       </li>
@@ -484,7 +484,7 @@ export default function HeaderSidebar({
             className="lg:hidden p-2 text-[#1D2229] transition-colors"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-label="Toggle menu"
-          >
+        >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
@@ -509,18 +509,18 @@ export default function HeaderSidebar({
           }, 200);
         }}
         style={{ marginTop: "-1px" }}
-      >
+    >
         {isMoreHovered && (
           <>
             {/* Invisible bridge area to connect button and dropdown - extends upward to eliminate gap */}
             <div
               className="absolute top-0 left-0 w-full pointer-events-auto"
               style={{ height: "20px", marginTop: "-20px" }}
-            ></div>
+          ></div>
             <div
               className="relative w-full bg-white border border-gray-200 shadow-lg z-40 overflow-hidden"
               style={{ borderRadius: "30px", marginTop: "-8px" }}
-            >
+          >
               <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                   {categories.length > 0
@@ -549,8 +549,8 @@ export default function HeaderSidebar({
                                   router.push("/video");
                                 }
                               }}
-                            >
-                              <span style={{ fontFamily: "Hanuman" }}>
+                          >
+                              <span>
                                 {category.name}
                               </span>
                             </Link>
@@ -577,12 +577,11 @@ export default function HeaderSidebar({
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="block text-base transition-colors text-gray-600 hover:text-[#E34C33]"
-                                          >
+                                        >
                                             <span
                                               style={{
-                                                fontFamily: "Hanuman",
                                               }}
-                                            >
+                                          >
                                               {subcategory.name}
                                             </span>
                                           </a>
@@ -601,12 +600,11 @@ export default function HeaderSidebar({
                                                 ? "text-[#E34C33] font-medium"
                                                 : "text-gray-600 hover:text-[#E34C33]"
                                             }`}
-                                          >
+                                        >
                                             <span
                                               style={{
-                                                fontFamily: "Hanuman",
                                               }}
-                                            >
+                                          >
                                               {subcategory.name}
                                             </span>
                                           </Link>
@@ -638,12 +636,11 @@ export default function HeaderSidebar({
                                               router.push("/video");
                                             }
                                           }}
-                                        >
+                                      >
                                           <span
                                             style={{
-                                              fontFamily: "Hanuman",
                                             }}
-                                          >
+                                        >
                                             {subcategory.name}
                                           </span>
                                         </Link>
@@ -706,7 +703,7 @@ export default function HeaderSidebar({
                     "rgba(29, 34, 41, 0.0314)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
-              >
+            >
                 <span>Search News "Khmer Daily Network"</span>
                 <div
                   className="flex items-center justify-center rounded-full shrink-0"
@@ -715,7 +712,7 @@ export default function HeaderSidebar({
                     width: "60px",
                     height: "38px",
                   }}
-                >
+              >
                   <Search size={14} color="white" />
                 </div>
               </button>
@@ -733,7 +730,7 @@ export default function HeaderSidebar({
                   }
                 }}
                 className="w-full"
-              >
+            >
                 <div
                   className="flex items-center justify-between h-[40px] w-full rounded-[50px] transition-all duration-200 font-poppins"
                   style={{
@@ -744,7 +741,7 @@ export default function HeaderSidebar({
                     paddingLeft: "16px",
                     paddingRight: "1px",
                   }}
-                >
+              >
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -762,7 +759,7 @@ export default function HeaderSidebar({
                       width: "60px",
                       height: "38px",
                     }}
-                  >
+                >
                     <Search size={14} color="white" />
                   </button>
                 </div>
@@ -779,7 +776,7 @@ export default function HeaderSidebar({
                     : "text-[#1D2229] hover:text-[#E34C33] font-medium"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
-              >
+            >
                 Latest
               </Link>
               <Link
@@ -790,7 +787,7 @@ export default function HeaderSidebar({
                     : "text-[#1D2229] hover:text-[#E34C33] font-medium"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
-              >
+            >
                 National
               </Link>
               <Link
@@ -801,7 +798,7 @@ export default function HeaderSidebar({
                     : "text-[#1D2229] hover:text-[#E34C33] font-medium"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
-              >
+            >
                 International
               </Link>
               <Link
@@ -816,7 +813,7 @@ export default function HeaderSidebar({
                   router.push("/video");
                   setIsMobileMenuOpen(false);
                 }}
-              >
+            >
                 Video
               </Link>
               <Link
@@ -827,14 +824,14 @@ export default function HeaderSidebar({
                     : "text-[#1D2229] hover:text-[#E34C33] font-medium"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
-              >
+            >
                 About Us
               </Link>
               <div className="border-t border-gray-200 pt-3">
                 <button
                   onClick={() => setIsMoreClicked(!isMoreClicked)}
                   className="text-[#1D2229] hover:text-[#E34C33] transition-colors font-medium text-base py-2 flex items-center gap-1 w-full text-left"
-                >
+              >
                   More
                   <ChevronDown
                     size={16}
@@ -871,7 +868,7 @@ export default function HeaderSidebar({
                                 setIsMobileMenuOpen(false);
                                 setIsMoreClicked(false);
                               }}
-                            >
+                          >
                               {category.name}
                             </Link>
                             {category.subcategories &&
@@ -885,7 +882,7 @@ export default function HeaderSidebar({
                                     );
                                   }}
                                   className="p-1"
-                                >
+                              >
                                   <ChevronDown
                                     size={12}
                                     className={`transition-transform ${
@@ -924,7 +921,7 @@ export default function HeaderSidebar({
                                             setIsMobileMenuOpen(false);
                                             setIsMoreClicked(false);
                                           }}
-                                        >
+                                      >
                                           {subcategory.name}
                                         </a>
                                       </li>
@@ -946,7 +943,7 @@ export default function HeaderSidebar({
                                             setIsMobileMenuOpen(false);
                                             setIsMoreClicked(false);
                                           }}
-                                        >
+                                      >
                                           {subcategory.name}
                                         </Link>
                                       </li>
@@ -978,7 +975,7 @@ export default function HeaderSidebar({
                                           setIsMobileMenuOpen(false);
                                           setIsMoreClicked(false);
                                         }}
-                                      >
+                                    >
                                         {subcategory.name}
                                       </Link>
                                     </li>

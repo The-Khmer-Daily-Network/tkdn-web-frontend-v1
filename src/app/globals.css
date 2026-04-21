@@ -3,34 +3,150 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* Khmer text: Hanuman only (English falls back to existing Latin fonts) */
-  --font-khmer-body:
-    "Hanuman", var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  /* Khmer headings/titles: also Hanuman */
+  /* Script-aware stack: Khmer => Hanuman, English => News Cycle */
+  --font-latin: "News Cycle", ui-sans-serif, system-ui, sans-serif;
+  --font-khmer-body: "Hanuman", "News Cycle", ui-sans-serif, system-ui, sans-serif;
+  /* Khmer headings/titles */
   --font-khmer-heading:
     "Hanuman", var(--font-khmer-body), ui-sans-serif, system-ui, sans-serif;
   --font-khmer: var(--font-khmer-body);
 }
 
-/* ─── Hanuman: Khmer-only glyph shaping, keep English in existing fonts ─── */
+/* Hanuman for Khmer glyphs */
 @font-face {
   font-family: "Hanuman";
-  src: url("/fonts/Hanuman/Hanuman-VariableFont_wght.ttf") format("truetype");
+  src: url("/fonts/Hanuman/Hanuman-Thin.ttf") format("truetype");
   font-display: swap;
-  font-weight: 100 900;
+  font-weight: 100;
   font-style: normal;
-  /* Khmer + Khmer Symbols blocks only */
   unicode-range:
     U+1780-17FF,
     U+19E0-19FF;
 }
 
-/* Backward-compat aliases: force old Khmer font names to render Hanuman */
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-ExtraLight.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 200;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Light.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 300;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Medium.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 500;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-SemiBold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 600;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Bold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 700;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-ExtraBold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 800;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Black.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 900;
+  font-style: normal;
+  unicode-range:
+    U+1780-17FF,
+    U+19E0-19FF;
+}
+
+/* News Cycle for Latin glyphs */
+@font-face {
+  font-family: "News Cycle";
+  src: url("/fonts/News_Cycle/NewsCycle-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+  unicode-range:
+    U+0000-00FF,
+    U+0100-024F,
+    U+1E00-1EFF,
+    U+2000-206F,
+    U+20A0-20CF;
+}
+
+@font-face {
+  font-family: "News Cycle";
+  src: url("/fonts/News_Cycle/NewsCycle-Bold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 700;
+  font-style: normal;
+  unicode-range:
+    U+0000-00FF,
+    U+0100-024F,
+    U+1E00-1EFF,
+    U+2000-206F,
+    U+20A0-20CF;
+}
+
+/* Backward-compat aliases */
 @font-face {
   font-family: "AKbalthom Techno";
-  src: url("/fonts/Hanuman/Hanuman-VariableFont_wght.ttf") format("truetype");
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
   font-display: swap;
-  font-weight: 100 900;
+  font-weight: 400;
   font-style: normal;
   unicode-range:
     U+1780-17FF,
@@ -39,9 +155,9 @@
 
 @font-face {
   font-family: "Inter Khmer Looped";
-  src: url("/fonts/Hanuman/Hanuman-VariableFont_wght.ttf") format("truetype");
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
   font-display: swap;
-  font-weight: 100 900;
+  font-weight: 400;
   font-style: normal;
   unicode-range:
     U+1780-17FF,
@@ -75,7 +191,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-khmer-body);
   --font-mono: var(--font-geist-mono);
-  --font-poppins: var(--font-khmer-body);
 }
 
 @media (prefers-color-scheme: dark) {

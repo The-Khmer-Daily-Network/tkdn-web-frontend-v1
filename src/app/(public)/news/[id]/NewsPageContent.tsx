@@ -768,8 +768,8 @@ export default function NewsPageContent({
               {singleNews.category && (
                 <span
                   className="text-sm font-bold text-[#1D2229] uppercase"
-                  style={{ fontFamily: "Hanuman" }}
-                >
+                 
+              >
                   {singleNews.category.name}
                 </span>
               )}
@@ -792,8 +792,8 @@ export default function NewsPageContent({
           {/* Main Title – Inter Khmer Looped Black from public/Khmer */}
           <h1
             className="text-xl md:text-2xl lg:text-3xl font-black text-[#1D2229] leading-snug"
-            style={{ fontFamily: '"Hanuman", sans-serif' }}
-          >
+            
+        >
             {singleNews.title}
           </h1>
 
@@ -801,8 +801,8 @@ export default function NewsPageContent({
           {singleNews.subtitle && (
             <p
               className="text-xl text-gray-700 mt-4"
-              style={{ fontFamily: "Hanuman" }}
-            >
+             
+          >
               {singleNews.subtitle}
             </p>
           )}
@@ -828,8 +828,8 @@ export default function NewsPageContent({
               {singleNews.cover_name && (
                 <p
                   className="text-sm text-gray-600 mt-2 italic"
-                  style={{ fontFamily: "Hanuman" }}
-                >
+                 
+              >
                   {singleNews.cover_name}
                 </p>
               )}
@@ -853,8 +853,8 @@ export default function NewsPageContent({
                       {block.subtitle && (
                         <h2
                           className="text-2xl font-bold text-[#1D2229] mt-8 mb-6"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {block.subtitle}
                         </h2>
                       )}
@@ -865,8 +865,8 @@ export default function NewsPageContent({
                           <p
                             key={paraIndex}
                             className="text-base text-gray-800 leading-relaxed"
-                            style={{ fontFamily: "Hanuman" }}
-                          >
+                           
+                        >
                             {paragraph.trim()}
                           </p>
                         ))}
@@ -912,7 +912,7 @@ export default function NewsPageContent({
                                             e.target as HTMLVideoElement;
                                           video.style.display = "none";
                                         }}
-                                      >
+                                    >
                                         Your browser does not support the video
                                         tag.
                                       </video>
@@ -921,7 +921,7 @@ export default function NewsPageContent({
                                       <button
                                         onClick={() => setIsVideoPlaying(false)}
                                         className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded hover:bg-opacity-70 transition-all z-30"
-                                      >
+                                    >
                                         × Close
                                       </button>
                                     </div>
@@ -942,7 +942,7 @@ export default function NewsPageContent({
                                         }
                                       }}
                                       className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden cursor-pointer group"
-                                    >
+                                  >
                                       {/* Thumbnail Image */}
                                       {thumbnailUrl ? (
                                         <img
@@ -989,7 +989,7 @@ export default function NewsPageContent({
                                             <div
                                               className="absolute inset-0 w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center"
                                               style={{ zIndex: 0 }}
-                                            >
+                                          >
                                               <Play className="w-16 h-16 text-gray-500" />
                                             </div>
                                           )}
@@ -1104,8 +1104,8 @@ export default function NewsPageContent({
           <div className="border-b border-gray-200 pb-4">
             <h1
               className="text-2xl font-bold text-[#1D2229]"
-              style={{ fontFamily: "Hanuman" }}
-            >
+             
+          >
               {category.name}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
@@ -1142,7 +1142,7 @@ export default function NewsPageContent({
                   key={article.id}
                   href={`/news/${article.id}`}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
-                >
+              >
                   {/* Article Image */}
                   <div className="relative w-[250px] h-[160px] shrink-0 rounded-lg overflow-hidden bg-gray-200 group">
                     {article.cover && (
@@ -1174,32 +1174,31 @@ export default function NewsPageContent({
                       {article.category && (
                         <span
                           className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {article.category.name}
                         </span>
                       )}
                       <p
                         className="text-xs max-[481px]:text-[10px] font-medium"
                         style={{
-                          fontFamily: "Hanuman",
                           color: "rgba(29, 34, 41, 0.6784)",
                         }}
-                      >
+                    >
                         {formatDate(article.date_time_post)}
                       </p>
                     </div>
                     <h2
                       className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "Hanuman" }}
-                    >
+                     
+                  >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm max-[481px]:text-xs text-gray-600 line-clamp-2 mt-1"
-                        style={{ fontFamily: "Hanuman" }}
-                      >
+                       
+                    >
                         {article.subtitle}
                       </p>
                     )}
@@ -1207,8 +1206,8 @@ export default function NewsPageContent({
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm max-[481px]:text-xs text-gray-600 line-clamp-2 mt-1"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {article.content_blocks[0].paragraph}
                         </p>
                       )}
@@ -1224,7 +1223,7 @@ export default function NewsPageContent({
                   key={article.id}
                   href={`/news/${article.id}`}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
-                >
+              >
                   {/* Article Image */}
                   {article.cover && (
                     <div className="relative w-full h-[200px] rounded-xl overflow-hidden bg-gray-200 group">
@@ -1255,8 +1254,8 @@ export default function NewsPageContent({
                     {article.category && (
                       <span
                         className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                        style={{ fontFamily: "Hanuman" }}
-                      >
+                       
+                    >
                         {article.category.name}
                       </span>
                     )}
@@ -1265,15 +1264,15 @@ export default function NewsPageContent({
                     </p>
                     <h2
                       className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight"
-                      style={{ fontFamily: "Hanuman" }}
-                    >
+                     
+                  >
                       {article.title}
                     </h2>
                     {article.subtitle && (
                       <p
                         className="text-sm text-gray-600 line-clamp-2"
-                        style={{ fontFamily: "Hanuman" }}
-                      >
+                       
+                    >
                         {article.subtitle}
                       </p>
                     )}
@@ -1281,8 +1280,8 @@ export default function NewsPageContent({
                       article.content_blocks.length > 0 && (
                         <p
                           className="text-sm text-gray-700 line-clamp-3"
-                          style={{ fontFamily: "Hanuman" }}
-                        >
+                         
+                      >
                           {article.content_blocks[0].paragraph}
                         </p>
                       )}
