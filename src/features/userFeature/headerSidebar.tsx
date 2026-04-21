@@ -288,8 +288,8 @@ export default function HeaderSidebar({
               href="/latest"
               className={`transition-colors text-base ${
                 isActiveRoute("/latest")
-                  ? "text-[#E34C33] font-semibold"
-                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                  ? "text-[#E34C33] font-bold"
+                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
               }`}
           >
               LATEST
@@ -298,8 +298,8 @@ export default function HeaderSidebar({
               href="/national"
               className={`transition-colors text-base ${
                 isActiveRoute("/national")
-                  ? "text-[#E34C33] font-semibold"
-                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                  ? "text-[#E34C33] font-bold"
+                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
               }`}
           >
               NATIONAL
@@ -308,8 +308,8 @@ export default function HeaderSidebar({
               href="/international"
               className={`transition-colors text-base ${
                 isActiveRoute("/international")
-                  ? "text-[#E34C33] font-semibold"
-                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                  ? "text-[#E34C33] font-bold"
+                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
               }`}
           >
               INTERNATIONAL
@@ -318,8 +318,8 @@ export default function HeaderSidebar({
               href="/video"
               className={`transition-colors text-base ${
                 isActiveRoute("/video")
-                  ? "text-[#E34C33] font-semibold"
-                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                  ? "text-[#E34C33] font-bold"
+                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
               }`}
               onClick={(e) => {
                 e.preventDefault();
@@ -348,7 +348,7 @@ export default function HeaderSidebar({
           >
               <a
                 href="#"
-                className="flex items-center gap-0 text-[#1D2229] hover:text-[#E34C33] transition-colors font-semibold text-base"
+                className="flex items-center gap-0 text-[#1D2229] hover:text-[#E34C33] transition-colors font-bold text-base"
             >
                 MORE
                 <ChevronDown
@@ -381,8 +381,8 @@ export default function HeaderSidebar({
                 href="/about-us"
                 className={`flex items-center gap-0 text-base transition-colors ${
                   isActiveRoute("/about-us")
-                    ? "text-[#E34C33] font-semibold"
-                    : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                    ? "text-[#E34C33] font-bold"
+                    : "text-[#1D2229] hover:text-[#E34C33] font-bold"
                 }`}
             >
                 ABOUT US
@@ -407,7 +407,7 @@ export default function HeaderSidebar({
                   <div className="py-2">
                     <Link
                       href="/about-us"
-                      className="block px-4 py-2 text-base transition-colors text-[#E34C33] font-semibold hover:bg-gray-50"
+                      className="block px-4 py-2 text-base transition-colors text-[#E34C33] font-bold hover:bg-gray-50"
                   >
                       About Us
                     </Link>
@@ -540,8 +540,8 @@ export default function HeaderSidebar({
                               href={categorySlug}
                               className={`block text-base transition-colors ${
                                 isCategoryActive
-                                  ? "text-[#E34C33] font-semibold"
-                                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                                  ? "text-[#E34C33] font-bold"
+                                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
                               }`}
                               onClick={(e) => {
                                 if (isVideoCategory) {
@@ -857,8 +857,8 @@ export default function HeaderSidebar({
                               href={categorySlug}
                               className={`flex-1 text-base transition-colors ${
                                 isCategoryActive
-                                  ? "text-[#E34C33] font-semibold"
-                                  : "text-[#1D2229] hover:text-[#E34C33] font-semibold"
+                                  ? "text-[#E34C33] font-bold"
+                                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
                               }`}
                               onClick={(e) => {
                                 if (isVideoCategory) {

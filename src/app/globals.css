@@ -3,25 +3,22 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* Script-aware stack: Khmer => Hanuman, English => News Cycle */
-  --font-latin: "News Cycle", ui-sans-serif, system-ui, sans-serif;
-  --font-khmer-body: "Hanuman", "News Cycle", ui-sans-serif, system-ui, sans-serif;
+  /* Primary UI font: Hanuman (Khmer + English / Latin) */
+  --font-latin: "Hanuman", ui-sans-serif, system-ui, sans-serif;
+  --font-khmer-body: "Hanuman", ui-sans-serif, system-ui, sans-serif;
   /* Khmer headings/titles */
   --font-khmer-heading:
     "Hanuman", var(--font-khmer-body), ui-sans-serif, system-ui, sans-serif;
   --font-khmer: var(--font-khmer-body);
 }
 
-/* Hanuman for Khmer glyphs */
+/* Hanuman (all scripts in these files — Khmer + Latin) */
 @font-face {
   font-family: "Hanuman";
   src: url("/fonts/Hanuman/Hanuman-Thin.ttf") format("truetype");
   font-display: swap;
   font-weight: 100;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -30,9 +27,6 @@
   font-display: swap;
   font-weight: 200;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -41,9 +35,6 @@
   font-display: swap;
   font-weight: 300;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -52,9 +43,6 @@
   font-display: swap;
   font-weight: 400;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -63,9 +51,6 @@
   font-display: swap;
   font-weight: 500;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -74,9 +59,6 @@
   font-display: swap;
   font-weight: 600;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -85,9 +67,6 @@
   font-display: swap;
   font-weight: 700;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -96,9 +75,6 @@
   font-display: swap;
   font-weight: 800;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -107,38 +83,6 @@
   font-display: swap;
   font-weight: 900;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
-}
-
-/* News Cycle for Latin glyphs */
-@font-face {
-  font-family: "News Cycle";
-  src: url("/fonts/News_Cycle/NewsCycle-Regular.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 400;
-  font-style: normal;
-  unicode-range:
-    U+0000-00FF,
-    U+0100-024F,
-    U+1E00-1EFF,
-    U+2000-206F,
-    U+20A0-20CF;
-}
-
-@font-face {
-  font-family: "News Cycle";
-  src: url("/fonts/News_Cycle/NewsCycle-Bold.ttf") format("truetype");
-  font-display: swap;
-  font-weight: 700;
-  font-style: normal;
-  unicode-range:
-    U+0000-00FF,
-    U+0100-024F,
-    U+1E00-1EFF,
-    U+2000-206F,
-    U+20A0-20CF;
 }
 
 /* Backward-compat aliases */
@@ -148,9 +92,6 @@
   font-display: swap;
   font-weight: 400;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 @font-face {
@@ -159,9 +100,6 @@
   font-display: swap;
   font-weight: 400;
   font-style: normal;
-  unicode-range:
-    U+1780-17FF,
-    U+19E0-19FF;
 }
 
 /* Body/caption Khmer text */
