@@ -168,16 +168,16 @@ export default function PublicLayout({
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Main Content - 70% on desktop/tablet, full width on mobile */}
-            <div className="w-full lg:w-[70%]">{children}</div>
+            <div className="w-full lg:w-full">{children}</div>
             {/* Right Side Sponsor - 30% on desktop/tablet, full width on mobile */}
-            <div className="w-full lg:w-[30%] lg:sticky lg:top-[124px] lg:self-start">
+            {/* <div className="w-full lg:w-[30%] lg:sticky lg:top-[124px] lg:self-start">
               <RightsideSponsor
                 images={adImages}
                 socialMedia={socialMedia}
                 statistics={statistics}
                 loading={loading}
               />
-            </div>
+            </div> */}
           </div>
         </div>
         <FooterFeature />
