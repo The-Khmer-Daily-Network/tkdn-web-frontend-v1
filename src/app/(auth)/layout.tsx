@@ -121,7 +121,7 @@ export default function AuthLayout({
     <div className="min-h-screen bg-white">
       <SidebareAdmin />
       {/* Main Content Area */}
-      <main className="ml-[250px] min-h-screen bg-gray-50">
+      <main className="ml-[280px] min-h-screen bg-gray-50">
         {/* Container with max-width 1440px, min-width 1000px, centered */}
         <div
           className="mx-auto min-h-screen bg-gray-50"

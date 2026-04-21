@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import Logo from "@/assets/TKDN_Logo/TKDN_Logo_Rectangle.jpg";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserPassword } from "@/services/auth";
 import type { User } from "@/types/auth";
@@ -138,44 +137,121 @@ export default function SidebareAdmin() {
   ) => {
     const active = isActive(path);
     const baseClasses = isSubItem
-      ? "block px-4 py-2 text-sm rounded-md transition-colors"
-      : "block px-4 py-2 rounded-md transition-colors";
+      ? "block ml-9 px-3 py-1.5 text-[14px] rounded-md transition-colors"
+      : "block w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors";
 
     if (disabled) {
       return `${baseClasses} text-gray-400 cursor-not-allowed opacity-60`;
     }
 
     if (active) {
-      return `${baseClasses} bg-[#273C8F] text-white`;
+      return isSubItem
+        ? `${baseClasses} bg-gray-200 text-[#1f1f1f] font-medium`
+        : `${baseClasses} bg-gray-200 text-[#1f1f1f] font-medium`;
     }
-    return `${baseClasses} text-[#273C8F] hover:bg-gray-100`;
+    return `${baseClasses} text-[#6b6b6b] hover:bg-gray-200/70 hover:text-[#1f1f1f]`;
+  };
+
+  const iconClass = "h-5 w-5 shrink-0";
+  const renderMenuIcon = (key: string) => {
+    switch (key) {
+      case "analytics":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 20h16M7 20V10m5 10V6m5 14v-8" />
+          </svg>
+        );
+      case "article":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7h8M8 12h8M8 17h5" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z" />
+          </svg>
+        );
+      case "video":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="14" height="14" rx="2" strokeWidth={1.8} />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 9l4 3-4 3V9zM18 10l3-2v8l-3-2v-4z" />
+          </svg>
+        );
+      case "notification":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0a3 3 0 11-6 0h6z" />
+          </svg>
+        );
+      case "media":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth={1.8} />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 13l2.5-2.5L15 15l2-2 3 3M8 9h.01" />
+          </svg>
+        );
+      case "activity":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12h4l2-5 4 10 2-5h6" />
+          </svg>
+        );
+      case "users":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1m13-8a3 3 0 110-6 3 3 0 010 6zm6 8v-1a4 4 0 00-3-3.87" />
+          </svg>
+        );
+      case "category":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h10" />
+          </svg>
+        );
+      case "ad":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 15V9a2 2 0 012-2h8l6-3v16l-6-3H6a2 2 0 01-2-2zM8 12h3" />
+          </svg>
+        );
+      case "team":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2m16-8a3 3 0 100-6 3 3 0 000 6z" />
+          </svg>
+        );
+      case "partner":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7h10v10H7zM3 3h4v4H3zM17 3h4v4h-4zM3 17h4v4H3zM17 17h4v4h-4z" />
+          </svg>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[250px] bg-white border-r border-gray-200 flex flex-col">
-      {/* Logo Section */}
-      <div className=" border-b border-gray-200 flex items-center justify-center">
-        <Image
-          src={Logo}
-          alt="The Khmer Daily Network Logo"
-          width={230}
-          height={90}
-          className="object-contain w-[230px] h-[110px]"
-          priority
-        />
+    <aside className="fixed left-0 top-0 h-screen w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col">
+      {/* Brand */}
+      <div className="min-h-16 border-b border-gray-200 px-5 py-3 flex items-center">
+        <p className="text-[18px] font-semibold leading-snug text-[#1f1f1f]">
+          The Khmer Daily Network
+        </p>
       </div>
 
       {/* Navigation Menu */}
-      <nav className="flex-1 overflow-y-auto p-4">
-        <ul className="space-y-2">
+      <nav className="flex-1 overflow-y-auto px-4 py-5">
+        <ul className="space-y-1">
           {isAdminOnly ? (
             <>
               <li>
                 <button
                   onClick={() => setDashboardOpen(!dashboardOpen)}
-                  className="cursor-pointer w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
+                  className="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[#6b6b6b] hover:bg-gray-200/70 hover:text-[#1f1f1f] rounded-md transition-colors"
               >
-                  <span>Analytics</span>
+                  <span className="flex items-center gap-3">
+                    {renderMenuIcon("analytics")}
+                    <span>Analytics</span>
+                  </span>
                   <svg
                     className={`w-4 h-4 transition-transform ${
                       dashboardOpen ? "rotate-180" : ""
@@ -231,7 +307,8 @@ export default function SidebareAdmin() {
                   href="/articleManagement"
                   className={getLinkClasses("/articleManagement")}
               >
-                  Article Management
+                  {renderMenuIcon("article")}
+                  <span>Article Management</span>
                 </Link>
               </li>
               <li>
@@ -239,7 +316,8 @@ export default function SidebareAdmin() {
                   href="/videoManagement"
                   className={getLinkClasses("/videoManagement")}
               >
-                  Video Management
+                  {renderMenuIcon("video")}
+                  <span>Video Management</span>
                 </Link>
               </li>
               <li>
@@ -247,7 +325,8 @@ export default function SidebareAdmin() {
                   href="/guidelines"
                   className={getLinkClasses("/guidelines")}
               >
-                  Notification
+                  {renderMenuIcon("notification")}
+                  <span>Notification</span>
                 </Link>
               </li>
             </>
@@ -257,9 +336,12 @@ export default function SidebareAdmin() {
           <li>
             <button
               onClick={() => setDashboardOpen(!dashboardOpen)}
-              className="cursor-pointer w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
+              className="cursor-pointer w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[#6b6b6b] hover:bg-gray-200/70 hover:text-[#1f1f1f] rounded-md transition-colors"
           >
-              <span>Analytics</span>
+              <span className="flex items-center gap-3">
+                {renderMenuIcon("analytics")}
+                <span>Analytics</span>
+              </span>
               <svg
                 className={`w-4 h-4 transition-transform ${
                   dashboardOpen ? "rotate-180" : ""
@@ -317,7 +399,8 @@ export default function SidebareAdmin() {
               href="/articleManagement"
               className={getLinkClasses("/articleManagement")}
           >
-              Article Management
+              {renderMenuIcon("article")}
+              <span>Article Management</span>
             </Link>
           </li>
 
@@ -327,14 +410,16 @@ export default function SidebareAdmin() {
               href="/videoManagement"
               className={getLinkClasses("/videoManagement")}
           >
-              Video Management
+              {renderMenuIcon("video")}
+              <span>Video Management</span>
             </Link>
           </li>
 
           {/* Guidelines (UI only for now) */}
           <li>
             <Link href="/guidelines" className={getLinkClasses("/guidelines")}>
-              Notification
+              {renderMenuIcon("notification")}
+              <span>Notification</span>
             </Link>
           </li>
 
@@ -342,9 +427,12 @@ export default function SidebareAdmin() {
           <li>
             <button
               onClick={() => setMediaLibraryOpen(!mediaLibraryOpen)}
-              className="w-full flex items-center justify-between px-4 py-2 text-left text-[#273C8F] hover:bg-gray-100 rounded-md transition-colors"
+              className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left text-[#6b6b6b] hover:bg-gray-200/70 hover:text-[#1f1f1f] rounded-md transition-colors"
           >
-              <span>Media Library</span>
+              <span className="flex items-center gap-3">
+                {renderMenuIcon("media")}
+                <span>Media Library</span>
+              </span>
               <svg
                 className={`w-4 h-4 transition-transform ${
                   mediaLibraryOpen ? "rotate-180" : ""
@@ -398,7 +486,8 @@ export default function SidebareAdmin() {
                 href="/activityLog"
                 className={getLinkClasses("/activityLog")}
             >
-                Activity Log
+                {renderMenuIcon("activity")}
+                <span>Activity Log</span>
               </Link>
             </li>
           )}
@@ -410,7 +499,8 @@ export default function SidebareAdmin() {
                 href="/userManagement"
                 className={getLinkClasses("/userManagement")}
             >
-                User Management
+                {renderMenuIcon("users")}
+                <span>User Management</span>
               </Link>
             </li>
           )}
@@ -422,14 +512,16 @@ export default function SidebareAdmin() {
                 href="/categoryManagement"
                 className={getLinkClasses("/categoryManagement")}
             >
-                Categories Management
+                {renderMenuIcon("category")}
+                <span>Categories Management</span>
               </Link>
             ) : (
               <>
                 <div
                   className={getLinkClasses("/categoryManagement", false, true)}
               >
-                  Categories Management
+                  {renderMenuIcon("category")}
+                  <span>Categories Management</span>
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                   <svg
@@ -458,12 +550,14 @@ export default function SidebareAdmin() {
                 href="/advertisement"
                 className={getLinkClasses("/advertisement")}
             >
-                Advertisement
+                {renderMenuIcon("ad")}
+                <span>Advertisement</span>
               </Link>
             ) : (
               <>
                 <div className={getLinkClasses("/advertisement", false, true)}>
-                  Advertisement
+                  {renderMenuIcon("ad")}
+                  <span>Advertisement</span>
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                   <svg
@@ -492,12 +586,14 @@ export default function SidebareAdmin() {
                 href="/newsroomTeam"
                 className={getLinkClasses("/newsroomTeam")}
             >
-                Newsroom Team
+                {renderMenuIcon("team")}
+                <span>Newsroom Team</span>
               </Link>
             ) : (
               <>
                 <div className={getLinkClasses("/newsroomTeam", false, true)}>
-                  Newsroom Team
+                  {renderMenuIcon("team")}
+                  <span>Newsroom Team</span>
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                   <svg
@@ -526,12 +622,14 @@ export default function SidebareAdmin() {
                 href="/ourPartner"
                 className={getLinkClasses("/ourPartner")}
             >
-                Partners
+                {renderMenuIcon("partner")}
+                <span>Partners</span>
               </Link>
             ) : (
               <>
                 <div className={getLinkClasses("/ourPartner", false, true)}>
-                  Partners
+                  {renderMenuIcon("partner")}
+                  <span>Partners</span>
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                   <svg
