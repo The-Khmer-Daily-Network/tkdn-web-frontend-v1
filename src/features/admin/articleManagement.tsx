@@ -1271,25 +1271,11 @@ export default function ArticleManagement() {
   }
 
   return (
-    <div className="relative h-screen flex flex-col">
+    <div className="relative h-screen flex flex-col bg-[#f7f7f7]">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Article Management
-          </h2>
-          <button
-            onClick={handleCreateArticle}
-            className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-        >
-            <Plus size={16} />
-            Add Article
-          </button>
-        </div>
-      </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-[#f7f7f7]">
         {error && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">{error}</p>
@@ -1309,11 +1295,11 @@ export default function ArticleManagement() {
             </div>
           </div>
         ) : (
-          <div className="overflow-hidden">
+          <div>
             {/* Table Header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+            <div className="sticky top-0 z-20 bg-[#f7f7f7] border-b border-gray-200 px-6 py-3 shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
               <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="text-center">#</div>
+                <div className="text-center">No.</div>
                 <div>Cover Image</div>
                 <div>Title</div>
                 <div>Category</div>
@@ -1328,9 +1314,9 @@ export default function ArticleManagement() {
               {paginatedData.paginatedArticles.map((article, index) => (
                 <div
                   key={article.id}
-                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="px-6 h-[85px] hover:bg-gray-50 transition-colors"
               >
-                  <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center">
+                  <div className="grid h-full grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center">
                     {/* Number */}
                     <div className="text-center">
                       <span className="text-sm font-medium text-gray-900">
@@ -1344,7 +1330,7 @@ export default function ArticleManagement() {
                     {/* Cover Image */}
                     <div>
                       {article.cover ? (
-                        <div className="relative w-20 h-20 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                        <div className="relative w-14 h-14 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
                             src={article.cover}
                             alt="Cover"
@@ -1356,7 +1342,7 @@ export default function ArticleManagement() {
                           />
                         </div>
                       ) : (
-                        <div className="w-20 h-20 rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
                           <span className="text-xs text-gray-400">
                             No Cover
                           </span>
@@ -1366,11 +1352,11 @@ export default function ArticleManagement() {
 
                     {/* Title */}
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2">
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">
                         {article.title}
                       </h3>
                       {article.subtitle && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                           {article.subtitle}
                         </p>
                       )}
@@ -1496,6 +1482,14 @@ export default function ArticleManagement() {
           </div>
         )}
       </div>
+      <button
+        onClick={handleCreateArticle}
+        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-white text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
+        aria-label="Create article"
+        title="Create article"
+      >
+        <Plus size={22} strokeWidth={2.5} />
+      </button>
 
     </div>
   );
