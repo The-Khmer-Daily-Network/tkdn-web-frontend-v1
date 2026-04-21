@@ -76,6 +76,7 @@ function NewsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showCoverActions, setShowCoverActions] = useState(false);
   const [middleImageUploading, setMiddleImageUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
@@ -155,6 +156,7 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
+    setShowCoverActions(false);
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -501,58 +503,149 @@ function NewsModal({
         <div
           className={
             asPage
-              ? "bg-white rounded-lg border border-gray-200 w-full overflow-y-auto"
-              : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              ? "bg-[#f7f7f7] w-full min-h-screen"
+              : "bg-[#f7f7f7] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           }
           onClick={(e) => e.stopPropagation()}
       >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
+          <div className="sticky top-0 z-50 flex items-center justify-between p-4 border-b border-gray-200 bg-[#f7f7f7]/98">
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Article
             </h2>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-          >
-              <X size={20} />
-            </button>
+            {!asPage && (
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
+            className={
+              asPage
+                ? "mx-auto w-full max-w-[980px] px-6 md:px-10 py-8 grid grid-cols-1 gap-8"
+                : "p-6 grid grid-cols-1 gap-6"
+            }
         >
             {/* Left column: keep Details + Content Blocks together */}
             <div className="min-w-0 space-y-6">
               {/* Basic Information Section */}
-              <div className="space-y-4 min-w-0">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Details
-                </h3>
-              </div>
+              <div className="order-2 space-y-4 min-w-0">
+              {!asPage && (
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
+                  <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Details
+                  </h3>
+                </div>
+              )}
+
+              {asPage && (
+                <div className="flex items-center gap-3 text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (loading || coverUploading) return;
+                      const input = coverFileInputRef.current;
+                      if (!input) return;
+                      input.value = "";
+                      input.click();
+                    }}
+                    className="cursor-pointer inline-flex items-center gap-2 text-[42px] leading-none text-gray-500 hover:text-gray-700 transition-colors"
+                    disabled={loading || coverUploading}
+                    aria-label="Add thumbnail"
+                  >
+                    <ImageIcon className="w-7 h-7" />
+                    <span className="text-[42px] font-medium leading-none">Add thumbnail</span>
+                  </button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    className="sr-only"
+                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                  />
+                </div>
+              )}
 
               {/* Title - Full Width */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Article Title <span className="text-red-500">*</span>
-                  <span className="text-xs font-normal text-gray-500 ml-2">
-                    ({title.length}/160 characters)
-                  </span>
-                </label>
+                {!asPage && (
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Article Title <span className="text-red-500">*</span>
+                    <span className="text-xs font-normal text-gray-500 ml-2">
+                      ({title.length}/160 characters)
+                    </span>
+                  </label>
+                )}
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter a compelling article title..."
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                  placeholder={asPage ? "New post" : "Enter a compelling article title..."}
+                  className={
+                    asPage
+                      ? "w-full bg-transparent text-[68px] leading-[1.05] font-semibold text-black placeholder:text-gray-500 outline-none border-0 p-0"
+                      : "w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                  }
                   disabled={loading}
                   required
                   maxLength={160}
                 />
               </div>
+
+              {asPage && cover && (
+                <div className="pt-2">
+                  <div className="relative w-full max-w-[860px]">
+                    <button
+                      type="button"
+                      onClick={() => setShowCoverActions((prev) => !prev)}
+                      className="cursor-pointer block w-full text-left"
+                      aria-label="Toggle thumbnail actions"
+                    >
+                      <img
+                        src={cover}
+                        alt="Cover"
+                        className="w-full h-[280px] object-cover rounded-sm"
+                      />
+                    </button>
+
+                    {showCoverActions && (
+                      <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            coverFileInputRef.current?.click();
+                          }}
+                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-gray-800 border border-gray-300 hover:bg-white transition-colors"
+                          disabled={loading || coverUploading}
+                        >
+                          {coverUploading ? "Uploading..." : "Change"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCover(null);
+                            setCoverName(null);
+                            setCoverUrlInput("");
+                            setShowCoverActions(false);
+                          }}
+                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+                          disabled={loading || coverUploading}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Category and Author - Side by Side */}
               <div className="grid grid-cols-2 gap-4">
@@ -693,118 +786,12 @@ function NewsModal({
             </div>
 
             {/* Images & Media Section - right column (vertical column layout) */}
-            <div className="space-y-4 lg:border-l lg:border-gray-200 lg:pl-6 min-w-0">
+            <div className="order-3 lg:col-span-2 space-y-4 min-w-0">
               <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
                 <div className="w-1 h-6 bg-blue-600 rounded"></div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Images & Media
                 </h3>
-              </div>
-
-              {/* Cover Image */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Cover Image
-                </label>
-                {cover ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <img
-                        src={cover}
-                        alt="Cover"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCover(null);
-                          setCoverName(null);
-                          setCoverUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || coverUploading}
-                    >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Image Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={coverName || ""}
-                          onChange={(e) => setCoverName(e.target.value || null)}
-                          placeholder="Enter image name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => coverFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || coverUploading}
-                    >
-                        {coverUploading ? "Uploading..." : "Change Image"}
-                      </button>
-                      <input
-                        ref={coverFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectCoverFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => coverFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || coverUploading}
-                  >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Cover Image
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={coverFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={coverUrlInput}
-                      onChange={(e) => handleCoverUrlChange(e.target.value)}
-                      placeholder="Enter image URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Middle Image */}
@@ -1042,7 +1029,7 @@ function NewsModal({
               <button
                 type="submit"
                 disabled={loading || !title.trim() || !author.trim()}
-                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
             >
                 {loading
                   ? "Saving..."
@@ -1257,7 +1244,7 @@ export default function ArticleManagement() {
 
   if (isCreatePage || isEditPage) {
     return (
-      <div className="h-screen overflow-y-auto p-4">
+      <div className="h-screen overflow-y-auto bg-[#f7f7f7]">
         <NewsModal
           isOpen
           asPage
@@ -1527,7 +1514,7 @@ export default function ArticleManagement() {
       </div>
       <button
         onClick={handleCreateArticle}
-        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-white text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
+        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-[#f7f7f7] text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
         aria-label="Create article"
         title="Create article"
       >
