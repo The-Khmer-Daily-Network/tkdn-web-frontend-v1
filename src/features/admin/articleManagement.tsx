@@ -1217,15 +1217,19 @@ export default function ArticleManagement() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDateAndTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return {
+      date: date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+      time: date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
   };
 
   if (loading) {
@@ -1298,14 +1302,15 @@ export default function ArticleManagement() {
           <div>
             {/* Table Header */}
             <div className="sticky top-0 z-20 bg-[#f7f7f7] border-b border-gray-200 px-6 py-3 shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
-              <div className="grid grid-cols-[50px_2.1fr_2fr_1.2fr_1.2fr_1.6fr_1.3fr] gap-3 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+              <div className="grid grid-cols-[50px_130px_minmax(180px,2fr)_90px_1.2fr_1.2fr_120px_88px] gap-[5px] items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 <div className="text-left pl-1">No.</div>
                 <div>Cover Image</div>
                 <div>Title</div>
+                <div>Visibility</div>
                 <div>Category</div>
                 <div>Author</div>
                 <div>Upload Date</div>
-                <div className="text-center">Actions</div>
+                <div className="text-center">View</div>
               </div>
             </div>
 
@@ -1314,9 +1319,9 @@ export default function ArticleManagement() {
               {paginatedData.paginatedArticles.map((article, index) => (
                 <div
                   key={article.id}
-                  className="px-6 h-[85px] hover:bg-gray-50 transition-colors"
+                  className="group px-6 h-[85px] hover:bg-gray-50 transition-colors"
               >
-                  <div className="grid h-full grid-cols-[50px_2.1fr_2fr_1.2fr_1.2fr_1.6fr_1.3fr] gap-3 items-center">
+                  <div className="grid h-full grid-cols-[50px_130px_minmax(180px,2fr)_90px_1.2fr_1.2fr_120px_88px] gap-[5px] items-center">
                     {/* Number */}
                     <div className="text-left pl-1">
                       <span className="text-xs font-medium text-gray-900">
@@ -1328,7 +1333,7 @@ export default function ArticleManagement() {
                     </div>
 
                     {/* Cover Image */}
-                    <div className="-ml-1">
+                    <div>
                       {article.cover ? (
                         <div className="relative w-[120px] h-[68px] rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
@@ -1352,14 +1357,41 @@ export default function ArticleManagement() {
 
                     {/* Title */}
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">
+                      <h3 className="text-[13px] font-semibold text-gray-900 leading-5 line-clamp-1">
                         {article.title}
                       </h3>
-                      {article.subtitle && (
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                          {article.subtitle}
+                      <div className="relative h-10 mt-0.5">
+                        <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
+                          {article.content_blocks?.find((block) => block.paragraph?.trim())
+                            ?.paragraph ||
+                            article.subtitle ||
+                            ""}
                         </p>
-                      )}
+                        <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditArticle(article)}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} strokeWidth={2.6} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(article.id)}
+                            disabled={deletingId === article.id}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} strokeWidth={2.6} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Visibility */}
+                    <div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                        Visible
+                      </span>
                     </div>
 
                     {/* Category */}
@@ -1382,30 +1414,26 @@ export default function ArticleManagement() {
 
                     {/* Upload Date */}
                     <div>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(article.created_at)}
-                      </p>
+                      {(() => {
+                        const dateTime = formatDateAndTime(article.created_at);
+                        return (
+                          <div className="text-xs text-gray-600 leading-4 text-left">
+                            <p>{dateTime.date}</p>
+                            <p>{dateTime.time}</p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    {/* Actions */}
-                    <div>
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditArticle(article)}
-                          className="cursor-pointer p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
+                    {/* View */}
+                    <div className="pr-1 text-center">
+                      <button
+                        type="button"
+                        className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-700"
+                        title="View"
                       >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(article.id)}
-                          disabled={deletingId === article.id}
-                          className="cursor-pointer p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete"
-                      >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                        View
+                      </button>
                     </div>
                   </div>
                 </div>
