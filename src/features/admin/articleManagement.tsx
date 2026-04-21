@@ -1298,8 +1298,8 @@ export default function ArticleManagement() {
           <div>
             {/* Table Header */}
             <div className="sticky top-0 z-20 bg-[#f7f7f7] border-b border-gray-200 px-6 py-3 shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
-              <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="text-center">No.</div>
+              <div className="grid grid-cols-[50px_2.1fr_2fr_1.2fr_1.2fr_1.6fr_1.3fr] gap-3 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <div className="text-left pl-1">No.</div>
                 <div>Cover Image</div>
                 <div>Title</div>
                 <div>Category</div>
@@ -1316,10 +1316,10 @@ export default function ArticleManagement() {
                   key={article.id}
                   className="px-6 h-[85px] hover:bg-gray-50 transition-colors"
               >
-                  <div className="grid h-full grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center">
+                  <div className="grid h-full grid-cols-[50px_2.1fr_2fr_1.2fr_1.2fr_1.6fr_1.3fr] gap-3 items-center">
                     {/* Number */}
-                    <div className="text-center">
-                      <span className="text-sm font-medium text-gray-900">
+                    <div className="text-left pl-1">
+                      <span className="text-xs font-medium text-gray-900">
                         {paginatedData.totalItems -
                           paginatedData.startIndex -
                           index +
@@ -1328,9 +1328,9 @@ export default function ArticleManagement() {
                     </div>
 
                     {/* Cover Image */}
-                    <div>
+                    <div className="-ml-1">
                       {article.cover ? (
-                        <div className="relative w-14 h-14 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                        <div className="relative w-[120px] h-[68px] rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
                             src={article.cover}
                             alt="Cover"
@@ -1342,7 +1342,7 @@ export default function ArticleManagement() {
                           />
                         </div>
                       ) : (
-                        <div className="w-14 h-14 rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <div className="w-[120px] h-[68px] rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
                           <span className="text-xs text-gray-400">
                             No Cover
                           </span>
