@@ -1301,16 +1301,16 @@ export default function ArticleManagement() {
         ) : (
           <div>
             {/* Table Header */}
-            <div className="sticky top-0 z-20 bg-[#f7f7f7] border-b border-gray-200 px-6 py-3 shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
-              <div className="grid grid-cols-[50px_130px_minmax(180px,2fr)_90px_1.2fr_1.2fr_120px_88px] gap-[5px] items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="text-left pl-1">No.</div>
-                <div>Cover Image</div>
-                <div>Title</div>
-                <div>Visibility</div>
-                <div>Category</div>
-                <div>Author</div>
-                <div>Upload Date</div>
-                <div className="text-center">View</div>
+            <div className="sticky top-0 z-20 h-16 bg-[#f7f7f7] border-b border-gray-200 px-6 flex items-center shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
+              <div className="grid h-full w-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <div className="flex h-full items-center justify-left">No.</div>
+                <div className="flex h-full items-center justify-left">Cover Image</div>
+                <div className="flex h-full items-center justify-left">Title</div>
+                <div className="flex h-full items-center justify-left">Visibility</div>
+                <div className="flex h-full items-center justify-left">Category</div>
+                <div className="flex h-full items-center justify-left">Author</div>
+                <div className="flex h-full items-center justify-left">Upload Date</div>
+                <div className="flex h-full items-center justify-center">View</div>
               </div>
             </div>
 
@@ -1319,11 +1319,14 @@ export default function ArticleManagement() {
               {paginatedData.paginatedArticles.map((article, index) => (
                 <div
                   key={article.id}
-                  className="group px-6 h-[85px] hover:bg-gray-50 transition-colors"
+                  className="group px-6 h-[85px] hover:bg-[#ececec] transition-colors"
               >
-                  <div className="grid h-full grid-cols-[50px_130px_minmax(180px,2fr)_90px_1.2fr_1.2fr_120px_88px] gap-[5px] items-center">
+                  <div className="grid h-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] items-center">
                     {/* Number */}
-                    <div className="text-left pl-1">
+                    <div
+                      className="text-left pl-1 cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
                       <span className="text-xs font-medium text-gray-900">
                         {paginatedData.totalItems -
                           paginatedData.startIndex -
@@ -1333,7 +1336,10 @@ export default function ArticleManagement() {
                     </div>
 
                     {/* Cover Image */}
-                    <div>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
                       {article.cover ? (
                         <div className="relative w-[120px] h-[68px] rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
@@ -1356,7 +1362,10 @@ export default function ArticleManagement() {
                     </div>
 
                     {/* Title */}
-                    <div>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
                       <h3 className="text-[13px] font-semibold text-gray-900 leading-5 line-clamp-1">
                         {article.title}
                       </h3>
@@ -1369,14 +1378,20 @@ export default function ArticleManagement() {
                         </p>
                         <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => handleEditArticle(article)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditArticle(article);
+                            }}
                             className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors"
                             title="Edit"
                           >
                             <Edit2 size={18} strokeWidth={2.6} />
                           </button>
                           <button
-                            onClick={() => handleDelete(article.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(article.id);
+                            }}
                             disabled={deletingId === article.id}
                             className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete"
@@ -1432,7 +1447,7 @@ export default function ArticleManagement() {
                         className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-700"
                         title="View"
                       >
-                        View
+                        ##
                       </button>
                     </div>
                   </div>

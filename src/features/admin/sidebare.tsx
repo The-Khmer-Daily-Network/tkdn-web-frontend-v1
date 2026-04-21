@@ -232,7 +232,7 @@ export default function SidebareAdmin() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-[280px] bg-[#f7f7f7] border-r border-gray-200 flex flex-col">
       {/* Brand */}
-      <div className="min-h-16 border-b border-gray-200 px-5 py-3 flex items-center">
+      <div className="min-h-16 px-5 py-3 flex items-center">
         <p className="text-[18px] font-semibold leading-snug text-[#1f1f1f]">
           The Khmer Daily Network
         </p>
