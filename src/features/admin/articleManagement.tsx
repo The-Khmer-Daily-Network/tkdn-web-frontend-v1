@@ -82,6 +82,7 @@ function NewsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [middleImageUploading, setMiddleImageUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
@@ -162,6 +163,7 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
+    setShowCategorySelector(false);
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -492,9 +494,11 @@ function NewsModal({
   categories.forEach((cat) => {
     allCategories.push({ id: cat.id, name: cat.name, isSub: false });
     cat.subcategories.forEach((sub) => {
-      allCategories.push({ id: sub.id, name: `  └ ${sub.name}`, isSub: true });
+      allCategories.push({ id: sub.id, name: `  ${sub.name}`, isSub: true });
     });
   });
+  const selectedCategoryName =
+    allCategories.find((cat) => cat.id === categoryId)?.name ?? "Select category";
 
   if (!isOpen) return null;
 
@@ -557,33 +561,66 @@ function NewsModal({
                 </div>
               )}
 
-              {asPage && !cover && (
-                <div className="flex items-center gap-2 text-gray-500">
+              {asPage && (
+                <div className="relative flex items-center gap-2 text-gray-500">
+                  {!cover && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (loading || coverUploading) return;
+                          const input = coverFileInputRef.current;
+                          if (!input) return;
+                          input.value = "";
+                          input.click();
+                        }}
+                        className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        disabled={loading || coverUploading}
+                        aria-label="Add thumbnail"
+                      >
+                        <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
+                          <ImageIcon className="h-[13px] w-[13px] shrink-0" />
+                          <span className="leading-none pt-1">Add thumbnail</span>
+                        </span>
+                      </button>
+                      <input
+                        ref={coverFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        className="sr-only"
+                        onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                      />
+                    </>
+                  )}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (loading || coverUploading) return;
-                      const input = coverFileInputRef.current;
-                      if (!input) return;
-                      input.value = "";
-                      input.click();
-                    }}
-                    className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-                    disabled={loading || coverUploading}
-                    aria-label="Add thumbnail"
+                    onClick={() => setShowCategorySelector((prev) => !prev)}
+                    className="pt-1 cursor-pointer h-8 rounded-md border-0 bg-[#f7f7f7] px-3 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700"
+                    disabled={loading}
                   >
-                    <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
-                      <ImageIcon className="h-[13px] w-[13px] shrink-0" />
-                      <span className="leading-none pt-1">Add thumbnail</span>
-                    </span>
+                    Category: {selectedCategoryName.trim()}
                   </button>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg"
-                    className="sr-only"
-                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                  />
+                  {showCategorySelector && (
+                    <div className="absolute top-10 left-0 z-20 max-h-64 w-[260px] overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-sm">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryId(cat.id);
+                            setShowCategorySelector(false);
+                          }}
+                          className={`w-full cursor-pointer rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                            categoryId === cat.id
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -641,7 +678,7 @@ function NewsModal({
                       <img
                         src={cover}
                         alt="Cover"
-                        className="w-full h-[280px] object-cover rounded-sm"
+                        className="w-full h-auto object-cover rounded-sm"
                       />
                     </button>
 
@@ -676,7 +713,8 @@ function NewsModal({
               )}
 
               {/* Category and Author - Side by Side */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className={asPage ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
+                {!asPage && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Category
@@ -699,6 +737,7 @@ function NewsModal({
                     ))}
                   </select>
                 </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -1527,7 +1566,7 @@ export default function ArticleManagement() {
                     setItemsPerPage(value);
                     setCurrentPage(1);
                   }}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
+                  className="cursor-pointer px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
               >
                   {PER_PAGE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
