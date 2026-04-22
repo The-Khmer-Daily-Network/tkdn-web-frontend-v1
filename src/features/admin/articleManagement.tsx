@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   getAdminArticles,
+  getAdminArticleById,
   createAdminArticle,
   updateAdminArticle,
   deleteAdminArticle,
@@ -1084,6 +1085,8 @@ export default function ArticleManagement() {
     useState<(typeof PER_PAGE_OPTIONS)[number]>(30);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedArticle, setSelectedArticle] = useState<News | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
   const hasFetchedInitialArticlesRef = useRef(false);
   const hasFetchedCategoriesRef = useRef(false);
   const hasPassedFirstPaginationEffectRef = useRef(false);
@@ -1091,9 +1094,6 @@ export default function ArticleManagement() {
   const editId = Number(searchParams.get("id"));
   const isCreatePage = mode === "create";
   const isEditPage = mode === "edit" && Number.isFinite(editId);
-  const selectedArticle = isEditPage
-    ? articles.find((article) => article.id === editId) || null
-    : null;
 
   const fetchArticles = async (
     page: number = currentPage,
@@ -1150,17 +1150,55 @@ export default function ArticleManagement() {
 
   useEffect(() => {
     if (hasFetchedInitialArticlesRef.current) return;
+    if (isCreatePage || isEditPage) {
+      setLoading(false);
+      return;
+    }
     hasFetchedInitialArticlesRef.current = true;
     fetchArticles(currentPage, itemsPerPage);
-  }, []);
+  }, [isCreatePage, isEditPage]);
 
   useEffect(() => {
+    if (isCreatePage || isEditPage) return;
     if (!hasPassedFirstPaginationEffectRef.current) {
       hasPassedFirstPaginationEffectRef.current = true;
       return;
     }
     fetchArticles(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, itemsPerPage, isCreatePage, isEditPage]);
+
+  useEffect(() => {
+    if (!isEditPage) {
+      setSelectedArticle(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchSelectedArticle = async () => {
+      try {
+        setEditLoading(true);
+        const response = await getAdminArticleById(editId);
+        if (isMounted) {
+          setSelectedArticle(response.data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch selected article",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setEditLoading(false);
+        }
+      }
+    };
+
+    fetchSelectedArticle();
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditPage, editId]);
 
   const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endIndex =
@@ -1227,7 +1265,9 @@ export default function ArticleManagement() {
     };
   };
 
-  if (loading) {
+  const shouldShowLoading = isEditPage ? editLoading : loading;
+
+  if (shouldShowLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-gray-600">Loading articles...</p>
@@ -1258,7 +1298,9 @@ export default function ArticleManagement() {
           asPage
           onClose={closeEditorPage}
           onSuccess={async () => {
-            await fetchArticles();
+            if (!isCreatePage) {
+              await fetchArticles();
+            }
             closeEditorPage();
           }}
           news={isEditPage ? selectedArticle : null}

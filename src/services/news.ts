@@ -1,5 +1,6 @@
 import type {
   NewsResponse,
+  NewsSingleResponse,
   NewsCreateParams,
   NewsUpdateParams,
   NewsCreateResponse,
@@ -9,6 +10,7 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const inFlightAdminArticlesRequests = new Map<string, Promise<NewsResponse>>();
+const inFlightAdminArticleByIdRequests = new Map<string, Promise<NewsSingleResponse>>();
 
 if (!API_BASE_URL) {
   console.warn(
@@ -192,6 +194,56 @@ export async function getAdminArticles(
   } catch (error) {
     console.warn("Admin articles fetch failed, using empty fallback:", error);
     return { success: false, data: [] };
+  }
+}
+
+/**
+ * Fetch a single admin article by ID
+ */
+export async function getAdminArticleById(
+  id: number,
+): Promise<NewsSingleResponse> {
+  try {
+    const url = getApiUrl(`/admin/articles/${id}`);
+
+    const existingRequest = inFlightAdminArticleByIdRequests.get(url);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const requestPromise = (async () => {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        credentials: "omit",
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch admin article: ${response.status} ${response.statusText}. ${errorText}`,
+        );
+      }
+
+      return response.json();
+    })();
+
+    inFlightAdminArticleByIdRequests.set(url, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      inFlightAdminArticleByIdRequests.delete(url);
+    }
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
   }
 }
 

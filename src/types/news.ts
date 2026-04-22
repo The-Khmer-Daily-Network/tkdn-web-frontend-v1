@@ -49,6 +49,11 @@ export interface NewsResponse {
   };
 }
 
+export interface NewsSingleResponse {
+  success: boolean;
+  data: News;
+}
+
 export interface NewsCreateParams {
   category_id?: number | null;
   author: string;
