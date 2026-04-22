@@ -204,7 +204,7 @@ export default function NewsDashboard({
   if (news.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-gray-600">No news available</p>
+        <p className="text-gray-600">News is Loading...</p>
       </div>
     );
   }

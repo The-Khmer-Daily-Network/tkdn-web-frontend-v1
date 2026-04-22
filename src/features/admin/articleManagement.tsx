@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -13,7 +13,12 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
+import {
+  getAdminArticles,
+  createAdminArticle,
+  updateAdminArticle,
+  deleteAdminArticle,
+} from "@/services/news";
 import { getCategories } from "@/services/category";
 import {
   deleteContentCover,
@@ -35,7 +40,7 @@ import type { ContentImage } from "@/types/contentImage";
 import type { ContentVideo } from "@/types/contentVideo";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ITEMS_PER_PAGE = 15;
+const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
 interface NewsModalProps {
   isOpen: boolean;
@@ -455,9 +460,9 @@ function NewsModal({
       // Do NOT include middle_video_url or middle_video_name in the request
 
       if (news) {
-        await updateNews(news.id, params);
+        await updateAdminArticle(news.id, params);
       } else {
-        await createNews(params);
+        await createAdminArticle(params);
       }
 
       onSuccess();
@@ -1075,9 +1080,13 @@ export default function ArticleManagement() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
-  const hasFetchedRef = useRef(false);
+  const [itemsPerPage, setItemsPerPage] =
+    useState<(typeof PER_PAGE_OPTIONS)[number]>(30);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const hasFetchedInitialArticlesRef = useRef(false);
+  const hasFetchedCategoriesRef = useRef(false);
+  const hasPassedFirstPaginationEffectRef = useRef(false);
   const mode = searchParams.get("mode");
   const editId = Number(searchParams.get("id"));
   const isCreatePage = mode === "create";
@@ -1086,24 +1095,14 @@ export default function ArticleManagement() {
     ? articles.find((article) => article.id === editId) || null
     : null;
 
-  useEffect(() => {
-    // Prevent duplicate calls in React Strict Mode (development)
-    if (hasFetchedRef.current) {
-      return;
-    }
-
-    hasFetchedRef.current = true;
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchArticles = async (
+    page: number = currentPage,
+    perPage: number = itemsPerPage,
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      const [newsResponse, categoriesResponse] = await Promise.all([
-        getNews(),
-        getCategories(),
-      ]);
+      const newsResponse = await getAdminArticles(undefined, page, perPage);
 
       // Filter articles: middle_video_url is null (to distinguish from video articles)
       const filteredArticles = newsResponse.data.filter(
@@ -1117,9 +1116,14 @@ export default function ArticleManagement() {
         return dateB - dateA; // Descending order (latest first)
       });
 
+      const pagination = newsResponse.pagination;
       setArticles(sortedArticles);
-      setCategories(categoriesResponse.categories);
-      setCurrentPage(1); // Reset to first page when data is fetched
+      setTotalItems(pagination?.total ?? sortedArticles.length);
+      setTotalPages(
+        pagination?.last_page ??
+          Math.max(1, Math.ceil(sortedArticles.length / perPage)),
+      );
+      setCurrentPage(pagination?.current_page ?? page);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -1128,34 +1132,42 @@ export default function ArticleManagement() {
     }
   };
 
-  // Calculate pagination data with useMemo for performance
-  const paginatedData = useMemo(() => {
-    const totalPages = Math.ceil(articles.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedArticles = articles.slice(startIndex, endIndex);
-
-    return {
-      paginatedArticles,
-      totalPages,
-      totalItems: articles.length,
-      startIndex: startIndex + 1,
-      endIndex: Math.min(endIndex, articles.length),
-    };
-  }, [articles, currentPage]);
-
-  // Reset to page 1 if current page is out of bounds
   useEffect(() => {
-    if (
-      paginatedData.totalPages > 0 &&
-      currentPage > paginatedData.totalPages
-    ) {
-      setCurrentPage(1);
+    if (hasFetchedCategoriesRef.current) return;
+    hasFetchedCategoriesRef.current = true;
+
+    const fetchCategoriesData = async () => {
+      try {
+        const categoriesResponse = await getCategories();
+        setCategories(categoriesResponse.categories);
+      } catch {
+        setCategories([]);
+      }
+    };
+
+    fetchCategoriesData();
+  }, []);
+
+  useEffect(() => {
+    if (hasFetchedInitialArticlesRef.current) return;
+    hasFetchedInitialArticlesRef.current = true;
+    fetchArticles(currentPage, itemsPerPage);
+  }, []);
+
+  useEffect(() => {
+    if (!hasPassedFirstPaginationEffectRef.current) {
+      hasPassedFirstPaginationEffectRef.current = true;
+      return;
     }
-  }, [paginatedData.totalPages, currentPage]);
+    fetchArticles(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage]);
+
+  const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endIndex =
+    totalItems === 0 ? 0 : Math.min((currentPage - 1) * itemsPerPage + articles.length, totalItems);
 
   const goToPage = (page: number) => {
-    if (page >= 1 && page <= paginatedData.totalPages) {
+    if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
       // Scroll to top of content area
       const contentArea = document.querySelector(".flex-1.overflow-y-auto");
@@ -1184,16 +1196,12 @@ export default function ArticleManagement() {
 
     try {
       setDeletingId(id);
-      await deleteNews(id);
-
-      // Remove the deleted item from the state
-      const updatedArticles = articles.filter((article) => article.id !== id);
-      setArticles(updatedArticles);
-
-      // Adjust page if needed (if we deleted the last item on the current page)
-      const newTotalPages = Math.ceil(updatedArticles.length / ITEMS_PER_PAGE);
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
+      await deleteAdminArticle(id);
+      const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      if (nextPage !== currentPage) {
+        setCurrentPage(nextPage);
+      } else {
+        await fetchArticles(nextPage, itemsPerPage);
       }
     } catch (err) {
       const errorMessage =
@@ -1232,7 +1240,7 @@ export default function ArticleManagement() {
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-red-600 mb-4">Error: {error}</p>
         <button
-          onClick={fetchData}
+          onClick={() => fetchArticles()}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
       >
           Retry
@@ -1250,7 +1258,7 @@ export default function ArticleManagement() {
           asPage
           onClose={closeEditorPage}
           onSuccess={async () => {
-            await fetchData();
+            await fetchArticles();
             closeEditorPage();
           }}
           news={isEditPage ? selectedArticle : null}
@@ -1303,7 +1311,7 @@ export default function ArticleManagement() {
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {paginatedData.paginatedArticles.map((article, index) => (
+              {articles.map((article, index) => (
                 <div
                   key={article.id}
                   className="group px-6 h-[85px] hover:bg-[#ececec] transition-colors"
@@ -1315,10 +1323,7 @@ export default function ArticleManagement() {
                       onClick={() => handleEditArticle(article)}
                     >
                       <span className="text-xs font-medium text-gray-900">
-                        {paginatedData.totalItems -
-                          paginatedData.startIndex -
-                          index +
-                          1}
+                        {totalItems - (currentPage - 1) * itemsPerPage - index}
                       </span>
                     </div>
 
@@ -1445,25 +1450,32 @@ export default function ArticleManagement() {
         )}
 
         {/* Pagination - Table Style */}
-        {articles.length > 0 && (
+        {totalItems > 0 && (
           <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               {/* Left side: Rows per page */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700">Rows per page:</span>
                 <select
-                  value={ITEMS_PER_PAGE}
-                  disabled
-                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const value = Number(e.target.value) as (typeof PER_PAGE_OPTIONS)[number];
+                    setItemsPerPage(value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
               >
-                  <option value={15}>15</option>
+                  {PER_PAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Center: Page info */}
               <div className="text-sm text-gray-700">
-                {paginatedData.startIndex}-{paginatedData.endIndex} of{" "}
-                {paginatedData.totalItems}
+                {startIndex}-{endIndex} of {totalItems}
               </div>
 
               {/* Right side: Navigation buttons */}
@@ -1491,7 +1503,7 @@ export default function ArticleManagement() {
                 {/* Next Button */}
                 <button
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Next page"
               >
@@ -1500,8 +1512,8 @@ export default function ArticleManagement() {
 
                 {/* Last Page Button */}
                 <button
-                  onClick={() => goToPage(paginatedData.totalPages)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  onClick={() => goToPage(totalPages)}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Last page"
               >
