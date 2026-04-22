@@ -82,7 +82,6 @@ function NewsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
-  const [showCoverActions, setShowCoverActions] = useState(false);
   const [middleImageUploading, setMiddleImageUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
@@ -100,6 +99,7 @@ function NewsModal({
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -162,7 +162,6 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
-    setShowCoverActions(false);
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -171,6 +170,14 @@ function NewsModal({
       previewObjectUrlsRef.current = [];
     };
   }, []);
+
+  useEffect(() => {
+    if (!asPage) return;
+    const el = titleTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title, asPage, isOpen]);
 
   const queuePreviewUrl = (file: File): string => {
     const url = URL.createObjectURL(file);
@@ -342,8 +349,8 @@ function NewsModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim() || !author.trim()) {
-      setError("Title and author are required");
+    if (!author.trim()) {
+      setError("Author is required");
       return;
     }
 
@@ -550,8 +557,8 @@ function NewsModal({
                 </div>
               )}
 
-              {asPage && (
-                <div className="flex items-center gap-3 text-gray-500">
+              {asPage && !cover && (
+                <div className="flex items-center gap-2 text-gray-500">
                   <button
                     type="button"
                     onClick={() => {
@@ -561,12 +568,14 @@ function NewsModal({
                       input.value = "";
                       input.click();
                     }}
-                    className="cursor-pointer inline-flex items-center gap-2 text-[42px] leading-none text-gray-500 hover:text-gray-700 transition-colors"
+                    className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
                     disabled={loading || coverUploading}
                     aria-label="Add thumbnail"
                   >
-                    <ImageIcon className="w-7 h-7" />
-                    <span className="text-[42px] font-medium leading-none">Add thumbnail</span>
+                    <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
+                      <ImageIcon className="h-[13px] w-[13px] shrink-0" />
+                      <span className="leading-none pt-1">Add thumbnail</span>
+                    </span>
                   </button>
                   <input
                     ref={coverFileInputRef}
@@ -582,34 +591,50 @@ function NewsModal({
               <div>
                 {!asPage && (
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Article Title <span className="text-red-500">*</span>
+                    Article Title
                     <span className="text-xs font-normal text-gray-500 ml-2">
-                      ({title.length}/160 characters)
+                      ({title.length}/500 characters)
                     </span>
                   </label>
                 )}
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={asPage ? "New post" : "Enter a compelling article title..."}
-                  className={
-                    asPage
-                      ? "w-full bg-transparent text-[68px] leading-[1.05] font-semibold text-black placeholder:text-gray-500 outline-none border-0 p-0"
-                      : "w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                  }
-                  disabled={loading}
-                  required
-                  maxLength={160}
-                />
+                {asPage ? (
+                  <div className="relative w-full max-w-[860px]">
+                    <div className="pointer-events-none absolute -left-15 top-2">
+                      <span className="block text-sm text-gray-500">Title</span>
+                      <span className="mt-1 block text-[11px] text-gray-400">
+                        {title.length}/500
+                      </span>
+                    </div>
+                    <div className="absolute -left-3 top-0 h-full w-px bg-gray-300" />
+                    <textarea
+                      ref={titleTextareaRef}
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="New post"
+                      rows={1}
+                      className="w-full resize-none overflow-hidden bg-transparent text-[35px] leading-[1.08] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
+                      disabled={loading}
+                      maxLength={500}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter a compelling article title..."
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                    disabled={loading}
+                    maxLength={500}
+                  />
+                )}
               </div>
 
               {asPage && cover && (
                 <div className="pt-2">
-                  <div className="relative w-full max-w-[860px]">
+                  <div className="group relative w-full max-w-[860px]">
                     <button
                       type="button"
-                      onClick={() => setShowCoverActions((prev) => !prev)}
                       className="cursor-pointer block w-full text-left"
                       aria-label="Toggle thumbnail actions"
                     >
@@ -620,35 +645,32 @@ function NewsModal({
                       />
                     </button>
 
-                    {showCoverActions && (
-                      <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            coverFileInputRef.current?.click();
-                          }}
-                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-gray-800 border border-gray-300 hover:bg-white transition-colors"
-                          disabled={loading || coverUploading}
-                        >
-                          {coverUploading ? "Uploading..." : "Change"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCover(null);
-                            setCoverName(null);
-                            setCoverUrlInput("");
-                            setShowCoverActions(false);
-                          }}
-                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
-                          disabled={loading || coverUploading}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
+                    <div className="absolute top-3 right-3 z-10 flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          coverFileInputRef.current?.click();
+                        }}
+                        className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
+                        disabled={loading || coverUploading}
+                      >
+                        {coverUploading ? "Uploading..." : "Change"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCover(null);
+                          setCoverName(null);
+                          setCoverUrlInput("");
+                        }}
+                        className="cursor-pointer rounded-md border border-red-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                        disabled={loading || coverUploading}
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1034,7 +1056,7 @@ function NewsModal({
               </button>
               <button
                 type="submit"
-                disabled={loading || !title.trim() || !author.trim()}
+                disabled={loading || !author.trim()}
                 className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
             >
                 {loading
