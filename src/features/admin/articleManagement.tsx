@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -13,9 +13,14 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
+import {
+  getAdminArticles,
+  getAdminArticleById,
+  createAdminArticle,
+  updateAdminArticle,
+  deleteAdminArticle,
+} from "@/services/news";
 import { getCategories } from "@/services/category";
-import { getPublishers } from "@/services/publisher";
 import {
   deleteContentCover,
   getContentCovers,
@@ -28,15 +33,15 @@ import {
 } from "@/services/contentImage";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
-import type { Publisher } from "@/types/publisher";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
 import ImageSelectorModal from "@/components/admin/ImageSelectorModal";
 import VideoSelectorModal from "@/components/admin/VideoSelectorModal";
 import type { ContentCover } from "@/types/contentCover";
 import type { ContentImage } from "@/types/contentImage";
 import type { ContentVideo } from "@/types/contentVideo";
+import { useAuth } from "@/contexts/AuthContext";
 
-const ITEMS_PER_PAGE = 15;
+const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
 interface NewsModalProps {
   isOpen: boolean;
@@ -44,7 +49,7 @@ interface NewsModalProps {
   onSuccess: () => void;
   news?: News | null;
   categories: Category[];
-  publishers: Publisher[];
+  currentUsername: string;
   asPage?: boolean;
 }
 
@@ -54,7 +59,7 @@ function NewsModal({
   onSuccess,
   news,
   categories,
-  publishers,
+  currentUsername,
   asPage = false,
 }: NewsModalProps) {
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -77,16 +82,17 @@ function NewsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showCoverActions, setShowCoverActions] = useState(false);
   const [middleImageUploading, setMiddleImageUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
-  >(null);
+>(null);
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
     useState<File | null>(null);
   const [endImagePendingFiles, setEndImagePendingFiles] = useState<
     Array<File | null>
-  >([null, null, null]);
+>([null, null, null]);
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleImageUrlRef = useRef<string | null>(null);
@@ -137,7 +143,7 @@ function NewsModal({
       ];
     } else {
       setCategoryId(null);
-      setAuthor("");
+      setAuthor(currentUsername);
       setTitle("");
       setCover(null);
       setCoverName(null);
@@ -156,7 +162,8 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
-  }, [news, isOpen]);
+    setShowCoverActions(false);
+  }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
     return () => {
@@ -454,9 +461,9 @@ function NewsModal({
       // Do NOT include middle_video_url or middle_video_name in the request
 
       if (news) {
-        await updateNews(news.id, params);
+        await updateAdminArticle(news.id, params);
       } else {
-        await createNews(params);
+        await createAdminArticle(params);
       }
 
       onSuccess();
@@ -482,29 +489,6 @@ function NewsModal({
     });
   });
 
-  // Create author options from publishers (similar to category dropdown)
-  const authorOptions = useMemo(() => {
-    const options: Array<{ value: string; label: string }> = publishers.map(
-      (pub) => {
-        const fullName = `${pub.first_name} ${pub.last_name}`;
-        return {
-          value: fullName,
-          label: `${fullName} (${pub.nickname})`,
-        };
-      },
-    );
-
-    // Add current author if it doesn't exist in publishers (for custom authors when editing)
-    if (author && !options.find((opt) => opt.value === author)) {
-      options.push({
-        value: author,
-        label: author,
-      });
-    }
-
-    return options;
-  }, [publishers, author]);
-
   if (!isOpen) return null;
 
   return (
@@ -521,62 +505,153 @@ function NewsModal({
             ? "relative"
             : "fixed inset-0 z-50 flex items-center justify-center p-4"
         }
-      >
+    >
         <div
           className={
             asPage
-              ? "bg-white rounded-lg border border-gray-200 w-full overflow-y-auto"
-              : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              ? "bg-[#f7f7f7] w-full min-h-screen"
+              : "bg-[#f7f7f7] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           }
           onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
+      >
+          <div className="sticky top-0 z-50 flex items-center justify-between p-4 border-b border-gray-200 bg-[#f7f7f7]/98">
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Article
             </h2>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            {!asPage && (
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
-              <X size={20} />
-            </button>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
-          >
+            className={
+              asPage
+                ? "mx-auto w-full max-w-[980px] px-6 md:px-10 py-8 grid grid-cols-1 gap-8"
+                : "p-6 grid grid-cols-1 gap-6"
+            }
+        >
             {/* Left column: keep Details + Content Blocks together */}
             <div className="min-w-0 space-y-6">
               {/* Basic Information Section */}
-              <div className="space-y-4 min-w-0">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Details
-                </h3>
-              </div>
+              <div className="order-2 space-y-4 min-w-0">
+              {!asPage && (
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
+                  <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Details
+                  </h3>
+                </div>
+              )}
+
+              {asPage && (
+                <div className="flex items-center gap-3 text-gray-500">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (loading || coverUploading) return;
+                      const input = coverFileInputRef.current;
+                      if (!input) return;
+                      input.value = "";
+                      input.click();
+                    }}
+                    className="cursor-pointer inline-flex items-center gap-2 text-[42px] leading-none text-gray-500 hover:text-gray-700 transition-colors"
+                    disabled={loading || coverUploading}
+                    aria-label="Add thumbnail"
+                  >
+                    <ImageIcon className="w-7 h-7" />
+                    <span className="text-[42px] font-medium leading-none">Add thumbnail</span>
+                  </button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg"
+                    className="sr-only"
+                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                  />
+                </div>
+              )}
 
               {/* Title - Full Width */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Article Title <span className="text-red-500">*</span>
-                  <span className="text-xs font-normal text-gray-500 ml-2">
-                    ({title.length}/160 characters)
-                  </span>
-                </label>
+                {!asPage && (
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Article Title <span className="text-red-500">*</span>
+                    <span className="text-xs font-normal text-gray-500 ml-2">
+                      ({title.length}/160 characters)
+                    </span>
+                  </label>
+                )}
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter a compelling article title..."
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                  placeholder={asPage ? "New post" : "Enter a compelling article title..."}
+                  className={
+                    asPage
+                      ? "w-full bg-transparent text-[68px] leading-[1.05] font-semibold text-black placeholder:text-gray-500 outline-none border-0 p-0"
+                      : "w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                  }
                   disabled={loading}
                   required
                   maxLength={160}
                 />
               </div>
+
+              {asPage && cover && (
+                <div className="pt-2">
+                  <div className="relative w-full max-w-[860px]">
+                    <button
+                      type="button"
+                      onClick={() => setShowCoverActions((prev) => !prev)}
+                      className="cursor-pointer block w-full text-left"
+                      aria-label="Toggle thumbnail actions"
+                    >
+                      <img
+                        src={cover}
+                        alt="Cover"
+                        className="w-full h-[280px] object-cover rounded-sm"
+                      />
+                    </button>
+
+                    {showCoverActions && (
+                      <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            coverFileInputRef.current?.click();
+                          }}
+                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-gray-800 border border-gray-300 hover:bg-white transition-colors"
+                          disabled={loading || coverUploading}
+                        >
+                          {coverUploading ? "Uploading..." : "Change"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCover(null);
+                            setCoverName(null);
+                            setCoverUrlInput("");
+                            setShowCoverActions(false);
+                          }}
+                          className="cursor-pointer px-3 py-1.5 text-xs font-medium rounded-md bg-white/95 text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
+                          disabled={loading || coverUploading}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Category and Author - Side by Side */}
               <div className="grid grid-cols-2 gap-4">
@@ -593,7 +668,7 @@ function NewsModal({
                     }
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
                     disabled={loading}
-                  >
+                >
                     <option value="">Select category</option>
                     {allCategories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
@@ -607,20 +682,14 @@ function NewsModal({
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Author <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={author || ""}
-                    onChange={(e) => setAuthor(e.target.value)}
+                    readOnly
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled={loading}
+                    disabled
                     required
-                  >
-                    <option value="">Select author</option>
-                    {authorOptions.map((option, index) => (
-                      <option key={index} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
             </div>
@@ -639,7 +708,7 @@ function NewsModal({
                     onClick={handleAddContentBlock}
                     className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
                     disabled={loading}
-                  >
+                >
                     <Plus size={14} />
                     Add Block
                   </button>
@@ -649,7 +718,7 @@ function NewsModal({
                     <div
                       key={index}
                       className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
-                    >
+                  >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
@@ -667,7 +736,7 @@ function NewsModal({
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                          >
+                        >
                             Remove
                           </button>
                         )}
@@ -723,118 +792,12 @@ function NewsModal({
             </div>
 
             {/* Images & Media Section - right column (vertical column layout) */}
-            <div className="space-y-4 lg:border-l lg:border-gray-200 lg:pl-6 min-w-0">
+            <div className="order-3 lg:col-span-2 space-y-4 min-w-0">
               <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
                 <div className="w-1 h-6 bg-blue-600 rounded"></div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   Images & Media
                 </h3>
-              </div>
-
-              {/* Cover Image */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Cover Image
-                </label>
-                {cover ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <img
-                        src={cover}
-                        alt="Cover"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCover(null);
-                          setCoverName(null);
-                          setCoverUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || coverUploading}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Image Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={coverName || ""}
-                          onChange={(e) => setCoverName(e.target.value || null)}
-                          placeholder="Enter image name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => coverFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || coverUploading}
-                      >
-                        {coverUploading ? "Uploading..." : "Change Image"}
-                      </button>
-                      <input
-                        ref={coverFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectCoverFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => coverFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || coverUploading}
-                    >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Cover Image
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={coverFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={coverUrlInput}
-                      onChange={(e) => handleCoverUrlChange(e.target.value)}
-                      placeholder="Enter image URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Middle Image */}
@@ -859,7 +822,7 @@ function NewsModal({
                         }}
                         className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                         disabled={loading || middleImageUploading}
-                      >
+                    >
                         <X size={12} />
                       </button>
                     </div>
@@ -887,7 +850,7 @@ function NewsModal({
                         onClick={() => middleImageFileInputRef.current?.click()}
                         className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
                         disabled={loading || middleImageUploading}
-                      >
+                    >
                         {middleImageUploading ? "Uploading..." : "Change Image"}
                       </button>
                       <input
@@ -908,7 +871,7 @@ function NewsModal({
                       onClick={() => middleImageFileInputRef.current?.click()}
                       className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                       disabled={loading || middleImageUploading}
-                    >
+                  >
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                           <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
@@ -975,7 +938,7 @@ function NewsModal({
                                   onClick={() => handleRemoveEndImage(slotIndex)}
                                   className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
                                   disabled={loading || isUploading}
-                                >
+                              >
                                   <X size={10} />
                                 </button>
                               </div>
@@ -1013,7 +976,7 @@ function NewsModal({
                               }
                               className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                               disabled={loading || isUploading}
-                            >
+                          >
                               <div className="flex flex-col items-center">
                                 <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                                   <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
@@ -1066,14 +1029,14 @@ function NewsModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
-              >
+            >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !title.trim() || !author.trim()}
-                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
-              >
+                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+            >
                 {loading
                   ? "Saving..."
                   : news
@@ -1109,42 +1072,37 @@ function NewsModal({
 
 export default function ArticleManagement() {
   const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [articles, setArticles] = useState<News[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
-  const hasFetchedRef = useRef(false);
+  const [itemsPerPage, setItemsPerPage] =
+    useState<(typeof PER_PAGE_OPTIONS)[number]>(30);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedArticle, setSelectedArticle] = useState<News | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const hasFetchedInitialArticlesRef = useRef(false);
+  const hasFetchedCategoriesRef = useRef(false);
+  const hasPassedFirstPaginationEffectRef = useRef(false);
   const mode = searchParams.get("mode");
   const editId = Number(searchParams.get("id"));
   const isCreatePage = mode === "create";
   const isEditPage = mode === "edit" && Number.isFinite(editId);
-  const selectedArticle = isEditPage
-    ? articles.find((article) => article.id === editId) || null
-    : null;
 
-  useEffect(() => {
-    // Prevent duplicate calls in React Strict Mode (development)
-    if (hasFetchedRef.current) {
-      return;
-    }
-
-    hasFetchedRef.current = true;
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchArticles = async (
+    page: number = currentPage,
+    perPage: number = itemsPerPage,
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      const [newsResponse, categoriesResponse, publishersResponse] =
-        await Promise.all([getNews(), getCategories(), getPublishers()]);
+      const newsResponse = await getAdminArticles(undefined, page, perPage);
 
       // Filter articles: middle_video_url is null (to distinguish from video articles)
       const filteredArticles = newsResponse.data.filter(
@@ -1158,10 +1116,14 @@ export default function ArticleManagement() {
         return dateB - dateA; // Descending order (latest first)
       });
 
+      const pagination = newsResponse.pagination;
       setArticles(sortedArticles);
-      setCategories(categoriesResponse.categories);
-      setPublishers(publishersResponse.data);
-      setCurrentPage(1); // Reset to first page when data is fetched
+      setTotalItems(pagination?.total ?? sortedArticles.length);
+      setTotalPages(
+        pagination?.last_page ??
+          Math.max(1, Math.ceil(sortedArticles.length / perPage)),
+      );
+      setCurrentPage(pagination?.current_page ?? page);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -1170,34 +1132,80 @@ export default function ArticleManagement() {
     }
   };
 
-  // Calculate pagination data with useMemo for performance
-  const paginatedData = useMemo(() => {
-    const totalPages = Math.ceil(articles.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedArticles = articles.slice(startIndex, endIndex);
-
-    return {
-      paginatedArticles,
-      totalPages,
-      totalItems: articles.length,
-      startIndex: startIndex + 1,
-      endIndex: Math.min(endIndex, articles.length),
-    };
-  }, [articles, currentPage]);
-
-  // Reset to page 1 if current page is out of bounds
   useEffect(() => {
-    if (
-      paginatedData.totalPages > 0 &&
-      currentPage > paginatedData.totalPages
-    ) {
-      setCurrentPage(1);
+    if (hasFetchedCategoriesRef.current) return;
+    hasFetchedCategoriesRef.current = true;
+
+    const fetchCategoriesData = async () => {
+      try {
+        const categoriesResponse = await getCategories();
+        setCategories(categoriesResponse.categories);
+      } catch {
+        setCategories([]);
+      }
+    };
+
+    fetchCategoriesData();
+  }, []);
+
+  useEffect(() => {
+    if (hasFetchedInitialArticlesRef.current) return;
+    if (isCreatePage || isEditPage) {
+      setLoading(false);
+      return;
     }
-  }, [paginatedData.totalPages, currentPage]);
+    hasFetchedInitialArticlesRef.current = true;
+    fetchArticles(currentPage, itemsPerPage);
+  }, [isCreatePage, isEditPage]);
+
+  useEffect(() => {
+    if (isCreatePage || isEditPage) return;
+    if (!hasPassedFirstPaginationEffectRef.current) {
+      hasPassedFirstPaginationEffectRef.current = true;
+      return;
+    }
+    fetchArticles(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage, isCreatePage, isEditPage]);
+
+  useEffect(() => {
+    if (!isEditPage) {
+      setSelectedArticle(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchSelectedArticle = async () => {
+      try {
+        setEditLoading(true);
+        const response = await getAdminArticleById(editId);
+        if (isMounted) {
+          setSelectedArticle(response.data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch selected article",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setEditLoading(false);
+        }
+      }
+    };
+
+    fetchSelectedArticle();
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditPage, editId]);
+
+  const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endIndex =
+    totalItems === 0 ? 0 : Math.min((currentPage - 1) * itemsPerPage + articles.length, totalItems);
 
   const goToPage = (page: number) => {
-    if (page >= 1 && page <= paginatedData.totalPages) {
+    if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
       // Scroll to top of content area
       const contentArea = document.querySelector(".flex-1.overflow-y-auto");
@@ -1226,16 +1234,12 @@ export default function ArticleManagement() {
 
     try {
       setDeletingId(id);
-      await deleteNews(id);
-
-      // Remove the deleted item from the state
-      const updatedArticles = articles.filter((article) => article.id !== id);
-      setArticles(updatedArticles);
-
-      // Adjust page if needed (if we deleted the last item on the current page)
-      const newTotalPages = Math.ceil(updatedArticles.length / ITEMS_PER_PAGE);
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
+      await deleteAdminArticle(id);
+      const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      if (nextPage !== currentPage) {
+        setCurrentPage(nextPage);
+      } else {
+        await fetchArticles(nextPage, itemsPerPage);
       }
     } catch (err) {
       const errorMessage =
@@ -1246,18 +1250,24 @@ export default function ArticleManagement() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDateAndTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return {
+      date: date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+      time: date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
   };
 
-  if (loading) {
+  const shouldShowLoading = isEditPage ? editLoading : loading;
+
+  if (shouldShowLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-gray-600">Loading articles...</p>
@@ -1270,9 +1280,9 @@ export default function ArticleManagement() {
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-red-600 mb-4">Error: {error}</p>
         <button
-          onClick={fetchData}
+          onClick={() => fetchArticles()}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -1282,43 +1292,31 @@ export default function ArticleManagement() {
 
   if (isCreatePage || isEditPage) {
     return (
-      <div className="h-screen overflow-y-auto p-4">
+      <div className="h-screen overflow-y-auto bg-[#f7f7f7]">
         <NewsModal
           isOpen
           asPage
           onClose={closeEditorPage}
           onSuccess={async () => {
-            await fetchData();
+            if (!isCreatePage) {
+              await fetchArticles();
+            }
             closeEditorPage();
           }}
           news={isEditPage ? selectedArticle : null}
           categories={categories}
-          publishers={publishers}
+          currentUsername={user?.username?.trim() || ""}
         />
       </div>
     );
   }
 
   return (
-    <div className="relative h-screen flex flex-col">
+    <div className="relative h-screen flex flex-col bg-[#f7f7f7]">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Article Management
-          </h2>
-          <button
-            onClick={handleCreateArticle}
-            className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
-            <Plus size={16} />
-            Add Article
-          </button>
-        </div>
-      </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto bg-[#f7f7f7]">
         {error && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">{error}</p>
@@ -1332,48 +1330,52 @@ export default function ArticleManagement() {
               <button
                 onClick={handleCreateArticle}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Article
               </button>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div>
             {/* Table Header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-              <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="text-center">#</div>
-                <div>Cover Image</div>
-                <div>Title</div>
-                <div>Category</div>
-                <div>Author</div>
-                <div>Upload Date</div>
-                <div className="text-center">Actions</div>
+            <div className="sticky top-0 z-20 h-16 bg-[#f7f7f7] border-b border-gray-200 px-6 flex items-center shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
+              <div className="grid h-full w-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <div className="flex h-full items-center justify-left">No.</div>
+                <div className="flex h-full items-center justify-left">Cover Image</div>
+                <div className="flex h-full items-center justify-left">Title</div>
+                <div className="flex h-full items-center justify-left">Visibility</div>
+                <div className="flex h-full items-center justify-left">Category</div>
+                <div className="flex h-full items-center justify-left">Author</div>
+                <div className="flex h-full items-center justify-left">Upload Date</div>
+                <div className="flex h-full items-center justify-center">View</div>
               </div>
             </div>
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {paginatedData.paginatedArticles.map((article, index) => (
+              {articles.map((article, index) => (
                 <div
                   key={article.id}
-                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="grid grid-cols-[1fr_2fr_2fr_1.5fr_1.5fr_2fr_2fr] gap-4 items-center">
+                  className="group px-6 h-[85px] hover:bg-[#ececec] transition-colors"
+              >
+                  <div className="grid h-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] items-center">
                     {/* Number */}
-                    <div className="text-center">
-                      <span className="text-sm font-medium text-gray-900">
-                        {paginatedData.totalItems -
-                          paginatedData.startIndex -
-                          index +
-                          1}
+                    <div
+                      className="text-left pl-1 cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
+                      <span className="text-xs font-medium text-gray-900">
+                        {totalItems - (currentPage - 1) * itemsPerPage - index}
                       </span>
                     </div>
 
                     {/* Cover Image */}
-                    <div>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
                       {article.cover ? (
-                        <div className="relative w-20 h-20 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                        <div className="relative w-[120px] h-[68px] rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
                             src={article.cover}
                             alt="Cover"
@@ -1385,7 +1387,7 @@ export default function ArticleManagement() {
                           />
                         </div>
                       ) : (
-                        <div className="w-20 h-20 rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <div className="w-[120px] h-[68px] rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
                           <span className="text-xs text-gray-400">
                             No Cover
                           </span>
@@ -1394,15 +1396,51 @@ export default function ArticleManagement() {
                     </div>
 
                     {/* Title */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2">
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
+                      <h3 className="text-[13px] font-semibold text-gray-900 leading-5 line-clamp-1">
                         {article.title}
                       </h3>
-                      {article.subtitle && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">
-                          {article.subtitle}
+                      <div className="relative h-10 mt-0.5">
+                        <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
+                          {article.content_blocks?.find((block) => block.paragraph?.trim())
+                            ?.paragraph ||
+                            article.subtitle ||
+                            ""}
                         </p>
-                      )}
+                        <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditArticle(article);
+                            }}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} strokeWidth={2.6} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(article.id);
+                            }}
+                            disabled={deletingId === article.id}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} strokeWidth={2.6} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Visibility */}
+                    <div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                        Visible
+                      </span>
                     </div>
 
                     {/* Category */}
@@ -1425,30 +1463,26 @@ export default function ArticleManagement() {
 
                     {/* Upload Date */}
                     <div>
-                      <p className="text-xs text-gray-600">
-                        {formatDate(article.created_at)}
-                      </p>
+                      {(() => {
+                        const dateTime = formatDateAndTime(article.created_at);
+                        return (
+                          <div className="text-xs text-gray-600 leading-4 text-left">
+                            <p>{dateTime.date}</p>
+                            <p>{dateTime.time}</p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    {/* Actions */}
-                    <div>
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditArticle(article)}
-                          className="cursor-pointer p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(article.id)}
-                          disabled={deletingId === article.id}
-                          className="cursor-pointer p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                    {/* View */}
+                    <div className="pr-1 text-center">
+                      <button
+                        type="button"
+                        className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-700"
+                        title="View"
+                      >
+                        ##
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1458,25 +1492,32 @@ export default function ArticleManagement() {
         )}
 
         {/* Pagination - Table Style */}
-        {articles.length > 0 && (
+        {totalItems > 0 && (
           <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               {/* Left side: Rows per page */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700">Rows per page:</span>
                 <select
-                  value={ITEMS_PER_PAGE}
-                  disabled
-                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
-                >
-                  <option value={15}>15</option>
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const value = Number(e.target.value) as (typeof PER_PAGE_OPTIONS)[number];
+                    setItemsPerPage(value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
+              >
+                  {PER_PAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Center: Page info */}
               <div className="text-sm text-gray-700">
-                {paginatedData.startIndex}-{paginatedData.endIndex} of{" "}
-                {paginatedData.totalItems}
+                {startIndex}-{endIndex} of {totalItems}
               </div>
 
               {/* Right side: Navigation buttons */}
@@ -1487,7 +1528,7 @@ export default function ArticleManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="First page"
-                >
+              >
                   <ChevronsLeft size={16} />
                 </button>
 
@@ -1497,27 +1538,27 @@ export default function ArticleManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Previous page"
-                >
+              >
                   <ChevronLeft size={16} />
                 </button>
 
                 {/* Next Button */}
                 <button
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Next page"
-                >
+              >
                   <ChevronRight size={16} />
                 </button>
 
                 {/* Last Page Button */}
                 <button
-                  onClick={() => goToPage(paginatedData.totalPages)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  onClick={() => goToPage(totalPages)}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Last page"
-                >
+              >
                   <ChevronsRight size={16} />
                 </button>
               </div>
@@ -1525,6 +1566,14 @@ export default function ArticleManagement() {
           </div>
         )}
       </div>
+      <button
+        onClick={handleCreateArticle}
+        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-[#f7f7f7] text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
+        aria-label="Create article"
+        title="Create article"
+      >
+        <Plus size={22} strokeWidth={2.5} />
+      </button>
 
     </div>
   );

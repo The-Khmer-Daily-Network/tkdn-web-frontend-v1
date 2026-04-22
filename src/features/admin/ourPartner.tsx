@@ -117,7 +117,7 @@ function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-md"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
               Upload Partner Logo
@@ -126,7 +126,7 @@ function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
               onClick={onClose}
               disabled={uploading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -155,7 +155,7 @@ function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
                       }}
                       className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                       aria-label="Remove image"
-                    >
+                  >
                       <X size={18} />
                     </button>
                   </div>
@@ -163,7 +163,7 @@ function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                  >
+                >
                     <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
                     <div className="mt-4">
                       <span className="text-blue-600 font-medium">
@@ -223,14 +223,14 @@ function UploadModal({ isOpen, onClose, onSuccess }: UploadModalProps) {
                 onClick={onClose}
                 disabled={uploading}
                 className="cursor-pointer px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!selectedFile || uploading}
                 className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+            >
                 {uploading ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
@@ -311,7 +311,7 @@ export default function OurPartner() {
         <button
           onClick={fetchLogos}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -329,7 +329,7 @@ export default function OurPartner() {
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
+        >
             <Plus size={16} />
             Upload Logo
           </button>
@@ -351,7 +351,7 @@ export default function OurPartner() {
               <button
                 onClick={() => setIsUploadModalOpen(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Upload Your First Logo
               </button>
             </div>
@@ -362,7 +362,7 @@ export default function OurPartner() {
               <div
                 key={logo.id}
                 className="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden group"
-              >
+            >
                 <div className="relative aspect-square bg-gray-100 overflow-hidden">
                   <img
                     src={logo.image_url}
@@ -377,7 +377,7 @@ export default function OurPartner() {
                     disabled={deletingId === logo.id}
                     className="cursor-pointer absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                     title="Delete logo"
-                  >
+                >
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -385,13 +385,13 @@ export default function OurPartner() {
                   <p
                     className="text-sm font-medium text-gray-900 truncate"
                     title={logo.name}
-                  >
+                >
                     {logo.name}
                   </p>
                   <p
                     className="text-xs text-gray-500 truncate mt-1"
                     title={logo.original_name}
-                  >
+                >
                     {logo.original_name}
                   </p>
                 </div>

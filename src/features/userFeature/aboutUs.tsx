@@ -257,7 +257,7 @@ export default function AboutUs() {
               : "bg-white text-[#273C8F] hover:bg-gray-100"
           }`}
           aria-label="Overview"
-        >
+      >
           <Globe
             className={`w-6 h-6 ${activeSection === "overview" ? "text-white" : "text-[#273C8F]"}`}
           />
@@ -270,7 +270,7 @@ export default function AboutUs() {
               : "bg-white text-[#273C8F] hover:bg-gray-100"
           }`}
           aria-label="Statistics"
-        >
+      >
           <FileText
             className={`w-6 h-6 ${activeSection === "statistics" ? "text-white" : "text-[#273C8F]"}`}
           />
@@ -283,7 +283,7 @@ export default function AboutUs() {
               : "bg-white text-[#273C8F] hover:bg-gray-100"
           }`}
           aria-label="Team"
-        >
+      >
           <User
             className={`w-6 h-6 ${activeSection === "team" ? "text-white" : "text-[#273C8F]"}`}
           />
@@ -296,7 +296,7 @@ export default function AboutUs() {
               : "bg-white text-[#273C8F] hover:bg-gray-100"
           }`}
           aria-label="Mission"
-        >
+      >
           <BookOpen
             className={`w-6 h-6 ${activeSection === "mission" ? "text-white" : "text-[#273C8F]"}`}
           />
@@ -309,7 +309,7 @@ export default function AboutUs() {
               : "bg-white text-[#273C8F] hover:bg-gray-100"
           }`}
           aria-label="Partners"
-        >
+      >
           <Handshake
             className={`w-6 h-6 ${activeSection === "partners" ? "text-white" : "text-[#273C8F]"}`}
           />
@@ -321,7 +321,7 @@ export default function AboutUs() {
         ref={overviewRef}
         data-section="overview"
         className="relative w-full h-[800px] max-[1000px]:h-[500px] max-[721px]:h-[300px] max-[349px]:h-[800px] flex items-end justify-center overflow-hidden"
-      >
+    >
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
@@ -339,7 +339,7 @@ export default function AboutUs() {
         ref={statisticsRef}
         data-section="statistics"
         className="py-16 px-4 bg-[gray-50]"
-      >
+    >
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl font-bold text-[#273C8F] uppercase text-center mb-12">
             Statistics & Metrics
@@ -471,7 +471,7 @@ export default function AboutUs() {
                           "--bar-width": `${articlesPublished}%`,
                         } as React.CSSProperties
                       }
-                    ></div>
+                  ></div>
                   </div>
                 </div>
                 <div>
@@ -491,7 +491,7 @@ export default function AboutUs() {
                           "--bar-width": `${videosPublished}%`,
                         } as React.CSSProperties
                       }
-                    ></div>
+                  ></div>
                   </div>
                 </div>
               </div>
@@ -523,7 +523,7 @@ export default function AboutUs() {
                               animationDelay: `${0.3 + index * 0.1}s`,
                             } as React.CSSProperties
                           }
-                        ></div>
+                      ></div>
                       </div>
                     </div>
                   ))}
@@ -559,12 +559,12 @@ export default function AboutUs() {
                   key={member.id}
                   className="bg-white rounded-[10px] shadow-md overflow-hidden relative"
                   style={{ width: "250px", margin: "0 auto" }}
-                >
+              >
                   {/* Image Section */}
                   <div
                     className="w-full bg-gray-200 overflow-hidden rounded-[10px] relative"
                     style={{ height: "300px" }}
-                  >
+                >
                     {member.image_url ? (
                       <img
                         src={member.image_url}
@@ -590,17 +590,17 @@ export default function AboutUs() {
                         paddingBottom: "5px",
                         paddingLeft: "5px",
                       }}
-                    >
+                  >
                       <h3
                         className="text-base font-semibold text-gray-900 mb-0.5 leading-tight text-center"
-                        style={{ fontFamily: "AKbalthom Techno" }}
-                      >
+                       
+                    >
                         {member.first_name} {member.last_name}
                       </h3>
                       <p
                         className="text-xs text-gray-600 leading-tight text-center"
-                        style={{ fontFamily: "AKbalthom Techno" }}
-                      >
+                       
+                    >
                         {member.position}
                       </p>
                     </div>
@@ -617,7 +617,7 @@ export default function AboutUs() {
         ref={missionRef}
         data-section="mission"
         className="py-16 px-4 bg-gray-50"
-      >
+    >
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div className="flex justify-center">
@@ -662,7 +662,7 @@ export default function AboutUs() {
                 <div
                   key={index}
                   className="aspect-square bg-gray-200 rounded-lg flex items-center justify-center"
-                >
+              >
                   {/* <span className="text-gray-400 text-sm">Partner Logo</span> */}
                 </div>
               ))}
@@ -673,7 +673,7 @@ export default function AboutUs() {
                 <div
                   key={partner.id}
                   className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center p-4"
-                >
+              >
                   {partner.image_url ? (
                     <img
                       src={partner.image_url}

@@ -107,7 +107,7 @@ export default function UploadVideoModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-2xl"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
@@ -118,7 +118,7 @@ export default function UploadVideoModal({
               disabled={uploading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Close"
-            >
+          >
               <X size={24} />
             </button>
           </div>
@@ -157,7 +157,7 @@ export default function UploadVideoModal({
                       }}
                       className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors cursor-pointer"
                       aria-label="Remove video"
-                    >
+                  >
                       <X size={18} />
                     </button>
                   </div>
@@ -165,7 +165,7 @@ export default function UploadVideoModal({
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     className="border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors aspect-video flex flex-col items-center justify-center"
-                  >
+                >
                     <Video className="h-12 w-12 text-gray-400" />
                     <div className="mt-4">
                       <span className="text-blue-600 font-medium">
@@ -196,14 +196,14 @@ export default function UploadVideoModal({
               onClick={handleClose}
               disabled={uploading}
               className="cursor-pointer px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+          >
               Cancel
             </button>
             <button
               onClick={handleUpload}
               disabled={!selectedFile || uploading}
               className="cursor-pointer flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
+          >
               {uploading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />

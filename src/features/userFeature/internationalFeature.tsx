@@ -120,8 +120,8 @@ export default function InternationalFeature({
     <div className="w-full">
       <h2
         className="text-xl font-bold text-[#E34C33] mb-3"
-        style={{ fontFamily: "AKbalthom Techno" }}
-      >
+       
+    >
         International News
       </h2>
       <div className="space-y-4">
@@ -130,7 +130,7 @@ export default function InternationalFeature({
             key={article.id}
             href={`/news/${article.id}`}
             className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
-          >
+        >
             <div className="relative max-[400px]:w-[150px] w-[200px] sm:w-[250px] h-[140px] shrink-0 rounded-xl overflow-hidden bg-gray-200 group">
               {article.cover && (
                 <img
@@ -148,38 +148,36 @@ export default function InternationalFeature({
                 {article.category && (
                   <span
                     className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
-                  >
+                   
+                >
                     {article.category.name}
                   </span>
                 )}
                 <p
                   className="text-xs max-[481px]:text-[10px] font-medium"
                   style={{
-                    fontFamily: "AKbalthom Techno",
                     color: "rgba(29, 34, 41, 0.6784)",
                   }}
-                >
+              >
                   {formatDate(article.date_time_post)}
                 </p>
               </div>
               <h2
                 className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed"
-                style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
-              >
+                
+            >
                 {article.title}
               </h2>
               {article.content_blocks && article.content_blocks.length > 0 && (
                 <p
                   className="hidden min-[639px]:block text-sm text-gray-600 line-clamp-2 overflow-hidden mt-1"
                   style={{
-                    fontFamily: "AKbalthom Techno",
                     display: "-webkit-box",
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: "vertical",
                     overflow: "hidden",
                   }}
-                >
+              >
                   {article.content_blocks[0].paragraph}
                 </p>
               )}

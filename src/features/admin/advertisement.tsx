@@ -149,7 +149,7 @@ function UploadImageModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               Upload Advertisement Image
@@ -158,7 +158,7 @@ function UploadImageModal({
               onClick={onClose}
               disabled={isUploadingImage}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -184,7 +184,7 @@ function UploadImageModal({
                           ? "border-blue-500 ring-2 ring-blue-200 shadow-md"
                           : "border-gray-200 hover:border-blue-300"
                       } ${isUploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
+                  >
                       <div className="aspect-video bg-gray-100 relative">
                         <Image
                           src={pos.image}
@@ -204,7 +204,7 @@ function UploadImageModal({
                             className="w-4 h-4"
                             fill="currentColor"
                             viewBox="0 0 20 20"
-                          >
+                        >
                             <path
                               fillRule="evenodd"
                               d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -261,7 +261,7 @@ function UploadImageModal({
                           ? "bg-blue-400 text-white cursor-wait"
                           : "bg-blue-600 text-white hover:bg-blue-700"
                       }`}
-                    >
+                  >
                       {isUploadingImage ? (
                         <>
                           <Loader2 size={18} className="animate-spin" />
@@ -478,7 +478,7 @@ function AdvertisementModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               {advertisement ? "Edit" : "Create"} Advertisement
@@ -487,7 +487,7 @@ function AdvertisementModal({
               onClick={onClose}
               disabled={loading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -533,7 +533,7 @@ function AdvertisementModal({
                               ? "border-blue-500 ring-2 ring-blue-200 shadow-md"
                               : "border-gray-200 hover:border-blue-300"
                           } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
+                      >
                           <div className="aspect-video bg-gray-100 relative">
                             <Image
                               src={pos.image}
@@ -553,7 +553,7 @@ function AdvertisementModal({
                                 className="w-4 h-4"
                                 fill="currentColor"
                                 viewBox="0 0 20 20"
-                              >
+                            >
                                 <path
                                   fillRule="evenodd"
                                   d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -602,7 +602,7 @@ function AdvertisementModal({
                             setShowImageSelector(!showImageSelector)
                           }
                           className="text-xs text-gray-500 hover:text-gray-700"
-                        >
+                      >
                           {showImageSelector ? "Hide" : "Show"}
                         </button>
                       </div>
@@ -630,7 +630,7 @@ function AdvertisementModal({
                                       ? "border-blue-500 ring-2 ring-blue-200 shadow-md"
                                       : "border-gray-200 hover:border-blue-300"
                                   }`}
-                                >
+                              >
                                   <img
                                     src={image.image_url}
                                     alt={image.position}
@@ -639,7 +639,7 @@ function AdvertisementModal({
                                   <p
                                     className="text-xs text-center p-2 bg-white truncate font-medium"
                                     title={image.position}
-                                  >
+                                >
                                     {image.position}
                                   </p>
                                   {/* Delete button in top right */}
@@ -655,7 +655,7 @@ function AdvertisementModal({
                                     disabled={deletingImageId === image.id}
                                     className="absolute top-1 right-1 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg z-10"
                                     title="Delete image"
-                                  >
+                                >
                                     {deletingImageId === image.id ? (
                                       <Loader2
                                         size={12}
@@ -731,14 +731,14 @@ function AdvertisementModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || !name.trim()}
                 className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+            >
                 {loading ? "Saving..." : advertisement ? "Update" : "Create"}
               </button>
             </div>
@@ -753,7 +753,7 @@ export default function Advertisement() {
   const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
   const [advertisementImages, setAdvertisementImages] = useState<
     AdvertisementImage[]
-  >([]);
+>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -925,7 +925,7 @@ export default function Advertisement() {
         <button
           onClick={fetchAdvertisements}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -944,14 +944,14 @@ export default function Advertisement() {
             <button
               onClick={() => setIsUploadImageModalOpen(true)}
               className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm"
-            >
+          >
               <Upload size={16} />
               Upload Image
             </button>
             <button
               onClick={handleCreateAdvertisement}
               className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-            >
+          >
               <Plus size={16} />
               Add Advertisement
             </button>
@@ -974,7 +974,7 @@ export default function Advertisement() {
               <button
                 onClick={handleCreateAdvertisement}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Advertisement
               </button>
             </div>
@@ -996,7 +996,7 @@ export default function Advertisement() {
                 <div
                   key={ad.id}
                   className="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-                >
+              >
                   <div className="w-full h-48 bg-gray-100 overflow-hidden relative">
                     {positionImage ? (
                       <Image
@@ -1031,7 +1031,7 @@ export default function Advertisement() {
                       <button
                         onClick={() => handleEditAdvertisement(ad)}
                         className="cursor-pointer flex-1 px-3 py-1.5 text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors text-sm font-medium"
-                      >
+                    >
                         <Edit2 size={14} className="inline mr-1" />
                         Edit
                       </button>
@@ -1039,7 +1039,7 @@ export default function Advertisement() {
                         onClick={() => handleDelete(ad.id)}
                         disabled={deletingId === ad.id}
                         className="cursor-pointer flex-1 px-3 py-1.5 text-red-600 bg-red-50 rounded hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                      >
+                    >
                         <Trash2 size={14} className="inline mr-1" />
                         Delete
                       </button>

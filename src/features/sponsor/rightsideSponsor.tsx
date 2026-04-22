@@ -199,7 +199,7 @@ export default function RightsideSponsor(
         <div
           className="relative overflow-hidden rounded-[10px] aspect-[3/5] w-full max-w-[180px] max-h-[300px] min-[402px]:hidden lg:block"
           style={baseStyle}
-        >
+      >
           <SocialMediaWidget
             socialMediaData={socialMedia}
             statistics={propStatistics}
@@ -211,7 +211,7 @@ export default function RightsideSponsor(
         <div
           className="hidden min-[402px]:flex lg:hidden relative overflow-hidden rounded-[10px] aspect-[3/5] w-full max-w-none max-h-none"
           style={baseStyle}
-        >
+      >
           <SocialMediaWidget
             socialMediaData={socialMedia}
             statistics={propStatistics}
@@ -223,7 +223,7 @@ export default function RightsideSponsor(
         <div
           className="flex min-[402px]:hidden lg:flex relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-[180px] max-h-[300px]"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("TopRight") ? (
             <Image
               src={getImageByPosition("TopRight")!.image_url}
@@ -253,7 +253,7 @@ export default function RightsideSponsor(
         <div
           className="hidden min-[402px]:flex lg:hidden relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-none max-h-none"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("TopRight") ? (
             <Image
               src={getImageByPosition("TopRight")!.image_url}
@@ -286,7 +286,7 @@ export default function RightsideSponsor(
         <div
           className="flex min-[402px]:hidden lg:flex relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-[180px] max-h-[300px]"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("SecondRight") ? (
             <Image
               src={getImageByPosition("SecondRight")!.image_url}
@@ -315,7 +315,7 @@ export default function RightsideSponsor(
         <div
           className="hidden min-[402px]:flex lg:hidden relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-none max-h-none"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("SecondRight") ? (
             <Image
               src={getImageByPosition("SecondRight")!.image_url}
@@ -344,7 +344,7 @@ export default function RightsideSponsor(
         <div
           className="flex min-[402px]:hidden lg:flex relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-[180px] max-h-[300px]"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("ThirdRight") ? (
             <Image
               src={getImageByPosition("ThirdRight")!.image_url}
@@ -374,7 +374,7 @@ export default function RightsideSponsor(
         <div
           className="hidden min-[402px]:flex lg:hidden relative overflow-hidden items-center justify-center rounded-[10px] aspect-[3/5] w-full max-w-none max-h-none"
           style={baseStyle}
-        >
+      >
           {getImageByPosition("ThirdRight") ? (
             <Image
               src={getImageByPosition("ThirdRight")!.image_url}

@@ -95,7 +95,7 @@ export default function VideoFeature({
             <div
               key={index}
               className="bg-white rounded-lg overflow-hidden animate-pulse"
-            >
+          >
               <div className="relative w-full aspect-video bg-gray-200 rounded-lg"></div>
               <div className="p-4 space-y-2">
                 <div className="flex flex-col space-y-2">
@@ -126,8 +126,8 @@ export default function VideoFeature({
     <div className="w-full">
       <h2
         className="text-xl font-bold text-[#E34C33] mb-3"
-        style={{ fontFamily: "AKbalthom Techno" }}
-      >
+       
+    >
         News Video
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -136,7 +136,7 @@ export default function VideoFeature({
             key={video.id}
             href={`/news/${video.id}`}
             className="bg-white rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow block"
-          >
+        >
             <div className="relative w-full aspect-video bg-gray-200 group">
               {video.cover && (
                 <img
@@ -162,32 +162,31 @@ export default function VideoFeature({
                 {video.category && (
                   <span
                     className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-3 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
-                  >
+                   
+                >
                     {video.category.name}
                   </span>
                 )}
                 <p
                   className="text-xs font-medium"
                   style={{
-                    fontFamily: "AKbalthom Techno",
                     color: "rgba(29, 34, 41, 0.6784)",
                   }}
-                >
+              >
                   {formatDate(video.date_time_post)}
                 </p>
               </div>
               <h2
                 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight"
-                style={{ fontFamily: "AKbalthom Techno" }}
-              >
+               
+            >
                 {video.title}
               </h2>
               {video.content_blocks && video.content_blocks.length > 0 && (
                 <p
                   className="text-sm text-gray-600 line-clamp-2"
-                  style={{ fontFamily: "AKbalthom Techno" }}
-                >
+                 
+              >
                   {video.content_blocks[0].paragraph}
                 </p>
               )}

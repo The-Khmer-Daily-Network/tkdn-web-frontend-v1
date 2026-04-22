@@ -108,7 +108,7 @@ function PublisherModal({
         <div
           className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               {publisher ? "Edit" : "Create"} Publisher
@@ -117,7 +117,7 @@ function PublisherModal({
               onClick={onClose}
               disabled={loading}
               className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-            >
+          >
               <X size={20} />
             </button>
           </div>
@@ -210,7 +210,7 @@ function PublisherModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
+            >
                 Cancel
               </button>
               <button
@@ -223,7 +223,7 @@ function PublisherModal({
                   !gmail.trim()
                 }
                 className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-              >
+            >
                 {loading ? "Saving..." : publisher ? "Update" : "Create"}
               </button>
             </div>
@@ -310,7 +310,7 @@ export default function Publishers() {
         <button
           onClick={fetchPublishers}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -328,7 +328,7 @@ export default function Publishers() {
           <button
             onClick={handleCreatePublisher}
             className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
+        >
             <Plus size={16} />
             Add Publisher
           </button>
@@ -350,7 +350,7 @@ export default function Publishers() {
               <button
                 onClick={handleCreatePublisher}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Publisher
               </button>
             </div>
@@ -361,7 +361,7 @@ export default function Publishers() {
               <div
                 key={publisher.id}
                 className="border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow p-4"
-              >
+            >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
@@ -392,7 +392,7 @@ export default function Publishers() {
                       onClick={() => handleEditPublisher(publisher)}
                       className="cursor-pointer p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       title="Edit Publisher"
-                    >
+                  >
                       <Edit2 size={16} />
                     </button>
                     <button
@@ -400,7 +400,7 @@ export default function Publishers() {
                       disabled={deletingId === publisher.id}
                       className="cursor-pointer p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete Publisher"
-                    >
+                  >
                       <Trash2 size={16} />
                     </button>
                   </div>

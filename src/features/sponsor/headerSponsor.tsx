@@ -25,7 +25,7 @@ export default function HeaderSponsor({
         <div
           className="flex animate-slide-right-responsive"
           style={{ width: "2880px" }}
-        >
+      >
           <div className="relative shrink-0 h-[30px] w-[1440px] bg-gray-200 animate-pulse"></div>
           <div className="relative shrink-0 h-[30px] w-[1440px] bg-gray-200 animate-pulse"></div>
         </div>
@@ -43,7 +43,7 @@ export default function HeaderSponsor({
       <div
         className="flex animate-slide-right-responsive"
         style={{ width: "2880px" }}
-      >
+    >
         <div className="relative shrink-0 h-[30px] w-[1440px]">
           <Image
             src={headerImage.image_url}

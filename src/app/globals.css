@@ -3,54 +3,125 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  /* Khmer body: article text, image captions (AKbalthom) */
-  --font-khmer-body:
-    "AKbalthom Techno", var(--font-poppins), ui-sans-serif, system-ui,
-    sans-serif;
-  /* Khmer headings/titles only (Inter Khmer Looped from public/Khmer) */
+  /* Primary UI font: Hanuman (Khmer + English / Latin) */
+  --font-latin: "Hanuman", ui-sans-serif, system-ui, sans-serif;
+  --font-khmer-body: "Hanuman", ui-sans-serif, system-ui, sans-serif;
+  /* Khmer headings/titles */
   --font-khmer-heading:
-    "Inter Khmer Looped", var(--font-khmer-body), ui-sans-serif, system-ui,
-    sans-serif;
+    "Hanuman", var(--font-khmer-body), ui-sans-serif, system-ui, sans-serif;
   --font-khmer: var(--font-khmer-body);
 }
 
-/* ─── AKbalthom Techno: article body & image captions (single weight) ─── */
+/* Hanuman (all scripts in these files — Khmer + Latin) */
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Thin.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 100;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-ExtraLight.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 200;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Light.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Medium.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-SemiBold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Bold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-ExtraBold.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Hanuman";
+  src: url("/fonts/Hanuman/Hanuman-Black.ttf") format("truetype");
+  font-display: swap;
+  font-weight: 900;
+  font-style: normal;
+}
+
+/* Backward-compat aliases */
 @font-face {
   font-family: "AKbalthom Techno";
-  src:
-    local("AKbalthom Techno"),
-    url("/fonts/AKbalthom Techno.ttf") format("truetype");
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
   font-display: swap;
-  font-weight: normal;
+  font-weight: 400;
   font-style: normal;
 }
 
-/* ─── Inter Khmer Looped: headers/titles only (variable font = bold works) ─── */
 @font-face {
   font-family: "Inter Khmer Looped";
-  src: url("/Khmer/variable/InterKhmerLooped[wght].ttf") format("truetype");
+  src: url("/fonts/Hanuman/Hanuman-Regular.ttf") format("truetype");
   font-display: swap;
-  font-weight: 100 900;
+  font-weight: 400;
   font-style: normal;
 }
-@font-face {
-  font-family: "Inter Khmer Looped";
-  src: url("/Khmer/variable/InterKhmerLooped-Italic[wght].ttf") format("truetype");
-  font-display: swap;
-  font-weight: 100 900;
-  font-style: italic;
-}
 
-/* Body/caption text: AKbalthom (article, image names) – allows synthetic bold when needed */
+/* Body/caption Khmer text */
 .font-khmer,
 .font-khmer-body {
   font-family: var(--font-khmer-body) !important;
   font-synthesis: weight;
 }
 
-/* Headers/titles: Inter Khmer Looped (bold/semibold work via variable font) */
+/* Headers/titles Khmer text */
 .font-khmer-heading {
   font-family: var(--font-khmer-heading) !important;
+}
+
+/*
+ * Global migration guard:
+ * Force legacy inline Khmer font declarations to use global Hanuman stack.
+ * This lets all existing components follow global font config without editing each file.
+ */
+[style*="AKbalthom Techno"],
+[style*="Inter Khmer Looped"] {
+  font-family: var(--font-khmer-body) !important;
 }
 
 @theme inline {
@@ -58,7 +129,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-khmer-body);
   --font-mono: var(--font-geist-mono);
-  --font-poppins: var(--font-khmer-body);
 }
 
 @media (prefers-color-scheme: dark) {

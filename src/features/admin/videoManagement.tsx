@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
 import { getCategories } from "@/services/category";
-import { getPublishers } from "@/services/publisher";
 import {
   deleteContentCover,
   getContentCovers,
@@ -34,13 +33,13 @@ import {
 } from "@/services/contentVideo";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
-import type { Publisher } from "@/types/publisher";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
 import VideoSelectorModal from "@/components/admin/VideoSelectorModal";
 import ImageSelectorModal from "@/components/admin/ImageSelectorModal";
 import type { ContentCover } from "@/types/contentCover";
 import type { ContentVideo } from "@/types/contentVideo";
 import type { ContentImage } from "@/types/contentImage";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -50,7 +49,7 @@ interface NewsModalProps {
   onSuccess: () => void;
   news?: News | null;
   categories: Category[];
-  publishers: Publisher[];
+  currentUsername: string;
   asPage?: boolean;
 }
 
@@ -60,7 +59,7 @@ function NewsModal({
   onSuccess,
   news,
   categories,
-  publishers,
+  currentUsername,
   asPage = false,
 }: NewsModalProps) {
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -85,13 +84,13 @@ function NewsModal({
   const [middleVideoUploading, setMiddleVideoUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
-  >(null);
+>(null);
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleVideoPendingFile, setMiddleVideoPendingFile] =
     useState<File | null>(null);
   const [endImagePendingFiles, setEndImagePendingFiles] = useState<
     Array<File | null>
-  >([null, null, null]);
+>([null, null, null]);
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleVideoUrlRef = useRef<string | null>(null);
@@ -138,7 +137,7 @@ function NewsModal({
       ];
     } else {
       setCategoryId(null);
-      setAuthor("");
+      setAuthor(currentUsername);
       setTitle("");
       setCover(null);
       setCoverName(null);
@@ -155,7 +154,7 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
-  }, [news, isOpen]);
+  }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
     return () => {
@@ -480,29 +479,6 @@ function NewsModal({
     });
   });
 
-  // Create author options from publishers (similar to category dropdown)
-  const authorOptions = useMemo(() => {
-    const options: Array<{ value: string; label: string }> = publishers.map(
-      (pub) => {
-        const fullName = `${pub.first_name} ${pub.last_name}`;
-        return {
-          value: fullName,
-          label: `${fullName} (${pub.nickname})`,
-        };
-      },
-    );
-
-    // Add current author if it doesn't exist in publishers (for custom authors when editing)
-    if (author && !options.find((opt) => opt.value === author)) {
-      options.push({
-        value: author,
-        label: author,
-      });
-    }
-
-    return options;
-  }, [publishers, author]);
-
   if (!isOpen) return null;
 
   return (
@@ -519,32 +495,34 @@ function NewsModal({
             ? "relative"
             : "fixed inset-0 z-100 flex items-center justify-center p-4"
         }
-      >
+    >
         <div
           className={
             asPage
-              ? "bg-white rounded-lg border border-gray-200 w-full overflow-y-auto"
+              ? "bg-white w-full min-h-screen overflow-y-auto"
               : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           }
           onClick={(e) => e.stopPropagation()}
-        >
+      >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Video Article
             </h2>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            {!asPage && (
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
-              <X size={20} />
-            </button>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           <form
             onSubmit={handleSubmit}
             className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
-          >
+        >
             {/* Left column: keep Details + Content Blocks together */}
             <div className="min-w-0 space-y-6">
               {/* Basic Information Section */}
@@ -591,7 +569,7 @@ function NewsModal({
                     }
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
                     disabled={loading}
-                  >
+                >
                     <option value="">Select category</option>
                     {allCategories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
@@ -605,20 +583,14 @@ function NewsModal({
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Author <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={author || ""}
-                    onChange={(e) => setAuthor(e.target.value)}
+                    readOnly
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled={loading}
+                    disabled
                     required
-                  >
-                    <option value="">Select author</option>
-                    {authorOptions.map((option, index) => (
-                      <option key={index} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
             </div>
@@ -637,7 +609,7 @@ function NewsModal({
                     onClick={handleAddContentBlock}
                     className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
                     disabled={loading}
-                  >
+                >
                     <Plus size={14} />
                     Add Block
                   </button>
@@ -647,7 +619,7 @@ function NewsModal({
                     <div
                       key={index}
                       className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
-                    >
+                  >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
@@ -665,7 +637,7 @@ function NewsModal({
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                          >
+                        >
                             Remove
                           </button>
                         )}
@@ -751,7 +723,7 @@ function NewsModal({
                         }}
                         className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                         disabled={loading || coverUploading}
-                      >
+                    >
                         <X size={12} />
                       </button>
                     </div>
@@ -777,7 +749,7 @@ function NewsModal({
                         onClick={() => coverFileInputRef.current?.click()}
                         className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
                         disabled={loading || coverUploading}
-                      >
+                    >
                         {coverUploading ? "Uploading..." : "Change Image"}
                       </button>
                       <input
@@ -798,7 +770,7 @@ function NewsModal({
                       onClick={() => coverFileInputRef.current?.click()}
                       className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                       disabled={loading || coverUploading}
-                    >
+                  >
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                           <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
@@ -857,7 +829,7 @@ function NewsModal({
                         }}
                         className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                         disabled={loading || middleVideoUploading}
-                      >
+                    >
                         <X size={12} />
                       </button>
                     </div>
@@ -885,7 +857,7 @@ function NewsModal({
                         onClick={() => middleVideoFileInputRef.current?.click()}
                         className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
                         disabled={loading || middleVideoUploading}
-                      >
+                    >
                         {middleVideoUploading ? "Uploading..." : "Change Video"}
                       </button>
                       <input
@@ -906,7 +878,7 @@ function NewsModal({
                       onClick={() => middleVideoFileInputRef.current?.click()}
                       className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                       disabled={loading || middleVideoUploading}
-                    >
+                  >
                       <div className="flex flex-col items-center">
                         <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                           <VideoIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
@@ -973,7 +945,7 @@ function NewsModal({
                                   onClick={() => handleRemoveEndImage(slotIndex)}
                                   className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
                                   disabled={loading || isUploading}
-                                >
+                              >
                                   <X size={10} />
                                 </button>
                               </div>
@@ -1011,7 +983,7 @@ function NewsModal({
                               }
                               className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
                               disabled={loading || isUploading}
-                            >
+                          >
                               <div className="flex flex-col items-center">
                                 <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
                                   <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
@@ -1065,7 +1037,7 @@ function NewsModal({
                 onClick={onClose}
                 disabled={loading}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
-              >
+            >
                 Cancel
               </button>
               <button
@@ -1074,7 +1046,7 @@ function NewsModal({
                   loading || !title.trim() || !author.trim() || !middleVideoUrl
                 }
                 className="cursor-pointer px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
-              >
+            >
                 {loading
                   ? "Saving..."
                   : news
@@ -1110,11 +1082,11 @@ function NewsModal({
 
 export default function VideoManagement() {
   const router = useRouter();
+  const { user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [articles, setArticles] = useState<News[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [publishers, setPublishers] = useState<Publisher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -1144,8 +1116,10 @@ export default function VideoManagement() {
     try {
       setLoading(true);
       setError(null);
-      const [newsResponse, categoriesResponse, publishersResponse] =
-        await Promise.all([getNews(), getCategories(), getPublishers()]);
+      const [newsResponse, categoriesResponse] = await Promise.all([
+        getNews(),
+        getCategories(),
+      ]);
 
       // Filter articles: middle_video_url is not null
       const filteredArticles = newsResponse.data.filter(
@@ -1161,7 +1135,6 @@ export default function VideoManagement() {
 
       setArticles(sortedArticles);
       setCategories(categoriesResponse.categories);
-      setPublishers(publishersResponse.data);
       setCurrentPage(1); // Reset to first page when data is fetched
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -1247,15 +1220,19 @@ export default function VideoManagement() {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDateAndTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return {
+      date: date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+      time: date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
   };
 
   if (loading) {
@@ -1273,7 +1250,7 @@ export default function VideoManagement() {
         <button
           onClick={fetchData}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-        >
+      >
           Retry
         </button>
       </div>
@@ -1282,7 +1259,7 @@ export default function VideoManagement() {
 
   if (isCreatePage || isEditPage) {
     return (
-      <div className="h-screen overflow-y-auto p-4">
+      <div className="min-h-screen overflow-y-auto bg-[#f7f7f7]">
         <NewsModal
           isOpen
           asPage
@@ -1293,32 +1270,25 @@ export default function VideoManagement() {
           }}
           news={isEditPage ? selectedArticle : null}
           categories={categories}
-          publishers={publishers}
+          currentUsername={user?.username?.trim() || ""}
         />
       </div>
     );
   }
 
   return (
-    <div className="relative h-screen flex flex-col">
+    <div className="relative h-screen flex flex-col bg-[#f7f7f7]">
       {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="px-4 py-3 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
             Video Management
           </h2>
-          <button
-            onClick={handleCreateArticle}
-            className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm text-sm"
-          >
-            <Plus size={16} />
-            Add Video Article
-          </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto bg-[#f7f7f7]">
         {error && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">{error}</p>
@@ -1332,23 +1302,24 @@ export default function VideoManagement() {
               <button
                 onClick={handleCreateArticle}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
+            >
                 Create Your First Video Article
               </button>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div>
             {/* Table Header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-              <div className="grid grid-cols-12 gap-4 items-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="col-span-1 text-center">#</div>
-                <div className="col-span-2">Cover Image</div>
-                <div className="col-span-2">Title</div>
-                <div className="col-span-2">Category</div>
-                <div className="col-span-2">Author</div>
-                <div className="col-span-2">Upload Date</div>
-                <div className="col-span-1 text-center">Actions</div>
+            <div className="sticky top-0 z-20 h-16 bg-[#f7f7f7] border-b border-gray-200 px-6 flex items-center shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
+              <div className="grid h-full w-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <div className="flex h-full items-center justify-center">No.</div>
+                <div className="flex h-full items-center justify-center">Cover Image</div>
+                <div className="flex h-full items-center justify-center">Title</div>
+                <div className="flex h-full items-center justify-center">Visibility</div>
+                <div className="flex h-full items-center justify-center">Category</div>
+                <div className="flex h-full items-center justify-center">Author</div>
+                <div className="flex h-full items-center justify-center">Upload Date</div>
+                <div className="flex h-full items-center justify-center">View</div>
               </div>
             </div>
 
@@ -1357,12 +1328,15 @@ export default function VideoManagement() {
               {paginatedData.paginatedArticles.map((article, index) => (
                 <div
                   key={article.id}
-                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="grid grid-cols-12 gap-4 items-center">
+                  className="group px-6 h-[85px] hover:bg-[#ececec] transition-colors"
+              >
+                  <div className="grid h-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] items-center">
                     {/* Number */}
-                    <div className="col-span-1 text-center">
-                      <span className="text-sm font-medium text-gray-900">
+                    <div
+                      className="text-left pl-1 cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
+                      <span className="text-xs font-medium text-gray-900">
                         {paginatedData.totalItems -
                           paginatedData.startIndex -
                           index +
@@ -1371,9 +1345,12 @@ export default function VideoManagement() {
                     </div>
 
                     {/* Cover Image */}
-                    <div className="col-span-2">
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => handleEditArticle(article)}
+                    >
                       {article.cover ? (
-                        <div className="relative w-20 h-20 rounded-md overflow-hidden border border-gray-200 bg-gray-100">
+                        <div className="relative w-[120px] h-[68px] rounded-md overflow-hidden border border-gray-200 bg-gray-100">
                           <img
                             src={article.cover}
                             alt="Cover"
@@ -1385,7 +1362,7 @@ export default function VideoManagement() {
                           />
                         </div>
                       ) : (
-                        <div className="w-20 h-20 rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
+                        <div className="w-[120px] h-[68px] rounded-md border border-gray-200 bg-gray-100 flex items-center justify-center">
                           <span className="text-xs text-gray-400">
                             No Cover
                           </span>
@@ -1394,19 +1371,55 @@ export default function VideoManagement() {
                     </div>
 
                     {/* Title */}
-                    <div className="col-span-2">
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2">
+                    <div
+                      className="cursor-pointer pl-1"
+                      onClick={() => handleEditArticle(article)}
+                    >
+                      <h3 className="text-[13px] font-semibold text-gray-900 leading-5 line-clamp-1">
                         {article.title}
                       </h3>
-                      {article.subtitle && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">
-                          {article.subtitle}
+                      <div className="relative h-10 mt-0.5">
+                        <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
+                          {article.content_blocks?.find((block) => block.paragraph?.trim())
+                            ?.paragraph ||
+                            article.subtitle ||
+                            ""}
                         </p>
-                      )}
+                        <div className="absolute inset-0 w-full flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditArticle(article);
+                            }}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} strokeWidth={2.6} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(article.id);
+                            }}
+                            disabled={deletingId === article.id}
+                            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center text-black hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} strokeWidth={2.6} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Visibility */}
+                    <div className="pl-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                        Visible
+                      </span>
                     </div>
 
                     {/* Category */}
-                    <div className="col-span-2">
+                    <div>
                       {article.category ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {article.category.name}
@@ -1419,36 +1432,32 @@ export default function VideoManagement() {
                     </div>
 
                     {/* Author */}
-                    <div className="col-span-2">
+                    <div>
                       <p className="text-sm text-gray-900">{article.author}</p>
                     </div>
 
                     {/* Upload Date */}
-                    <div className="col-span-2">
-                      <p className="text-xs text-gray-600">
-                        {formatDate(article.created_at)}
-                      </p>
+                    <div>
+                      {(() => {
+                        const dateTime = formatDateAndTime(article.created_at);
+                        return (
+                          <div className="text-xs text-gray-600 leading-4 text-left">
+                            <p>{dateTime.date}</p>
+                            <p>{dateTime.time}</p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    {/* Actions */}
-                    <div className="col-span-1">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditArticle(article)}
-                          className="cursor-pointer p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(article.id)}
-                          disabled={deletingId === article.id}
-                          className="cursor-pointer p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                    {/* View */}
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-700"
+                        title="View"
+                      >
+                        ##
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1468,7 +1477,7 @@ export default function VideoManagement() {
                   value={ITEMS_PER_PAGE}
                   disabled
                   className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
-                >
+              >
                   <option value={15}>15</option>
                 </select>
               </div>
@@ -1487,7 +1496,7 @@ export default function VideoManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="First page"
-                >
+              >
                   <ChevronsLeft size={16} />
                 </button>
 
@@ -1497,7 +1506,7 @@ export default function VideoManagement() {
                   disabled={currentPage === 1}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Previous page"
-                >
+              >
                   <ChevronLeft size={16} />
                 </button>
 
@@ -1507,7 +1516,7 @@ export default function VideoManagement() {
                   disabled={currentPage === paginatedData.totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Next page"
-                >
+              >
                   <ChevronRight size={16} />
                 </button>
 
@@ -1517,7 +1526,7 @@ export default function VideoManagement() {
                   disabled={currentPage === paginatedData.totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Last page"
-                >
+              >
                   <ChevronsRight size={16} />
                 </button>
               </div>
@@ -1525,6 +1534,15 @@ export default function VideoManagement() {
           </div>
         )}
       </div>
+
+      <button
+        onClick={handleCreateArticle}
+        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-white text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
+        aria-label="Create video article"
+        title="Create video article"
+      >
+        <Plus size={22} strokeWidth={2.5} />
+      </button>
 
     </div>
   );

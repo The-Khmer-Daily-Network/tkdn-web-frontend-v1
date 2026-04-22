@@ -139,7 +139,7 @@ export default function NewsDashboard({
             <div
               className="relative w-full rounded-[10px] bg-gray-200"
               style={{ height: "200px" }}
-            ></div>
+          ></div>
 
             {/* Main Article Info Skeleton */}
             <div className="flex flex-col space-y-1">
@@ -156,7 +156,7 @@ export default function NewsDashboard({
             <div
               className="relative rounded-[10px] bg-gray-200"
               style={{ width: "500px", height: "275px" }}
-            ></div>
+          ></div>
 
             {/* Main Article Content Skeleton */}
             <div className="w-full sm:w-1/2 flex flex-col justify-start mt-4 space-y-6">
@@ -204,7 +204,7 @@ export default function NewsDashboard({
   if (news.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-gray-600">No news available</p>
+        <p className="text-gray-600">News is Loading...</p>
       </div>
     );
   }
@@ -231,7 +231,7 @@ export default function NewsDashboard({
               <div
                 className="relative w-full rounded-xl overflow-hidden bg-gray-200 group"
                 style={{ height: "200px" }}
-              >
+            >
                 {mainArticle.cover && (
                   <img
                     src={mainArticle.cover}
@@ -249,8 +249,8 @@ export default function NewsDashboard({
                 {mainArticle.category && (
                   <span
                     className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                    style={{ fontFamily: "AKbalthom Techno" }}
-                  >
+                   
+                >
                     {mainArticle.category.name}
                   </span>
                 )}
@@ -259,8 +259,8 @@ export default function NewsDashboard({
                 </p>
                 <h1
                   className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                  style={{ fontFamily: "AKbalthom Techno" }}
-                >
+                 
+              >
                   {mainArticle.title}
                 </h1>
               </div>
@@ -272,7 +272,7 @@ export default function NewsDashboard({
               <div
                 className="relative rounded-xl overflow-hidden bg-gray-200 group"
                 style={{ width: "500px", height: "275px" }}
-              >
+            >
                 {mainArticle.cover && (
                   <img
                     src={mainArticle.cover}
@@ -291,8 +291,8 @@ export default function NewsDashboard({
                   {mainArticle.category && (
                     <span
                       className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-3 underline-offset-5 uppercase"
-                      style={{ fontFamily: "AKbalthom Techno" }}
-                    >
+                     
+                  >
                       {mainArticle.category.name}
                     </span>
                   )}
@@ -303,8 +303,8 @@ export default function NewsDashboard({
                 <div className="space-y-2">
                   <h1
                     className="text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
-                    style={{ fontFamily: '"Inter Khmer Looped", sans-serif' }}
-                  >
+                    
+                >
                     {mainArticle.title}
                   </h1>
                 </div>
@@ -312,8 +312,8 @@ export default function NewsDashboard({
                   mainArticle.content_blocks.length > 0 && (
                     <p
                       className="text-xs text-gray-700 line-clamp-3"
-                      style={{ fontFamily: "AKbalthom Techno" }}
-                    >
+                     
+                  >
                       {mainArticle.content_blocks[0].paragraph}
                     </p>
                   )}
@@ -331,7 +331,7 @@ export default function NewsDashboard({
               key={article.id}
               href={`/news/${article.id}`}
               className="cursor-pointer hover:opacity-90 transition-opacity"
-            >
+          >
               {/* Mobile: Horizontal layout - image left, content right */}
               <div className="flex flex-row gap-3 sm:flex-col sm:space-y-0">
                 {/* Article Image */}
@@ -353,8 +353,8 @@ export default function NewsDashboard({
                   {article.category && (
                     <span
                       className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                      style={{ fontFamily: "AKbalthom Techno" }}
-                    >
+                     
+                  >
                       {article.category.name}
                     </span>
                   )}
@@ -363,8 +363,8 @@ export default function NewsDashboard({
                   </p>
                   <h2
                     className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                    style={{ fontFamily: "AKbalthom Techno" }}
-                  >
+                   
+                >
                     {article.title}
                   </h2>
                   {/* {article.content_blocks &&

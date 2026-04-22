@@ -74,7 +74,7 @@ export default function WelcomePopup() {
         opacity: isClosing ? 0 : isOpen ? 1 : 0,
         transition: `opacity ${ANIMATION_MS}ms ease-out`,
       }}
-    >
+  >
       <div
         className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-lg shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -83,7 +83,7 @@ export default function WelcomePopup() {
           opacity: isClosing ? 0 : isOpen ? 1 : 0,
           transition: `transform ${ANIMATION_MS}ms ease-out, opacity ${ANIMATION_MS}ms ease-out`,
         }}
-      >
+    >
         <Image
           src={IMAGE_PATH}
           alt="The Khmer Daily Network Team"
