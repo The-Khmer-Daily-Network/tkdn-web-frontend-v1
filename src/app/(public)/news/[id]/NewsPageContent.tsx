@@ -28,6 +28,7 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
   "h2",
   "blockquote",
   "br",
+  "img",
 ]);
 
 const isSafeHref = (href: string) => {
@@ -38,6 +39,15 @@ const isSafeHref = (href: string) => {
     normalizedHref.startsWith("mailto:") ||
     normalizedHref.startsWith("tel:") ||
     normalizedHref.startsWith("/")
+  );
+};
+
+const isSafeImageSrc = (src: string) => {
+  const normalizedSrc = src.trim().toLowerCase();
+  return (
+    normalizedSrc.startsWith("http://") ||
+    normalizedSrc.startsWith("https://") ||
+    normalizedSrc.startsWith("/")
   );
 };
 
@@ -74,14 +84,22 @@ const sanitizeRichText = (html: string): string => {
     const attributes = [...element.attributes];
     for (const attr of attributes) {
       const attrName = attr.name.toLowerCase();
-      if (tagName !== "a") {
-        element.removeAttribute(attr.name);
+
+      if (tagName === "a") {
+        if (attrName !== "href" && attrName !== "target" && attrName !== "rel") {
+          element.removeAttribute(attr.name);
+        }
         continue;
       }
 
-      if (attrName !== "href" && attrName !== "target" && attrName !== "rel") {
-        element.removeAttribute(attr.name);
+      if (tagName === "img") {
+        if (attrName !== "src" && attrName !== "alt" && attrName !== "title") {
+          element.removeAttribute(attr.name);
+        }
+        continue;
       }
+
+      element.removeAttribute(attr.name);
     }
 
     if (tagName === "a") {
@@ -91,6 +109,27 @@ const sanitizeRichText = (html: string): string => {
       }
       element.setAttribute("rel", "noopener noreferrer");
       element.setAttribute("target", "_blank");
+    }
+
+    if (tagName === "img") {
+      const src = element.getAttribute("src") || "";
+      if (!isSafeImageSrc(src)) {
+        element.remove();
+        return;
+      }
+      element.setAttribute("loading", "lazy");
+      if (!element.getAttribute("alt")) {
+        element.setAttribute("alt", "Article image");
+      }
+    }
+
+    if (tagName === "blockquote") {
+      const quoteText = (element.textContent || "").replace(/\u00A0/g, "").trim();
+      const hasImage = element.querySelector("img") !== null;
+      if (!quoteText && !hasImage) {
+        element.remove();
+        return;
+      }
     }
 
     const children = [...element.childNodes];
@@ -665,6 +704,9 @@ export default function NewsPageContent({
   if (isNewsDetail && singleNews) {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const articleUrl = `${baseUrl}/news/${singleNews.id}`;
+    const hasInlineContentImages = (singleNews.content_blocks || []).some((block) =>
+      /<img[\s>]/i.test(block.paragraph || ""),
+    );
 
     // Ensure image URL is absolute
     let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
@@ -954,7 +996,7 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeRichText(paragraph.trim()),
                             }}
@@ -1118,7 +1160,8 @@ export default function NewsPageContent({
                             })()}
 
                           {/* Middle Image (if no video) */}
-                          {!singleNews.middle_video_url &&
+                          {!hasInlineContentImages &&
+                            !singleNews.middle_video_url &&
                             singleNews.middle_image_url && (
                               <div className="w-full my-8">
                                 <img
@@ -1151,7 +1194,9 @@ export default function NewsPageContent({
             )}
 
           {/* End Images */}
-          {singleNews.end_images && singleNews.end_images.length > 0 && (
+          {!hasInlineContentImages &&
+            singleNews.end_images &&
+            singleNews.end_images.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
               {singleNews.end_images.map((endImage, index) => (
                 <div key={index} className="w-full">

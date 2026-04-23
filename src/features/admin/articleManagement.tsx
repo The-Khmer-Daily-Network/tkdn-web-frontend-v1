@@ -80,6 +80,7 @@ function NewsModal({
   const [endImages, setEndImages] = useState<EndImage[]>([]);
   const [endImageUrlInputs, setEndImageUrlInputs] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
+  const [inlineImageUploading, setInlineImageUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const [showCategorySelector, setShowCategorySelector] = useState(false);
@@ -119,6 +120,9 @@ function NewsModal({
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contentTextareaRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const inlineImageInputRef = useRef<HTMLInputElement | null>(null);
+  const savedInlineImageRangeRef = useRef<Range | null>(null);
+  const savedInlineImageBlockIndexRef = useRef<number | null>(null);
 
   const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
     const selection = window.getSelection();
@@ -340,6 +344,200 @@ function NewsModal({
       setActiveSelection(null);
       setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
     });
+  };
+
+  const handleContentKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const editor = contentTextareaRefs.current[index];
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const node = selection.anchorNode;
+    let current: Element | null =
+      node?.nodeType === Node.ELEMENT_NODE
+        ? (node as Element)
+        : node?.parentElement || null;
+
+    let quoteElement: Element | null = null;
+    while (current && editor.contains(current)) {
+      if (current.tagName.toLowerCase() === "blockquote") {
+        quoteElement = current;
+        break;
+      }
+      current = current.parentElement;
+    }
+
+    if (!quoteElement) return;
+
+    // Keep existing quote unchanged; move caret to a new normal line after quote.
+    e.preventDefault();
+    const paragraph = document.createElement("p");
+    paragraph.appendChild(document.createElement("br"));
+
+    if (quoteElement.parentNode) {
+      const nextSibling = quoteElement.nextSibling;
+      if (nextSibling) {
+        quoteElement.parentNode.insertBefore(paragraph, nextSibling);
+      } else {
+        quoteElement.parentNode.appendChild(paragraph);
+      }
+    } else {
+      editor.appendChild(paragraph);
+    }
+
+    const selectionAfter = window.getSelection();
+    if (selectionAfter) {
+      const newRange = document.createRange();
+      newRange.setStart(paragraph, 0);
+      newRange.collapse(true);
+      selectionAfter.removeAllRanges();
+      selectionAfter.addRange(newRange);
+    }
+
+    requestAnimationFrame(() => {
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      syncActiveTextFormat(editor);
+    });
+  };
+
+  const handleInlineImageButtonClick = () => {
+    if (loading || inlineImageUploading || activeEditorBlockIndex === null) return;
+    savedInlineImageBlockIndexRef.current =
+      activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      savedInlineImageRangeRef.current = range.cloneRange();
+    } else {
+      savedInlineImageRangeRef.current = null;
+    }
+    if (inlineImageInputRef.current) {
+      inlineImageInputRef.current.value = "";
+      inlineImageInputRef.current.click();
+    }
+  };
+
+  const assignUploadedImageToLegacySlots = (
+    imageUrl: string,
+    imageName: string | null,
+  ) => {
+    if (!middleImageUrl) {
+      setMiddleImageUrl(imageUrl);
+      setMiddleImageName(imageName);
+      setMiddleImagePendingFile(null);
+      setMiddleImageUrlInput("");
+      setMiddleVideoUrl(null);
+      setMiddleVideoName(null);
+      return true;
+    }
+
+    if (endImages.length < 3) {
+      setEndImages((prev) => [...prev, { url: imageUrl, name: imageName }]);
+      return true;
+    }
+
+    setError("Maximum 4 images reached (Image 1 + 3 more images).");
+    return false;
+  };
+
+  const handleInlineImageFileChange = async (file?: File) => {
+    const blockIndex =
+      savedInlineImageBlockIndexRef.current ??
+      activeSelection?.blockIndex ??
+      activeEditorBlockIndex;
+    if (!file || blockIndex === null) return;
+    try {
+      setInlineImageUploading(true);
+      setError(null);
+      const uploadResponse = await uploadContentImage({ image: file });
+      const uploaded = Array.isArray(uploadResponse.data)
+        ? uploadResponse.data[0]
+        : uploadResponse.data;
+      const imageUrl = uploaded?.image_url;
+      if (!imageUrl) {
+        throw new Error("Failed to get uploaded image URL");
+      }
+      const imageName =
+        (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
+
+      const didAssign = assignUploadedImageToLegacySlots(imageUrl, imageName);
+      if (!didAssign) return;
+
+      const editor = contentTextareaRefs.current[blockIndex];
+      if (!editor) return;
+      editor.focus();
+
+      const selection = window.getSelection();
+      const range = savedInlineImageRangeRef.current;
+      const canInsertAtSavedRange =
+        !!selection &&
+        !!range &&
+        editor.contains(range.commonAncestorContainer);
+
+      if (selection && canInsertAtSavedRange && range) {
+        const workingRange = range.cloneRange();
+        workingRange.deleteContents();
+
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.style.display = "block";
+        wrapper.style.margin = "16px 0";
+
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = imageName || "Inline image";
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.borderRadius = "8px";
+        img.style.display = "block";
+        wrapper.appendChild(img);
+
+        const spacer = document.createElement("br");
+        workingRange.insertNode(spacer);
+        workingRange.insertNode(wrapper);
+
+        const caretRange = document.createRange();
+        caretRange.setStartAfter(spacer);
+        caretRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caretRange);
+      } else {
+        // Fallback: append image at end if selection cannot be restored.
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.style.display = "block";
+        wrapper.style.margin = "16px 0";
+
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = imageName || "Inline image";
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.borderRadius = "8px";
+        img.style.display = "block";
+        wrapper.appendChild(img);
+
+        editor.appendChild(wrapper);
+        editor.appendChild(document.createElement("br"));
+      }
+
+      handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to upload inline image";
+      setError(errorMessage);
+    } finally {
+      setInlineImageUploading(false);
+      savedInlineImageRangeRef.current = null;
+      savedInlineImageBlockIndexRef.current = null;
+      if (inlineImageInputRef.current) {
+        inlineImageInputRef.current.value = "";
+      }
+    }
   };
 
   const applySelectionFormat = (
@@ -737,6 +935,22 @@ function NewsModal({
             </h2>
             {asPage && (
               <div className="flex items-center gap-2">
+                <input
+                  ref={inlineImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={(e) => handleInlineImageFileChange(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={handleInlineImageButtonClick}
+                  disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inlineImageUploading ? "Adding..." : "Add Image"}
+                </button>
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
@@ -1120,6 +1334,7 @@ function NewsModal({
                               }
                               onSelect={(e) => handleContentSelection(index, e)}
                               onMouseUp={(e) => handleContentSelection(index, e)}
+                              onKeyDown={(e) => handleContentKeyDown(index, e)}
                               onKeyUp={(e) => handleContentSelection(index, e)}
                               onClick={(e) => handleContentSelection(index, e)}
                               onBlur={() => {
@@ -1132,7 +1347,7 @@ function NewsModal({
                                   quote: false,
                                 });
                               }}
-                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             />
                           </div>
                         ) : (
@@ -1164,240 +1379,15 @@ function NewsModal({
               </div>
             </div>
 
-            {/* Images & Media Section - right column (vertical column layout) */}
-            <div className="order-3 lg:col-span-2 space-y-4 min-w-0">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Images & Media
-                </h3>
-              </div>
-
-              {/* Middle Image */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Middle Image
-                </label>
-                {middleImageUrl ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <img
-                        src={middleImageUrl}
-                        alt="Middle"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMiddleImageUrl(null);
-                          setMiddleImageName(null);
-                          setMiddleImageUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || middleImageUploading}
-                    >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Image Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={middleImageName || ""}
-                          onChange={(e) =>
-                            setMiddleImageName(e.target.value || null)
-                          }
-                          placeholder="Enter image name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => middleImageFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || middleImageUploading}
-                    >
-                        {middleImageUploading ? "Uploading..." : "Change Image"}
-                      </button>
-                      <input
-                        ref={middleImageFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectMiddleImageFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => middleImageFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || middleImageUploading}
-                  >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Middle Image
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={middleImageFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) =>
-                        handleSelectMiddleImageFile(e.target.files?.[0])
-                      }
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={middleImageUrlInput}
-                      onChange={(e) => handleMiddleImageUrlChange(e.target.value)}
-                      placeholder="Enter image URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* End Images (stacked slots) */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  End Images{" "}
-                  <span className="text-xs font-normal text-gray-500">
-                    (Max 3)
-                  </span>
-                </label>
-                <div className="space-y-3">
-                  {[0, 1, 2].map((slotIndex) => {
-                    const img = endImages[slotIndex];
-                    const isUploading = endImageUploadingIndex === slotIndex;
-                    return (
-                      <div key={slotIndex} className="space-y-2">
-                        {img ? (
-                          <>
-                            <div className="relative group">
-                              <div className="relative aspect-square rounded-lg border border-gray-300 overflow-hidden bg-gray-100">
-                                <img
-                                  src={img.url}
-                                  alt={img.name || `End ${slotIndex + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEndImage(slotIndex)}
-                                  className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                                  disabled={loading || isUploading}
-                              >
-                                  <X size={10} />
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Name{" "}
-                                <span className="text-gray-400 font-normal">
-                                  (Optional)
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                value={img.name || ""}
-                                onChange={(e) => {
-                                  const updated = [...endImages];
-                                  updated[slotIndex] = {
-                                    ...updated[slotIndex],
-                                    name: e.target.value || null,
-                                  };
-                                  setEndImages(updated);
-                                }}
-                                placeholder="Enter name (optional)..."
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                                disabled={loading || isUploading}
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                endImageFileInputRefs.current[slotIndex]?.click()
-                              }
-                              className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                              disabled={loading || isUploading}
-                          >
-                              <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                                  <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                                </div>
-                                <p className="text-xs font-medium text-gray-700 mb-0.5">
-                                  {isUploading
-                                    ? "Uploading..."
-                                    : `Select End Image ${slotIndex + 1}`}
-                                </p>
-                                {!isUploading && (
-                                  <p className="text-[11px] text-gray-500">
-                                    Click to upload from your computer
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg"
-                              className="hidden"
-                              ref={(el) => {
-                                endImageFileInputRefs.current[slotIndex] = el;
-                              }}
-                              onChange={(e) =>
-                                handleSelectEndImageFile(
-                                  slotIndex,
-                                  e.target.files?.[0],
-                                )
-                              }
-                            />
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
             {error && (
-              <div className="order-4 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="order-3 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
             {/* Footer Actions */}
             {!asPage && (
-            <div className="order-5 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <div className="order-4 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
