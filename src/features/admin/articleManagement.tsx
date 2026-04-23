@@ -90,6 +90,16 @@ function NewsModal({
   const [activeSelection, setActiveSelection] = useState<{
     blockIndex: number;
   } | null>(null);
+  const [activeEditorBlockIndex, setActiveEditorBlockIndex] = useState<number | null>(
+    null,
+  );
+  const [activeTextFormat, setActiveTextFormat] = useState<{
+    bold: boolean;
+    subtitle: boolean;
+  }>({
+    bold: false,
+    subtitle: false,
+  });
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
     useState<File | null>(null);
@@ -105,6 +115,58 @@ function NewsModal({
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const contentTextareaRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      setActiveTextFormat({ bold: false, subtitle: false });
+      return;
+    }
+
+    const rootEditor =
+      editor ??
+      contentTextareaRefs.current.find((el) => {
+        if (!el) return false;
+        const anchorNode = selection.anchorNode;
+        const focusNode = selection.focusNode;
+        return (
+          (!!anchorNode && el.contains(anchorNode)) ||
+          (!!focusNode && el.contains(focusNode))
+        );
+      }) ??
+      null;
+
+    if (!rootEditor) {
+      setActiveTextFormat({ bold: false, subtitle: false });
+      return;
+    }
+
+    const isNodeInsideTag = (node: Node | null, tagNames: string[]) => {
+      if (!node) return false;
+      let current: Element | null =
+        node.nodeType === Node.ELEMENT_NODE
+          ? (node as Element)
+          : node.parentElement;
+
+      while (current && rootEditor.contains(current)) {
+        if (tagNames.includes(current.tagName.toLowerCase())) {
+          return true;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    };
+
+    const subtitle =
+      isNodeInsideTag(selection.anchorNode, ["h2"]) ||
+      isNodeInsideTag(selection.focusNode, ["h2"]);
+    const bold =
+      isNodeInsideTag(selection.anchorNode, ["b", "strong"]) ||
+      isNodeInsideTag(selection.focusNode, ["b", "strong"]) ||
+      document.queryCommandState("bold");
+
+    setActiveTextFormat({ bold, subtitle });
+  };
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -198,6 +260,7 @@ function NewsModal({
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
         setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false });
         return;
       }
       const range = selection.getRangeAt(0);
@@ -205,7 +268,10 @@ function NewsModal({
       const isInsideEditor = editor.contains(commonNode);
       if (!isInsideEditor) {
         setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false });
+        return;
       }
+      syncActiveTextFormat(editor);
     };
 
     document.addEventListener("selectionchange", syncSelectionState);
@@ -241,6 +307,7 @@ function NewsModal({
     e: React.SyntheticEvent<HTMLDivElement>,
   ) => {
     const target = e.currentTarget;
+    setActiveEditorBlockIndex(index);
     requestAnimationFrame(() => {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
@@ -248,20 +315,23 @@ function NewsModal({
         const commonNode = range.commonAncestorContainer;
         if (!target.contains(commonNode)) {
           setActiveSelection(null);
+          setActiveTextFormat({ bold: false, subtitle: false });
           return;
         }
         setActiveSelection({ blockIndex: index });
+        syncActiveTextFormat(target);
         return;
       }
       setActiveSelection(null);
+      setActiveTextFormat({ bold: false, subtitle: false });
     });
   };
 
   const applySelectionFormat = (
-    type: "bold" | "italic" | "link" | "h1" | "h2" | "quote",
+    type: "bold" | "italic" | "link" | "subtitle" | "quote",
   ) => {
-    if (!activeSelection) return;
-    const { blockIndex } = activeSelection;
+    const blockIndex = activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    if (blockIndex === null) return;
     switch (type) {
       case "bold":
         document.execCommand("bold");
@@ -272,11 +342,12 @@ function NewsModal({
       case "link":
         document.execCommand("createLink", false, "https://");
         break;
-      case "h1":
-        document.execCommand("formatBlock", false, "h1");
-        break;
-      case "h2":
-        document.execCommand("formatBlock", false, "h2");
+      case "subtitle":
+        if (activeTextFormat.subtitle) {
+          document.execCommand("formatBlock", false, "p");
+        } else {
+          document.execCommand("formatBlock", false, "h2");
+        }
         break;
       case "quote":
         document.execCommand("formatBlock", false, "blockquote");
@@ -287,6 +358,9 @@ function NewsModal({
     const editor = contentTextareaRefs.current[blockIndex];
     if (!editor) return;
     handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    requestAnimationFrame(() => {
+      syncActiveTextFormat();
+    });
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -617,7 +691,7 @@ function NewsModal({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("quote")}
-                  disabled={loading || !activeSelection}
+                  disabled={loading || activeEditorBlockIndex === null}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   ""
@@ -625,26 +699,21 @@ function NewsModal({
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => applySelectionFormat("h2")}
-                  disabled={loading || !activeSelection}
-                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => applySelectionFormat("subtitle")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.subtitle
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  H2
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => applySelectionFormat("h1")}
-                  disabled={loading || !activeSelection}
-                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  H1
+                  Subtitle
                 </button>
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("link")}
-                  disabled={loading || !activeSelection}
+                  disabled={loading || activeEditorBlockIndex === null}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Link
@@ -653,7 +722,7 @@ function NewsModal({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("italic")}
-                  disabled={loading || !activeSelection}
+                  disabled={loading || activeEditorBlockIndex === null}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium italic text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   i
@@ -662,8 +731,12 @@ function NewsModal({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("bold")}
-                  disabled={loading || !activeSelection}
-                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.bold
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
                   B
                 </button>
@@ -993,8 +1066,13 @@ function NewsModal({
                               onClick={(e) => handleContentSelection(index, e)}
                               onBlur={() => {
                                 setActiveSelection(null);
+                                setActiveEditorBlockIndex(null);
+                                setActiveTextFormat({
+                                  bold: false,
+                                  subtitle: false,
+                                });
                               }}
-                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[24px] leading-[1.25] text-black outline-none border-0 md:text-[28px]"
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2"
                             />
                           </div>
                         ) : (

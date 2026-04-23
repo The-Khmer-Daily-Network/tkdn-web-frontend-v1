@@ -43,6 +43,10 @@ const isSafeHref = (href: string) => {
 
 const sanitizeRichText = (html: string): string => {
   if (!html?.trim()) return "";
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    // Server render fallback: avoid runtime crash; client pass will sanitize.
+    return html;
+  }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
@@ -948,14 +952,13 @@ export default function NewsPageContent({
                       {/* Block Paragraphs - Split by line breaks, each creates a new paragraph with spacing */}
                       <div className="space-y-4">
                         {paragraphs.map((paragraph, paraIndex) => (
-                          <p
+                          <div
                             key={paraIndex}
-                            className="text-base text-gray-800 leading-relaxed"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeRichText(paragraph.trim()),
                             }}
-                          >
-                          </p>
+                          />
                         ))}
                       </div>
 
