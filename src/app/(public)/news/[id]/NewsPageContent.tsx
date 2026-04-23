@@ -954,7 +954,7 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeRichText(paragraph.trim()),
                             }}

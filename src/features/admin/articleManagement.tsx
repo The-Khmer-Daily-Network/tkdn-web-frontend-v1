@@ -96,9 +96,13 @@ function NewsModal({
   const [activeTextFormat, setActiveTextFormat] = useState<{
     bold: boolean;
     subtitle: boolean;
+    link: boolean;
+    quote: boolean;
   }>({
     bold: false,
     subtitle: false,
+    link: false,
+    quote: false,
   });
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
@@ -119,7 +123,7 @@ function NewsModal({
   const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
-      setActiveTextFormat({ bold: false, subtitle: false });
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
       return;
     }
 
@@ -137,7 +141,7 @@ function NewsModal({
       null;
 
     if (!rootEditor) {
-      setActiveTextFormat({ bold: false, subtitle: false });
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
       return;
     }
 
@@ -160,12 +164,18 @@ function NewsModal({
     const subtitle =
       isNodeInsideTag(selection.anchorNode, ["h2"]) ||
       isNodeInsideTag(selection.focusNode, ["h2"]);
+    const quote =
+      isNodeInsideTag(selection.anchorNode, ["blockquote"]) ||
+      isNodeInsideTag(selection.focusNode, ["blockquote"]);
+    const link =
+      isNodeInsideTag(selection.anchorNode, ["a"]) ||
+      isNodeInsideTag(selection.focusNode, ["a"]);
     const bold =
       isNodeInsideTag(selection.anchorNode, ["b", "strong"]) ||
       isNodeInsideTag(selection.focusNode, ["b", "strong"]) ||
       document.queryCommandState("bold");
 
-    setActiveTextFormat({ bold, subtitle });
+    setActiveTextFormat({ bold, subtitle, link, quote });
   };
 
   // Modal states
@@ -260,7 +270,7 @@ function NewsModal({
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
         setActiveSelection(null);
-        setActiveTextFormat({ bold: false, subtitle: false });
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
         return;
       }
       const range = selection.getRangeAt(0);
@@ -268,7 +278,7 @@ function NewsModal({
       const isInsideEditor = editor.contains(commonNode);
       if (!isInsideEditor) {
         setActiveSelection(null);
-        setActiveTextFormat({ bold: false, subtitle: false });
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
         return;
       }
       syncActiveTextFormat(editor);
@@ -315,7 +325,12 @@ function NewsModal({
         const commonNode = range.commonAncestorContainer;
         if (!target.contains(commonNode)) {
           setActiveSelection(null);
-          setActiveTextFormat({ bold: false, subtitle: false });
+          setActiveTextFormat({
+            bold: false,
+            subtitle: false,
+            link: false,
+            quote: false,
+          });
           return;
         }
         setActiveSelection({ blockIndex: index });
@@ -323,7 +338,7 @@ function NewsModal({
         return;
       }
       setActiveSelection(null);
-      setActiveTextFormat({ bold: false, subtitle: false });
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
     });
   };
 
@@ -332,6 +347,26 @@ function NewsModal({
   ) => {
     const blockIndex = activeSelection?.blockIndex ?? activeEditorBlockIndex;
     if (blockIndex === null) return;
+    const selection = window.getSelection();
+
+    const hasSelectionText =
+      !!selection && selection.rangeCount > 0 && !selection.isCollapsed;
+
+    const normalizeLinkUrl = (rawUrl: string) => {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return null;
+      if (
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("mailto:") ||
+        trimmed.startsWith("tel:") ||
+        trimmed.startsWith("/")
+      ) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
+
     switch (type) {
       case "bold":
         document.execCommand("bold");
@@ -339,9 +374,19 @@ function NewsModal({
       case "italic":
         document.execCommand("italic");
         break;
-      case "link":
-        document.execCommand("createLink", false, "https://");
+      case "link": {
+        if (activeTextFormat.link) {
+          document.execCommand("unlink");
+          break;
+        }
+        if (!hasSelectionText) return;
+        const inputUrl = window.prompt("Enter link URL", "https://example.com");
+        if (!inputUrl) return;
+        const url = normalizeLinkUrl(inputUrl);
+        if (!url) return;
+        document.execCommand("createLink", false, url);
         break;
+      }
       case "subtitle":
         if (activeTextFormat.subtitle) {
           document.execCommand("formatBlock", false, "p");
@@ -350,6 +395,11 @@ function NewsModal({
         }
         break;
       case "quote":
+        if (activeTextFormat.quote) {
+          document.execCommand("formatBlock", false, "p");
+          break;
+        }
+        if (!hasSelectionText) return;
         document.execCommand("formatBlock", false, "blockquote");
         break;
       default:
@@ -692,9 +742,13 @@ function NewsModal({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("quote")}
                   disabled={loading || activeEditorBlockIndex === null}
-                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.quote
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  ""
+                  Quote
                 </button>
                 <button
                   type="button"
@@ -714,7 +768,11 @@ function NewsModal({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applySelectionFormat("link")}
                   disabled={loading || activeEditorBlockIndex === null}
-                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.link
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
                   Link
                 </button>
@@ -879,7 +937,7 @@ function NewsModal({
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="New post"
                       rows={1}
-                      className="w-full resize-none overflow-hidden bg-transparent text-[35px] leading-[1.08] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
+                      className="w-full resize-none overflow-hidden bg-transparent text-[24px] leading-[1.3] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
                       disabled={loading}
                       maxLength={500}
                     />
@@ -1070,9 +1128,11 @@ function NewsModal({
                                 setActiveTextFormat({
                                   bold: false,
                                   subtitle: false,
+                                  link: false,
+                                  quote: false,
                                 });
                               }}
-                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2"
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             />
                           </div>
                         ) : (
