@@ -302,7 +302,7 @@ export default function NewsDashboard({
                 </div>
                 <div className="space-y-2">
                   <h1
-                    className="text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
+                    className="line-clamp-2 text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
                     
                 >
                     {mainArticle.title}
