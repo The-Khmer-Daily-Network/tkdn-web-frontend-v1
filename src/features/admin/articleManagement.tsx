@@ -87,6 +87,11 @@ function NewsModal({
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
 >(null);
+  const [activeSelection, setActiveSelection] = useState<{
+    blockIndex: number;
+    start: number;
+    end: number;
+  } | null>(null);
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
     useState<File | null>(null);
@@ -101,6 +106,7 @@ function NewsModal({
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -181,14 +187,19 @@ function NewsModal({
     el.style.height = `${el.scrollHeight}px`;
   }, [title, asPage, isOpen]);
 
+  useEffect(() => {
+    if (!asPage) return;
+    contentTextareaRefs.current.forEach((el) => {
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    });
+  }, [contentBlocks, asPage, isOpen]);
+
   const queuePreviewUrl = (file: File): string => {
     const url = URL.createObjectURL(file);
     previewObjectUrlsRef.current.push(url);
     return url;
-  };
-
-  const handleAddContentBlock = () => {
-    setContentBlocks([...contentBlocks, { subtitle: null, paragraph: "" }]);
   };
 
   const handleRemoveContentBlock = (index: number) => {
@@ -205,6 +216,62 @@ function NewsModal({
     const updated = [...contentBlocks];
     updated[index] = { ...updated[index], [field]: value };
     setContentBlocks(updated);
+  };
+
+  const handleContentSelection = (
+    index: number,
+    e: React.SyntheticEvent<HTMLTextAreaElement>,
+  ) => {
+    const target = e.currentTarget;
+    const start = target.selectionStart ?? 0;
+    const end = target.selectionEnd ?? 0;
+    if (start !== end) {
+      setActiveSelection({ blockIndex: index, start, end });
+      return;
+    }
+    setActiveSelection(null);
+  };
+
+  const applySelectionFormat = (
+    type: "bold" | "italic" | "link" | "h1" | "h2" | "quote",
+  ) => {
+    if (!activeSelection) return;
+    const { blockIndex, start, end } = activeSelection;
+    const block = contentBlocks[blockIndex];
+    if (!block) return;
+
+    const paragraph = block.paragraph || "";
+    const selectedText = paragraph.slice(start, end);
+    if (!selectedText) return;
+
+    let formatted = selectedText;
+    switch (type) {
+      case "bold":
+        formatted = `**${selectedText}**`;
+        break;
+      case "italic":
+        formatted = `*${selectedText}*`;
+        break;
+      case "link":
+        formatted = `[${selectedText}](https://)`;
+        break;
+      case "h1":
+        formatted = `# ${selectedText}`;
+        break;
+      case "h2":
+        formatted = `## ${selectedText}`;
+        break;
+      case "quote":
+        formatted = `> ${selectedText}`;
+        break;
+      default:
+        break;
+    }
+
+    const nextParagraph =
+      paragraph.slice(0, start) + formatted + paragraph.slice(end);
+    handleUpdateContentBlock(blockIndex, "paragraph", nextParagraph);
+    setActiveSelection(null);
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -713,8 +780,8 @@ function NewsModal({
               )}
 
               {/* Category and Author - Side by Side */}
-              <div className={asPage ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
-                {!asPage && (
+              {!asPage && (
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Category
@@ -737,114 +804,171 @@ function NewsModal({
                     ))}
                   </select>
                 </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Author <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={author || ""}
-                    readOnly
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled
-                    required
-                  />
-                </div>
               </div>
+              )}
             </div>
 
               {/* Content Blocks Section */}
               <div className="space-y-4 min-w-0">
-                <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Content Blocks <span className="text-red-500">*</span>
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddContentBlock}
-                    className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
-                    disabled={loading}
-                >
-                    <Plus size={14} />
-                    Add Block
-                  </button>
+                <div className="">
+                  {!asPage && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Content Blocks <span className="text-red-500">*</span>
+                      </h3>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-3">
+                <div className={asPage ? "space-y-6" : "space-y-3"}>
                   {contentBlocks.map((block, index) => (
                     <div
                       key={index}
-                      className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      className={
+                        asPage
+                          ? "relative w-full max-w-[860px]"
+                          : "p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      }
                   >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                            <span className="text-xs font-semibold text-blue-600">
-                              {index + 1}
+                      {!asPage && (
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                              <span className="text-xs font-semibold text-blue-600">
+                                {index + 1}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              Block {index + 1}
                             </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700">
-                            Block {index + 1}
-                          </span>
+                          {contentBlocks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveContentBlock(index)}
+                              className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
+                              disabled={loading}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        {contentBlocks.length > 1 && (
+                      )}
+                      {asPage && contentBlocks.length > 1 && (
+                        <div className="absolute right-0 top-0">
                           <button
                             type="button"
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                        >
+                          >
                             Remove
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="space-y-2.5">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Subtitle{" "}
-                            <span className="text-gray-400 font-normal">
-                              (Optional)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            value={block.subtitle || ""}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "subtitle",
-                                e.target.value || null,
-                              )
-                            }
-                            placeholder="Enter a subtitle for this block (optional)..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Content <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={block.paragraph}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "paragraph",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Enter the main content for this block..."
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                            required
-                          />
-                        </div>
+                        {asPage ? (
+                          <div className="relative w-full">
+                            <div className="pointer-events-none mb-2 block text-sm text-gray-500 md:hidden">
+                              {index === 0 ? "Content" : `Content ${index + 1}`}
+                            </div>
+                            <div className="pointer-events-none absolute -left-20 top-2 hidden md:block">
+                              <span className="block text-sm text-gray-500">
+                                {index === 0 ? "Content" : `Content ${index + 1}`}
+                              </span>
+                            </div>
+                            <div className="absolute -left-3 top-0 hidden h-full w-px bg-gray-300 md:block" />
+                            {activeSelection?.blockIndex === index && (
+                              <div className="absolute left-1/2 top-[-58px] z-20 -translate-x-1/2 rounded-xl bg-[#2a2a2a] px-3 py-2 text-white shadow-lg">
+                                <div className="flex items-center gap-1 text-sm">
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("bold")}
+                                    className="rounded px-2 py-1 font-bold hover:bg-white/10"
+                                  >
+                                    B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("italic")}
+                                    className="rounded px-2 py-1 italic hover:bg-white/10"
+                                  >
+                                    i
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("link")}
+                                    className="rounded px-2 py-1 hover:bg-white/10"
+                                  >
+                                    link
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("h1")}
+                                    className="rounded px-2 py-1 hover:bg-white/10"
+                                  >
+                                    H1
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("h2")}
+                                    className="rounded px-2 py-1 hover:bg-white/10"
+                                  >
+                                    H2
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => applySelectionFormat("quote")}
+                                    className="rounded px-2 py-1 hover:bg-white/10"
+                                  >
+                                    ""
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            <textarea
+                              ref={(el) => {
+                                contentTextareaRefs.current[index] = el;
+                              }}
+                              value={block.paragraph}
+                              onChange={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.target.value,
+                                )
+                              }
+                              onMouseUp={(e) => handleContentSelection(index, e)}
+                              onKeyUp={(e) => handleContentSelection(index, e)}
+                              placeholder="Write your content..."
+                              rows={4}
+                              className="w-full resize-none overflow-hidden bg-transparent px-0 pb-0 pt-[8px] text-[24px] leading-[1.25] text-black placeholder:text-gray-400 outline-none border-0 md:text-[28px]"
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Content <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={block.paragraph}
+                              onChange={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Enter the main content for this block..."
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
