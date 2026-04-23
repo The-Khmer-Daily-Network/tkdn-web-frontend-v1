@@ -196,6 +196,29 @@ function NewsModal({
     });
   }, [contentBlocks, asPage, isOpen]);
 
+  useEffect(() => {
+    if (!activeSelection) return;
+
+    const syncSelectionState = () => {
+      const textarea = contentTextareaRefs.current[activeSelection.blockIndex];
+      if (!textarea) {
+        setActiveSelection(null);
+        return;
+      }
+
+      const start = textarea.selectionStart ?? 0;
+      const end = textarea.selectionEnd ?? 0;
+      if (start === end) {
+        setActiveSelection(null);
+      }
+    };
+
+    document.addEventListener("selectionchange", syncSelectionState);
+    return () => {
+      document.removeEventListener("selectionchange", syncSelectionState);
+    };
+  }, [activeSelection]);
+
   const queuePreviewUrl = (file: File): string => {
     const url = URL.createObjectURL(file);
     previewObjectUrlsRef.current.push(url);
@@ -271,7 +294,16 @@ function NewsModal({
     const nextParagraph =
       paragraph.slice(0, start) + formatted + paragraph.slice(end);
     handleUpdateContentBlock(blockIndex, "paragraph", nextParagraph);
-    setActiveSelection(null);
+    const nextStart = start;
+    const nextEnd = start + formatted.length;
+    setActiveSelection({ blockIndex, start: nextStart, end: nextEnd });
+
+    requestAnimationFrame(() => {
+      const textarea = contentTextareaRefs.current[blockIndex];
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(nextStart, nextEnd);
+    });
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -880,7 +912,10 @@ function NewsModal({
                             <div className="absolute -left-3 top-0 hidden h-full w-px bg-gray-300 md:block" />
                             {activeSelection?.blockIndex === index && (
                               <div className="absolute left-1/2 top-[-58px] z-20 -translate-x-1/2 rounded-xl bg-[#2a2a2a] px-3 py-2 text-white shadow-lg">
-                                <div className="flex items-center gap-1 text-sm">
+                                <div
+                                  className="flex items-center gap-1 text-sm"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                >
                                   <button
                                     type="button"
                                     onClick={() => applySelectionFormat("bold")}
@@ -938,8 +973,10 @@ function NewsModal({
                                   e.target.value,
                                 )
                               }
+                              onSelect={(e) => handleContentSelection(index, e)}
                               onMouseUp={(e) => handleContentSelection(index, e)}
                               onKeyUp={(e) => handleContentSelection(index, e)}
+                              onBlur={() => setActiveSelection(null)}
                               placeholder="Write your content..."
                               rows={4}
                               className="w-full resize-none overflow-hidden bg-transparent px-0 pb-0 pt-[8px] text-[24px] leading-[1.25] text-black placeholder:text-gray-400 outline-none border-0 md:text-[28px]"
