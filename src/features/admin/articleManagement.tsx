@@ -89,8 +89,6 @@ function NewsModal({
 >(null);
   const [activeSelection, setActiveSelection] = useState<{
     blockIndex: number;
-    start: number;
-    end: number;
   } | null>(null);
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
@@ -106,7 +104,7 @@ function NewsModal({
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const contentTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([]);
+  const contentTextareaRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -188,27 +186,24 @@ function NewsModal({
   }, [title, asPage, isOpen]);
 
   useEffect(() => {
-    if (!asPage) return;
-    contentTextareaRefs.current.forEach((el) => {
-      if (!el) return;
-      el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
-    });
-  }, [contentBlocks, asPage, isOpen]);
-
-  useEffect(() => {
     if (!activeSelection) return;
 
     const syncSelectionState = () => {
-      const textarea = contentTextareaRefs.current[activeSelection.blockIndex];
-      if (!textarea) {
+      const editor = contentTextareaRefs.current[activeSelection.blockIndex];
+      if (!editor) {
         setActiveSelection(null);
         return;
       }
 
-      const start = textarea.selectionStart ?? 0;
-      const end = textarea.selectionEnd ?? 0;
-      if (start === end) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        setActiveSelection(null);
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const commonNode = range.commonAncestorContainer;
+      const isInsideEditor = editor.contains(commonNode);
+      if (!isInsideEditor) {
         setActiveSelection(null);
       }
     };
@@ -243,67 +238,55 @@ function NewsModal({
 
   const handleContentSelection = (
     index: number,
-    e: React.SyntheticEvent<HTMLTextAreaElement>,
+    e: React.SyntheticEvent<HTMLDivElement>,
   ) => {
     const target = e.currentTarget;
-    const start = target.selectionStart ?? 0;
-    const end = target.selectionEnd ?? 0;
-    if (start !== end) {
-      setActiveSelection({ blockIndex: index, start, end });
-      return;
-    }
-    setActiveSelection(null);
+    requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const commonNode = range.commonAncestorContainer;
+        if (!target.contains(commonNode)) {
+          setActiveSelection(null);
+          return;
+        }
+        setActiveSelection({ blockIndex: index });
+        return;
+      }
+      setActiveSelection(null);
+    });
   };
 
   const applySelectionFormat = (
     type: "bold" | "italic" | "link" | "h1" | "h2" | "quote",
   ) => {
     if (!activeSelection) return;
-    const { blockIndex, start, end } = activeSelection;
-    const block = contentBlocks[blockIndex];
-    if (!block) return;
-
-    const paragraph = block.paragraph || "";
-    const selectedText = paragraph.slice(start, end);
-    if (!selectedText) return;
-
-    let formatted = selectedText;
+    const { blockIndex } = activeSelection;
     switch (type) {
       case "bold":
-        formatted = `**${selectedText}**`;
+        document.execCommand("bold");
         break;
       case "italic":
-        formatted = `*${selectedText}*`;
+        document.execCommand("italic");
         break;
       case "link":
-        formatted = `[${selectedText}](https://)`;
+        document.execCommand("createLink", false, "https://");
         break;
       case "h1":
-        formatted = `# ${selectedText}`;
+        document.execCommand("formatBlock", false, "h1");
         break;
       case "h2":
-        formatted = `## ${selectedText}`;
+        document.execCommand("formatBlock", false, "h2");
         break;
       case "quote":
-        formatted = `> ${selectedText}`;
+        document.execCommand("formatBlock", false, "blockquote");
         break;
       default:
         break;
     }
-
-    const nextParagraph =
-      paragraph.slice(0, start) + formatted + paragraph.slice(end);
-    handleUpdateContentBlock(blockIndex, "paragraph", nextParagraph);
-    const nextStart = start;
-    const nextEnd = start + formatted.length;
-    setActiveSelection({ blockIndex, start: nextStart, end: nextEnd });
-
-    requestAnimationFrame(() => {
-      const textarea = contentTextareaRefs.current[blockIndex];
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(nextStart, nextEnd);
-    });
+    const editor = contentTextareaRefs.current[blockIndex];
+    if (!editor) return;
+    handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -628,6 +611,80 @@ function NewsModal({
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Article
             </h2>
+            {asPage && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("quote")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ""
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("h2")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  H2
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("h1")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  H1
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("link")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Link
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("italic")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium italic text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  i
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("bold")}
+                  disabled={loading || !activeSelection}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="article-editor-form"
+                  disabled={loading || !author.trim()}
+                  className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            )}
             {!asPage && (
               <button
                 onClick={onClose}
@@ -640,6 +697,7 @@ function NewsModal({
           </div>
 
           <form
+            id="article-editor-form"
             onSubmit={handleSubmit}
             className={
               asPage
@@ -910,78 +968,33 @@ function NewsModal({
                               </span>
                             </div>
                             <div className="absolute -left-3 top-0 hidden h-full w-px bg-gray-300 md:block" />
-                            {activeSelection?.blockIndex === index && (
-                              <div className="absolute left-1/2 top-[-58px] z-20 -translate-x-1/2 rounded-xl bg-[#2a2a2a] px-3 py-2 text-white shadow-lg">
-                                <div
-                                  className="flex items-center gap-1 text-sm"
-                                  onMouseDown={(e) => e.preventDefault()}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("bold")}
-                                    className="rounded px-2 py-1 font-bold hover:bg-white/10"
-                                  >
-                                    B
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("italic")}
-                                    className="rounded px-2 py-1 italic hover:bg-white/10"
-                                  >
-                                    i
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("link")}
-                                    className="rounded px-2 py-1 hover:bg-white/10"
-                                  >
-                                    link
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("h1")}
-                                    className="rounded px-2 py-1 hover:bg-white/10"
-                                  >
-                                    H1
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("h2")}
-                                    className="rounded px-2 py-1 hover:bg-white/10"
-                                  >
-                                    H2
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => applySelectionFormat("quote")}
-                                    className="rounded px-2 py-1 hover:bg-white/10"
-                                  >
-                                    ""
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            <textarea
+                            <div
                               ref={(el) => {
                                 contentTextareaRefs.current[index] = el;
+                                if (!el) return;
+                                const nextHtml = block.paragraph || "";
+                                const isFocused = document.activeElement === el;
+                                if (!isFocused && el.innerHTML !== nextHtml) {
+                                  el.innerHTML = nextHtml;
+                                }
                               }}
-                              value={block.paragraph}
-                              onChange={(e) =>
+                              contentEditable={!loading}
+                              suppressContentEditableWarning
+                              onInput={(e) =>
                                 handleUpdateContentBlock(
                                   index,
                                   "paragraph",
-                                  e.target.value,
+                                  e.currentTarget.innerHTML,
                                 )
                               }
                               onSelect={(e) => handleContentSelection(index, e)}
                               onMouseUp={(e) => handleContentSelection(index, e)}
                               onKeyUp={(e) => handleContentSelection(index, e)}
-                              onBlur={() => setActiveSelection(null)}
-                              placeholder="Write your content..."
-                              rows={4}
-                              className="w-full resize-none overflow-hidden bg-transparent px-0 pb-0 pt-[8px] text-[24px] leading-[1.25] text-black placeholder:text-gray-400 outline-none border-0 md:text-[28px]"
-                              disabled={loading}
-                              required
+                              onClick={(e) => handleContentSelection(index, e)}
+                              onBlur={() => {
+                                setActiveSelection(null);
+                              }}
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[24px] leading-[1.25] text-black outline-none border-0 md:text-[28px]"
                             />
                           </div>
                         ) : (
@@ -1245,6 +1258,7 @@ function NewsModal({
             )}
 
             {/* Footer Actions */}
+            {!asPage && (
             <div className="order-5 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
@@ -1266,6 +1280,7 @@ function NewsModal({
                     : "Create Article"}
               </button>
             </div>
+            )}
           </form>
         </div>
       </div>

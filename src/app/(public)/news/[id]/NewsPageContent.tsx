@@ -17,6 +17,92 @@ interface NewsPageContentProps {
   initialNewsData?: News | null;
 }
 
+const ALLOWED_RICH_TEXT_TAGS = new Set([
+  "b",
+  "strong",
+  "i",
+  "em",
+  "u",
+  "a",
+  "h1",
+  "h2",
+  "blockquote",
+  "br",
+]);
+
+const isSafeHref = (href: string) => {
+  const normalizedHref = href.trim().toLowerCase();
+  return (
+    normalizedHref.startsWith("http://") ||
+    normalizedHref.startsWith("https://") ||
+    normalizedHref.startsWith("mailto:") ||
+    normalizedHref.startsWith("tel:") ||
+    normalizedHref.startsWith("/")
+  );
+};
+
+const sanitizeRichText = (html: string): string => {
+  if (!html?.trim()) return "";
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return "";
+
+  const walk = (node: Node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const element = node as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+
+    if (!ALLOWED_RICH_TEXT_TAGS.has(tagName)) {
+      const parent = element.parentNode;
+      if (!parent) return;
+      while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+      }
+      parent.removeChild(element);
+      return;
+    }
+
+    const attributes = [...element.attributes];
+    for (const attr of attributes) {
+      const attrName = attr.name.toLowerCase();
+      if (tagName !== "a") {
+        element.removeAttribute(attr.name);
+        continue;
+      }
+
+      if (attrName !== "href" && attrName !== "target" && attrName !== "rel") {
+        element.removeAttribute(attr.name);
+      }
+    }
+
+    if (tagName === "a") {
+      const href = element.getAttribute("href") || "";
+      if (!isSafeHref(href)) {
+        element.removeAttribute("href");
+      }
+      element.setAttribute("rel", "noopener noreferrer");
+      element.setAttribute("target", "_blank");
+    }
+
+    const children = [...element.childNodes];
+    for (const child of children) {
+      walk(child);
+    }
+  };
+
+  const children = [...root.childNodes];
+  for (const child of children) {
+    walk(child);
+  }
+
+  return root.innerHTML;
+};
+
 export default function NewsPageContent({
   initialNewsData = null,
 }: NewsPageContentProps = {}) {
@@ -865,9 +951,10 @@ export default function NewsPageContent({
                           <p
                             key={paraIndex}
                             className="text-base text-gray-800 leading-relaxed"
-                           
-                        >
-                            {paragraph.trim()}
+                            dangerouslySetInnerHTML={{
+                              __html: sanitizeRichText(paragraph.trim()),
+                            }}
+                          >
                           </p>
                         ))}
                       </div>
