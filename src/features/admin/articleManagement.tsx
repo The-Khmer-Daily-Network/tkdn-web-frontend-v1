@@ -123,6 +123,12 @@ function NewsModal({
   const inlineImageInputRef = useRef<HTMLInputElement | null>(null);
   const savedInlineImageRangeRef = useRef<Range | null>(null);
   const savedInlineImageBlockIndexRef = useRef<number | null>(null);
+  const inlinePendingImagesRef = useRef<
+    Record<string, { file: File; type: "middle" | "end" }>
+  >({});
+  const inlinePendingImageCounterRef = useRef(0);
+  const inlineImageInsertTypeRef = useRef<"middle" | "end">("end");
+  const removedInlineImageUrlsRef = useRef<Set<string>>(new Set());
 
   const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
     const selection = window.getSelection();
@@ -244,6 +250,8 @@ function NewsModal({
     }
     setError(null);
     setShowCategorySelector(false);
+    inlinePendingImagesRef.current = {};
+    removedInlineImageUrlsRef.current = new Set();
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -404,8 +412,296 @@ function NewsModal({
     });
   };
 
-  const handleInlineImageButtonClick = () => {
+  const handleContentEditorClick = (
+    index: number,
+    e: React.SyntheticEvent<HTMLDivElement>,
+  ) => {
+    const target = e.target as HTMLElement;
+    const removeBtn = target.closest("button[data-inline-remove-id]");
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const removeId = removeBtn.getAttribute("data-inline-remove-id");
+      const wrapper = removeBtn.closest("[data-inline-image-wrapper='true']");
+      if (wrapper) {
+        removeInlineImageFromEditor(index, wrapper, removeId);
+      }
+      return;
+    }
+    handleContentSelection(index, e);
+  };
+
+  const removeInlineImageFromEditor = (
+    editorIndex: number,
+    wrapper: Element,
+    pendingId: string | null,
+  ) => {
+    const imageKind =
+      wrapper.getAttribute("data-inline-image-kind") ||
+      wrapper.querySelector("img")?.getAttribute("data-inline-image-kind") ||
+      "middle";
+    if (pendingId && inlinePendingImagesRef.current[pendingId]) {
+      delete inlinePendingImagesRef.current[pendingId];
+    } else {
+      const img = wrapper.querySelector("img");
+      const src = img?.getAttribute("src") || "";
+      if (
+        src &&
+        !src.startsWith("blob:") &&
+        !src.startsWith("data:") &&
+        !src.startsWith("about:")
+      ) {
+        removedInlineImageUrlsRef.current.add(src);
+      }
+      if (imageKind === "end" && src) {
+        setEndImages((prev) => {
+          const idx = prev.findIndex((image) => image.url === src);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        });
+      }
+    }
+    wrapper.remove();
+    const editor = contentTextareaRefs.current[editorIndex];
+    if (editor) {
+      handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+      requestAnimationFrame(() => {
+        const refreshedEditor = contentTextareaRefs.current[editorIndex];
+        if (!refreshedEditor) return;
+        decorateInlineImagesInEditor(refreshedEditor, editorIndex);
+      });
+    }
+  };
+
+  const sanitizePastedHtml = (html: string) => {
+    if (!html.trim()) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+    const root = doc.body.firstElementChild;
+    if (!root) return html;
+
+    const nodes = root.querySelectorAll("*");
+    nodes.forEach((el) => {
+      const styleAttr = el.getAttribute("style");
+      if (styleAttr) {
+        const cleanedStyle = styleAttr
+          .split(";")
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .filter((part) => {
+            const prop = part.split(":")[0]?.trim().toLowerCase();
+            return prop !== "background" && prop !== "background-color";
+          })
+          .join("; ");
+        if (cleanedStyle) {
+          el.setAttribute("style", cleanedStyle);
+        } else {
+          el.removeAttribute("style");
+        }
+      }
+      el.removeAttribute("bgcolor");
+    });
+
+    return root.innerHTML;
+  };
+
+  const handleContentPaste = (
+    index: number,
+    e: React.ClipboardEvent<HTMLDivElement>,
+  ) => {
+    const clipboard = e.clipboardData;
+    const html = clipboard.getData("text/html");
+    const text = clipboard.getData("text/plain");
+    if (!html && !text) return;
+
+    e.preventDefault();
+    if (html) {
+      const cleanedHtml = sanitizePastedHtml(html);
+      document.execCommand("insertHTML", false, cleanedHtml);
+    } else {
+      document.execCommand("insertText", false, text);
+    }
+
+    requestAnimationFrame(() => {
+      const editor = contentTextareaRefs.current[index];
+      if (!editor) return;
+      decorateInlineImagesInEditor(editor, index);
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      handleContentSelection(index, {
+        currentTarget: editor,
+      } as React.SyntheticEvent<HTMLDivElement>);
+    });
+  };
+
+  const attachInlineRemoveButtonHover = (
+    wrapper: HTMLDivElement,
+    actionsBar: HTMLDivElement,
+  ) => {
+    actionsBar.style.opacity = "0";
+    actionsBar.style.transition = "opacity 150ms ease";
+    wrapper.onmouseenter = () => {
+      actionsBar.style.opacity = "1";
+    };
+    wrapper.onmouseleave = () => {
+      actionsBar.style.opacity = "0";
+    };
+  };
+
+  const createEndInlineImageActionsBar = (imageId: string) => {
+    const actionsBar = document.createElement("div");
+    actionsBar.style.position = "absolute";
+    actionsBar.style.top = "8px";
+    actionsBar.style.right = "8px";
+    actionsBar.style.display = "flex";
+    actionsBar.style.gap = "6px";
+    actionsBar.style.zIndex = "2";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.setAttribute("data-inline-remove-id", imageId);
+    removeBtn.textContent = "Remove";
+    removeBtn.style.border = "1px solid #e5e7eb";
+    removeBtn.style.borderRadius = "6px";
+    removeBtn.style.background = "#ffffff";
+    removeBtn.style.color = "#ef4444";
+    removeBtn.style.fontSize = "11px";
+    removeBtn.style.fontWeight = "600";
+    removeBtn.style.padding = "4px 8px";
+    removeBtn.style.cursor = "pointer";
+
+    actionsBar.appendChild(removeBtn);
+    return actionsBar;
+  };
+
+  const applyInlineImageWrapperStyle = (
+    wrapper: HTMLDivElement,
+    imageKind: "middle" | "end",
+  ) => {
+    wrapper.contentEditable = "false";
+    wrapper.style.position = "relative";
+    wrapper.style.display = "block";
+    wrapper.style.margin = "16px 0";
+    wrapper.style.width = "100%";
+    wrapper.style.maxWidth = "100%";
+    wrapper.style.verticalAlign = "";
+  };
+
+  const applyInlineImageElementStyle = (
+    img: HTMLImageElement,
+    imageKind: "middle" | "end",
+  ) => {
+    img.style.width = "100%";
+    img.style.maxWidth = "100%";
+    img.style.aspectRatio = "100 / 53";
+    img.style.height = "auto";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "8px";
+    img.style.display = "block";
+  };
+
+  const attachEndInlineImageActions = (
+    wrapper: HTMLDivElement,
+    editorIndex: number,
+    imageId: string,
+  ) => {
+    wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
+      node.remove();
+    });
+    const actionsBar = createEndInlineImageActionsBar(imageId);
+    const removeBtn = actionsBar.querySelector(
+      "button[data-inline-remove-id]",
+    ) as HTMLButtonElement | null;
+    if (removeBtn) {
+      const runRemove = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeInlineImageFromEditor(editorIndex, wrapper, imageId);
+      };
+      removeBtn.addEventListener("mousedown", runRemove);
+      removeBtn.addEventListener("click", runRemove);
+    }
+    actionsBar.setAttribute("data-inline-actions", "true");
+    attachInlineRemoveButtonHover(wrapper, actionsBar);
+    wrapper.appendChild(actionsBar);
+  };
+
+  const decorateInlineImagesInEditor = (
+    editor: HTMLDivElement,
+    editorIndex: number,
+  ) => {
+    const existingWrappers = Array.from(
+      editor.querySelectorAll<HTMLDivElement>("[data-inline-image-wrapper='true']"),
+    );
+    for (const wrapper of existingWrappers) {
+      const img = wrapper.querySelector("img");
+      if (!img) continue;
+      const imageId =
+        wrapper.getAttribute("data-inline-image-id") ||
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[imageId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind =
+        (wrapper.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        (img.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        pendingType ||
+        (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image-id", imageId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      img.setAttribute("data-inline-pending-id", imageId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      if (imageKind === "end") {
+        attachEndInlineImageActions(wrapper, editorIndex, imageId);
+      } else {
+        wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
+          node.remove();
+        });
+      }
+    }
+
+    const images = Array.from(editor.querySelectorAll("img"));
+    for (const img of images) {
+      if (img.closest("[data-inline-image-wrapper='true']")) continue;
+
+      const wrapper = document.createElement("div");
+      const existingPendingId =
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[existingPendingId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind = pendingType || (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image", "true");
+      wrapper.setAttribute("data-inline-image-wrapper", "true");
+      wrapper.setAttribute("data-inline-image-id", existingPendingId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      img.setAttribute("data-inline-pending-id", existingPendingId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      const parent = img.parentNode;
+      if (!parent) continue;
+      parent.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      if (imageKind === "end") {
+        attachEndInlineImageActions(wrapper, editorIndex, existingPendingId);
+      }
+    }
+  };
+
+  const handleInlineImageButtonClick = (type: "middle" | "end") => {
     if (loading || inlineImageUploading || activeEditorBlockIndex === null) return;
+    inlineImageInsertTypeRef.current = type;
     savedInlineImageBlockIndexRef.current =
       activeSelection?.blockIndex ?? activeEditorBlockIndex;
     const selection = window.getSelection();
@@ -421,29 +717,6 @@ function NewsModal({
     }
   };
 
-  const assignUploadedImageToLegacySlots = (
-    imageUrl: string,
-    imageName: string | null,
-  ) => {
-    if (!middleImageUrl) {
-      setMiddleImageUrl(imageUrl);
-      setMiddleImageName(imageName);
-      setMiddleImagePendingFile(null);
-      setMiddleImageUrlInput("");
-      setMiddleVideoUrl(null);
-      setMiddleVideoName(null);
-      return true;
-    }
-
-    if (endImages.length < 3) {
-      setEndImages((prev) => [...prev, { url: imageUrl, name: imageName }]);
-      return true;
-    }
-
-    setError("Maximum 4 images reached (Image 1 + 3 more images).");
-    return false;
-  };
-
   const handleInlineImageFileChange = async (file?: File) => {
     const blockIndex =
       savedInlineImageBlockIndexRef.current ??
@@ -453,19 +726,13 @@ function NewsModal({
     try {
       setInlineImageUploading(true);
       setError(null);
-      const uploadResponse = await uploadContentImage({ image: file });
-      const uploaded = Array.isArray(uploadResponse.data)
-        ? uploadResponse.data[0]
-        : uploadResponse.data;
-      const imageUrl = uploaded?.image_url;
-      if (!imageUrl) {
-        throw new Error("Failed to get uploaded image URL");
-      }
-      const imageName =
-        (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
-
-      const didAssign = assignUploadedImageToLegacySlots(imageUrl, imageName);
-      if (!didAssign) return;
+      const pendingId = `inline-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      inlinePendingImagesRef.current[pendingId] = {
+        file,
+        type: inlineImageInsertTypeRef.current,
+      };
+      const imageKind = inlineImageInsertTypeRef.current;
+      const previewUrl = queuePreviewUrl(file);
 
       const editor = contentTextareaRefs.current[blockIndex];
       if (!editor) return;
@@ -484,26 +751,32 @@ function NewsModal({
 
         const wrapper = document.createElement("div");
         wrapper.setAttribute("data-inline-image", "true");
-        wrapper.style.display = "block";
-        wrapper.style.margin = "16px 0";
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
 
         const img = document.createElement("img");
-        img.src = imageUrl;
-        img.alt = imageName || "Inline image";
-        img.style.width = "100%";
-        img.style.aspectRatio = "100 / 53";
-        img.style.height = "auto";
-        img.style.objectFit = "cover";
-        img.style.borderRadius = "8px";
-        img.style.display = "block";
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
         wrapper.appendChild(img);
+        if (imageKind === "end") {
+          attachEndInlineImageActions(wrapper, blockIndex, pendingId);
+        }
 
-        const spacer = document.createElement("br");
-        workingRange.insertNode(spacer);
+
         workingRange.insertNode(wrapper);
-
         const caretRange = document.createRange();
-        caretRange.setStartAfter(spacer);
+        if (imageKind === "end") {
+          caretRange.setStartAfter(wrapper);
+        } else {
+          const spacer = document.createElement("br");
+          workingRange.insertNode(spacer);
+          caretRange.setStartAfter(spacer);
+        }
         caretRange.collapse(true);
         selection.removeAllRanges();
         selection.addRange(caretRange);
@@ -511,22 +784,27 @@ function NewsModal({
         // Fallback: append image at end if selection cannot be restored.
         const wrapper = document.createElement("div");
         wrapper.setAttribute("data-inline-image", "true");
-        wrapper.style.display = "block";
-        wrapper.style.margin = "16px 0";
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
 
         const img = document.createElement("img");
-        img.src = imageUrl;
-        img.alt = imageName || "Inline image";
-        img.style.width = "100%";
-        img.style.aspectRatio = "100 / 53";
-        img.style.height = "auto";
-        img.style.objectFit = "cover";
-        img.style.borderRadius = "8px";
-        img.style.display = "block";
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
         wrapper.appendChild(img);
+        if (imageKind === "end") {
+          attachEndInlineImageActions(wrapper, blockIndex, pendingId);
+        }
+
 
         editor.appendChild(wrapper);
-        editor.appendChild(document.createElement("br"));
+        if (imageKind !== "end") {
+          editor.appendChild(document.createElement("br"));
+        }
       }
 
       handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
@@ -710,6 +988,27 @@ function NewsModal({
     return single.image_url ?? null;
   };
 
+  const extractImageUrlsFromBlocks = (blocks: ContentBlock[]): Set<string> => {
+    const urls = new Set<string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const matches = block.paragraph.matchAll(/<img[^>]*src="([^"]+)"/g);
+      for (const match of matches) {
+        const src = match[1]?.trim();
+        if (!src) continue;
+        if (
+          src.startsWith("blob:") ||
+          src.startsWith("data:") ||
+          src.startsWith("about:")
+        ) {
+          continue;
+        }
+        urls.add(src);
+      }
+    }
+    return urls;
+  };
+
   const handleSelectCoverFile = (file?: File) => {
     if (!file) return;
     setCoverPendingFile(file);
@@ -778,6 +1077,7 @@ function NewsModal({
       // Upload pending files ONLY when saving.
       let finalCover = cover;
       let finalMiddleImageUrl = middleImageUrl;
+      let finalMiddleImageName = middleImageName;
       let finalEndImages: Array<EndImage | null> = [
         endImages[0] ?? null,
         endImages[1] ?? null,
@@ -812,40 +1112,135 @@ function NewsModal({
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
       }
 
-      // If editing and media was replaced, delete old assets from content library (best-effort).
-      if (news) {
-        const oldCover = originalCoverUrlRef.current;
-        if (coverPendingFile && oldCover && finalCover && oldCover !== finalCover) {
-          try {
-            await deleteCoverByUrlIfPresent(oldCover);
-          } catch {
-            // best-effort delete only
-          }
-        }
+      // Free legacy slots for images that were removed from edited content,
+      // so adding a new image after deleting an old one acts as replacement.
+      const referencedExistingInlineUrls = extractImageUrlsFromBlocks(validBlocks);
+      if (
+        finalMiddleImageUrl &&
+        !referencedExistingInlineUrls.has(finalMiddleImageUrl)
+      ) {
+        finalMiddleImageUrl = null;
+        finalMiddleImageName = null;
+      }
+      finalEndImages = finalEndImages.map((img) => {
+        if (!img?.url) return null;
+        return referencedExistingInlineUrls.has(img.url) ? img : null;
+      });
 
-        const oldMiddle = originalMiddleImageUrlRef.current;
-        if (
-          middleImagePendingFile &&
-          oldMiddle &&
-          finalMiddleImageUrl &&
-          oldMiddle !== finalMiddleImageUrl
-        ) {
-          try {
-            await deleteImageByUrlIfPresent(oldMiddle);
-          } catch {
-            // best-effort delete only
-          }
+      // Upload inline pending images only on save, then replace temporary preview URLs.
+      const pendingInlineIds: string[] = [];
+      const seenInlineIds = new Set<string>();
+      for (const block of validBlocks) {
+        const matches = block.paragraph.matchAll(/data-inline-pending-id="([^"]+)"/g);
+        for (const match of matches) {
+          const id = match[1];
+          if (!id || seenInlineIds.has(id)) continue;
+          seenInlineIds.add(id);
+          pendingInlineIds.push(id);
         }
+      }
 
-        for (let i = 0; i < 3; i++) {
-          const oldEnd = originalEndImageUrlsRef.current[i];
-          const newEnd = finalEndImages[i]?.url ?? null;
-          if (endImagePendingFiles[i] && oldEnd && newEnd && oldEnd !== newEnd) {
-            try {
-              await deleteImageByUrlIfPresent(oldEnd);
-            } catch {
-              // best-effort delete only
+      const inlineUploadMap: Record<string, { url: string; name: string | null }> = {};
+      for (const pendingId of pendingInlineIds) {
+        const pending = inlinePendingImagesRef.current[pendingId];
+        if (!pending?.file) continue;
+        setInlineImageUploading(true);
+        const res = await uploadContentImage({ image: pending.file });
+        const uploaded = Array.isArray(res.data) ? res.data[0] : res.data;
+        const uploadedUrl = uploaded?.image_url;
+        if (!uploadedUrl) {
+          throw new Error("Inline image upload succeeded but URL missing");
+        }
+        const uploadedName =
+          (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
+        inlineUploadMap[pendingId] = { url: uploadedUrl, name: uploadedName };
+
+        // Keep backend compatibility: map first image to middle, next up to 3 to end_images.
+        if (pending.type === "middle") {
+          finalMiddleImageUrl = uploadedUrl;
+          finalMiddleImageName = uploadedName;
+        } else {
+          const emptySlot = finalEndImages.findIndex((img) => !img?.url);
+          if (emptySlot === -1) {
+            throw new Error(
+              "Maximum 5 images reached total (Thumbnail + 1 Middle Image + 3 End Images).",
+            );
+          }
+          finalEndImages[emptySlot] = { url: uploadedUrl, name: uploadedName };
+        }
+      }
+
+      const processedBlocks = validBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+
+        container.querySelectorAll("button[data-inline-remove-id]").forEach((btn) => btn.remove());
+
+        container
+          .querySelectorAll("img[data-inline-pending-id]")
+          .forEach((imgNode) => {
+            const id = imgNode.getAttribute("data-inline-pending-id");
+            if (id && inlineUploadMap[id]) {
+              imgNode.setAttribute("src", inlineUploadMap[id].url);
+              if (!imgNode.getAttribute("alt")) {
+                imgNode.setAttribute(
+                  "alt",
+                  inlineUploadMap[id].name || "Inline image",
+                );
+              }
             }
+            imgNode.removeAttribute("data-inline-pending-id");
+          });
+
+        container
+          .querySelectorAll("[data-inline-image-wrapper='true']")
+          .forEach((wrapper) => {
+            const imgNode = wrapper.querySelector("img");
+            if (imgNode) {
+              wrapper.replaceWith(imgNode);
+            } else {
+              wrapper.remove();
+            }
+          });
+
+        container
+          .querySelectorAll(
+            "[data-inline-image],[data-inline-image-id],[data-inline-image-kind]",
+          )
+          .forEach((el) => {
+            el.removeAttribute("data-inline-image");
+            el.removeAttribute("data-inline-image-id");
+            el.removeAttribute("data-inline-image-kind");
+          });
+
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
+      // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
+      const removedMediaUrls = new Set<string>();
+      if (news) {
+        const oldMiddle = originalMiddleImageUrlRef.current;
+        const nextMiddle = finalMiddleImageUrl ?? null;
+        if (oldMiddle && oldMiddle !== nextMiddle) {
+          removedMediaUrls.add(oldMiddle);
+        }
+
+        const oldEndUrls = new Set(
+          originalEndImageUrlsRef.current.filter(
+            (u): u is string => typeof u === "string" && u.length > 0,
+          ),
+        );
+        const nextEndUrls = new Set(
+          finalEndImages
+            .filter((img): img is EndImage => !!img?.url)
+            .map((img) => img.url),
+        );
+        for (const oldUrl of oldEndUrls) {
+          if (!nextEndUrls.has(oldUrl)) {
+            removedMediaUrls.add(oldUrl);
           }
         }
       }
@@ -858,7 +1253,7 @@ function NewsModal({
         cover_name: coverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
-        content_blocks: validBlocks,
+        content_blocks: processedBlocks,
         end_images:
           finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
             ? finalEndImages.filter((img): img is EndImage => !!img?.url)
@@ -867,9 +1262,9 @@ function NewsModal({
 
       // For articles: only send middle_image_url, don't send middle_video_url at all
       // Backend will automatically clear middle_video_url when middle_image_url is present
-      if (middleImageUrl) {
+      if (finalMiddleImageUrl) {
         params.middle_image_url = finalMiddleImageUrl;
-        params.middle_image_name = middleImageName;
+        params.middle_image_name = finalMiddleImageName;
       } else {
         // If no image, set to null to clear it
         params.middle_image_url = null;
@@ -883,7 +1278,37 @@ function NewsModal({
         await createAdminArticle(params);
       }
 
+      // Delete removed inline images from storage only after successful save.
+      const removedInlineUrls = new Set<string>(removedInlineImageUrlsRef.current);
+      if (news?.content_blocks) {
+        const oldInlineUrls = extractImageUrlsFromBlocks(news.content_blocks);
+        const newInlineUrls = extractImageUrlsFromBlocks(processedBlocks);
+        for (const oldUrl of oldInlineUrls) {
+          if (!newInlineUrls.has(oldUrl)) {
+            removedInlineUrls.add(oldUrl);
+          }
+        }
+      }
+      for (const removedUrl of removedInlineUrls) {
+        try {
+          await deleteImageByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
+      // Delete removed middle/end images from storage only after successful save.
+      for (const removedUrl of removedMediaUrls) {
+        try {
+          await deleteImageByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
       onSuccess();
+      inlinePendingImagesRef.current = {};
+      removedInlineImageUrlsRef.current = new Set();
       onClose();
     } catch (err) {
       const errorMessage =
@@ -893,6 +1318,7 @@ function NewsModal({
       setCoverUploading(false);
       setMiddleImageUploading(false);
       setEndImageUploadingIndex(null);
+      setInlineImageUploading(false);
       setLoading(false);
     }
   };
@@ -949,11 +1375,20 @@ function NewsModal({
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={handleInlineImageButtonClick}
+                  onClick={() => handleInlineImageButtonClick("middle")}
                   disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {inlineImageUploading ? "Adding..." : "Add Image"}
+                  {inlineImageUploading ? "Adding..." : "Mid Image"}
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInlineImageButtonClick("end")}
+                  disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inlineImageUploading ? "Adding..." : "End Image"}
                 </button>
                 <button
                   type="button"
@@ -1326,9 +1761,13 @@ function NewsModal({
                                 if (!isFocused && el.innerHTML !== nextHtml) {
                                   el.innerHTML = nextHtml;
                                 }
+                                decorateInlineImagesInEditor(el, index);
                               }}
                               contentEditable={!loading}
                               suppressContentEditableWarning
+                              onFocus={(e) =>
+                                decorateInlineImagesInEditor(e.currentTarget, index)
+                              }
                               onInput={(e) =>
                                 handleUpdateContentBlock(
                                   index,
@@ -1336,11 +1775,12 @@ function NewsModal({
                                   e.currentTarget.innerHTML,
                                 )
                               }
+                              onPaste={(e) => handleContentPaste(index, e)}
                               onSelect={(e) => handleContentSelection(index, e)}
                               onMouseUp={(e) => handleContentSelection(index, e)}
                               onKeyDown={(e) => handleContentKeyDown(index, e)}
                               onKeyUp={(e) => handleContentSelection(index, e)}
-                              onClick={(e) => handleContentSelection(index, e)}
+                              onClick={(e) => handleContentEditorClick(index, e)}
                               onBlur={() => {
                                 setActiveSelection(null);
                                 setActiveEditorBlockIndex(null);

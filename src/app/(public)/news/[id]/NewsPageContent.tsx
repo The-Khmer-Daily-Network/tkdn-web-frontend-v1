@@ -1197,13 +1197,13 @@ export default function NewsPageContent({
           {!hasInlineContentImages &&
             singleNews.end_images &&
             singleNews.end_images.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+            <div className="mt-8 flex flex-wrap gap-4">
               {singleNews.end_images.map((endImage, index) => (
-                <div key={index} className="w-full">
+                <div key={index} className="w-[30vw] max-w-full">
                   <img
                     src={endImage.url}
                     alt={endImage.name || `End image ${index + 1}`}
-                    className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
+                    className="h-auto w-full object-cover rounded-lg aspect-[100/63.8]"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
