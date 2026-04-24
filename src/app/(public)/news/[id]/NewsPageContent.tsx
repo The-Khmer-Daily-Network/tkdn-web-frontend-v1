@@ -951,7 +951,7 @@ export default function NewsPageContent({
               <img
                 src={singleNews.cover}
                 alt={singleNews.title}
-                className="w-full h-auto object-cover rounded-lg"
+                className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -996,7 +996,7 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: sanitizeRichText(paragraph.trim()),
                             }}
@@ -1170,7 +1170,7 @@ export default function NewsPageContent({
                                     singleNews.middle_image_name ||
                                     singleNews.title
                                   }
-                                  className="w-full h-auto object-cover rounded-lg"
+                                  className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
                                   onError={(e) => {
                                     (
                                       e.target as HTMLImageElement
@@ -1203,7 +1203,7 @@ export default function NewsPageContent({
                   <img
                     src={endImage.url}
                     alt={endImage.name || `End image ${index + 1}`}
-                    className="w-full h-auto object-cover rounded-lg"
+                    className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}

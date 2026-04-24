@@ -490,8 +490,10 @@ function NewsModal({
         const img = document.createElement("img");
         img.src = imageUrl;
         img.alt = imageName || "Inline image";
-        img.style.maxWidth = "100%";
+        img.style.width = "100%";
+        img.style.aspectRatio = "100 / 53";
         img.style.height = "auto";
+        img.style.objectFit = "cover";
         img.style.borderRadius = "8px";
         img.style.display = "block";
         wrapper.appendChild(img);
@@ -515,8 +517,10 @@ function NewsModal({
         const img = document.createElement("img");
         img.src = imageUrl;
         img.alt = imageName || "Inline image";
-        img.style.maxWidth = "100%";
+        img.style.width = "100%";
+        img.style.aspectRatio = "100 / 53";
         img.style.height = "auto";
+        img.style.objectFit = "cover";
         img.style.borderRadius = "8px";
         img.style.display = "block";
         wrapper.appendChild(img);
@@ -1347,7 +1351,7 @@ function NewsModal({
                                   quote: false,
                                 });
                               }}
-                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             />
                           </div>
                         ) : (
