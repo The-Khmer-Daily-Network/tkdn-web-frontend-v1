@@ -51,6 +51,51 @@ const isSafeImageSrc = (src: string) => {
   );
 };
 
+const getImageCaptionFallback = (src: string) => {
+  if (!src) return "";
+  try {
+    const cleanPath = src.split("?")[0].split("#")[0];
+    const segment = cleanPath.split("/").filter(Boolean).pop() || "";
+    const decoded = decodeURIComponent(segment);
+    const withoutExt = decoded.replace(/\.[a-zA-Z0-9]+$/, "");
+    return withoutExt.replace(/[-_]+/g, " ").trim();
+  } catch {
+    return "";
+  }
+};
+
+const getCaptionText = (preferred?: string | null, src?: string | null) => {
+  const explicit = (preferred || "").trim();
+  if (explicit) return explicit;
+  return getImageCaptionFallback((src || "").trim());
+};
+
+const hydrateInlineImageNames = (html: string, imageNameByUrl: Map<string, string>) => {
+  if (!html?.trim()) return html;
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return html;
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+
+  const images = Array.from(root.querySelectorAll("img"));
+  for (const image of images) {
+    const src = (image.getAttribute("src") || "").trim();
+    if (!src) continue;
+    const mappedName = imageNameByUrl.get(src);
+    if (!mappedName) continue;
+    const alt = (image.getAttribute("alt") || "").trim().toLowerCase();
+    if (!alt || alt === "inline image" || alt === "article image") {
+      image.setAttribute("alt", mappedName);
+    }
+    image.setAttribute("title", mappedName);
+  }
+
+  return root.innerHTML;
+};
+
 const sanitizeRichText = (html: string): string => {
   if (!html?.trim()) return "";
   if (typeof window === "undefined" || typeof DOMParser === "undefined") {
@@ -74,10 +119,16 @@ const sanitizeRichText = (html: string): string => {
     if (!ALLOWED_RICH_TEXT_TAGS.has(tagName)) {
       const parent = element.parentNode;
       if (!parent) return;
+      const unwrappedChildren = [...element.childNodes];
       while (element.firstChild) {
         parent.insertBefore(element.firstChild, element);
       }
       parent.removeChild(element);
+      // Continue sanitizing children after unwrapping unsupported wrappers
+      // (e.g. <div><img/></div>) so image caption logic still runs.
+      for (const child of unwrappedChildren) {
+        walk(child);
+      }
       return;
     }
 
@@ -120,6 +171,28 @@ const sanitizeRichText = (html: string): string => {
       element.setAttribute("loading", "lazy");
       if (!element.getAttribute("alt")) {
         element.setAttribute("alt", "Article image");
+      }
+      const captionText = (
+        element.getAttribute("title") ||
+        element.getAttribute("alt") ||
+        getImageCaptionFallback(src)
+      ).trim();
+      if (
+        captionText &&
+        captionText.toLowerCase() !== "inline image" &&
+        captionText.toLowerCase() !== "article image"
+      ) {
+        const nextSibling = element.nextElementSibling;
+        const hasCaptionAlready =
+          !!nextSibling &&
+          nextSibling.tagName.toLowerCase() === "i" &&
+          (nextSibling.getAttribute("data-img-caption") || "") === "true";
+        if (!hasCaptionAlready) {
+          const captionNode = doc.createElement("i");
+          captionNode.setAttribute("data-img-caption", "true");
+          captionNode.textContent = captionText;
+          element.insertAdjacentElement("afterend", captionNode);
+        }
       }
     }
 
@@ -707,6 +780,22 @@ export default function NewsPageContent({
     const hasInlineContentImages = (singleNews.content_blocks || []).some((block) =>
       /<img[\s>]/i.test(block.paragraph || ""),
     );
+    const inlineImageNameByUrl = new Map<string, string>();
+    if (singleNews.middle_image_url) {
+      const middleName = getCaptionText(
+        singleNews.middle_image_name || (singleNews as any).middleImageName,
+        singleNews.middle_image_url,
+      );
+      if (middleName) inlineImageNameByUrl.set(singleNews.middle_image_url, middleName);
+    }
+    for (const endImage of singleNews.end_images || []) {
+      if (!endImage?.url) continue;
+      const endName = getCaptionText(
+        endImage.name || (endImage as any).title,
+        endImage.url,
+      );
+      if (endName) inlineImageNameByUrl.set(endImage.url, endName);
+    }
 
     // Ensure image URL is absolute
     let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
@@ -957,12 +1046,18 @@ export default function NewsPageContent({
                 }}
               />
               {/* Cover Image Caption – AKbalthom (article/image font) */}
-              {singleNews.cover_name && (
+              {getCaptionText(
+                singleNews.cover_name || (singleNews as any).coverName,
+                singleNews.cover,
+              ) && (
                 <p
                   className="text-sm text-gray-600 mt-2 italic"
                  
               >
-                  {singleNews.cover_name}
+                  {getCaptionText(
+                    singleNews.cover_name || (singleNews as any).coverName,
+                    singleNews.cover,
+                  )}
                 </p>
               )}
             </div>
@@ -996,9 +1091,14 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
-                              __html: sanitizeRichText(paragraph.trim()),
+                              __html: sanitizeRichText(
+                                hydrateInlineImageNames(
+                                  paragraph.trim(),
+                                  inlineImageNameByUrl,
+                                ),
+                              ),
                             }}
                           />
                         ))}
@@ -1178,9 +1278,17 @@ export default function NewsPageContent({
                                   }}
                                 />
                                 {/* Image Caption */}
-                                {singleNews.middle_image_name && (
+                                {getCaptionText(
+                                  singleNews.middle_image_name ||
+                                    (singleNews as any).middleImageName,
+                                  singleNews.middle_image_url,
+                                ) && (
                                   <p className="text-sm text-gray-600 mt-2 italic">
-                                    {singleNews.middle_image_name}
+                                    {getCaptionText(
+                                      singleNews.middle_image_name ||
+                                        (singleNews as any).middleImageName,
+                                      singleNews.middle_image_url,
+                                    )}
                                   </p>
                                 )}
                               </div>
@@ -1197,9 +1305,9 @@ export default function NewsPageContent({
           {!hasInlineContentImages &&
             singleNews.end_images &&
             singleNews.end_images.length > 0 && (
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
               {singleNews.end_images.map((endImage, index) => (
-                <div key={index} className="w-[30vw] max-w-full">
+                <div key={index} className="w-full">
                   <img
                     src={endImage.url}
                     alt={endImage.name || `End image ${index + 1}`}
@@ -1209,9 +1317,15 @@ export default function NewsPageContent({
                     }}
                   />
                   {/* End Image Caption */}
-                  {endImage.name && (
+                  {getCaptionText(
+                    endImage.name || (endImage as any).title,
+                    endImage.url,
+                  ) && (
                     <p className="text-sm text-gray-600 mt-2 italic">
-                      {endImage.name}
+                      {getCaptionText(
+                        endImage.name || (endImage as any).title,
+                        endImage.url,
+                      )}
                     </p>
                   )}
                 </div>

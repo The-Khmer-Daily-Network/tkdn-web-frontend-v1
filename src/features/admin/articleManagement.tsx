@@ -428,6 +428,12 @@ function NewsModal({
       }
       return;
     }
+    const nameBtn = target.closest("button[data-inline-name-id]");
+    if (nameBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     handleContentSelection(index, e);
   };
 
@@ -549,7 +555,10 @@ function NewsModal({
     };
   };
 
-  const createEndInlineImageActionsBar = (imageId: string) => {
+  const createInlineImageActionsBar = (
+    imageId: string,
+    imageKind: "middle" | "end",
+  ) => {
     const actionsBar = document.createElement("div");
     actionsBar.style.position = "absolute";
     actionsBar.style.top = "8px";
@@ -558,20 +567,35 @@ function NewsModal({
     actionsBar.style.gap = "6px";
     actionsBar.style.zIndex = "2";
 
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.setAttribute("data-inline-remove-id", imageId);
-    removeBtn.textContent = "Remove";
-    removeBtn.style.border = "1px solid #e5e7eb";
-    removeBtn.style.borderRadius = "6px";
-    removeBtn.style.background = "#ffffff";
-    removeBtn.style.color = "#ef4444";
-    removeBtn.style.fontSize = "11px";
-    removeBtn.style.fontWeight = "600";
-    removeBtn.style.padding = "4px 8px";
-    removeBtn.style.cursor = "pointer";
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("data-inline-name-id", imageId);
+    nameBtn.textContent = "Image Name";
+    nameBtn.style.border = "1px solid #e5e7eb";
+    nameBtn.style.borderRadius = "6px";
+    nameBtn.style.background = "#ffffff";
+    nameBtn.style.color = "#374151";
+    nameBtn.style.fontSize = "11px";
+    nameBtn.style.fontWeight = "600";
+    nameBtn.style.padding = "4px 8px";
+    nameBtn.style.cursor = "pointer";
+    actionsBar.appendChild(nameBtn);
 
-    actionsBar.appendChild(removeBtn);
+    if (imageKind === "end") {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.setAttribute("data-inline-remove-id", imageId);
+      removeBtn.textContent = "Remove";
+      removeBtn.style.border = "1px solid #e5e7eb";
+      removeBtn.style.borderRadius = "6px";
+      removeBtn.style.background = "#ffffff";
+      removeBtn.style.color = "#ef4444";
+      removeBtn.style.fontSize = "11px";
+      removeBtn.style.fontWeight = "600";
+      removeBtn.style.padding = "4px 8px";
+      removeBtn.style.cursor = "pointer";
+      actionsBar.appendChild(removeBtn);
+    }
     return actionsBar;
   };
 
@@ -601,15 +625,61 @@ function NewsModal({
     img.style.display = "block";
   };
 
-  const attachEndInlineImageActions = (
+  const attachInlineImageActions = (
     wrapper: HTMLDivElement,
     editorIndex: number,
     imageId: string,
+    imageKind: "middle" | "end",
   ) => {
     wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
       node.remove();
     });
-    const actionsBar = createEndInlineImageActionsBar(imageId);
+    const actionsBar = createInlineImageActionsBar(imageId, imageKind);
+    const nameBtn = actionsBar.querySelector(
+      "button[data-inline-name-id]",
+    ) as HTMLButtonElement | null;
+    if (nameBtn) {
+      const runSetName = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const img = wrapper.querySelector("img");
+        if (!img) return;
+        const src = img.getAttribute("src") || "";
+        const currentName =
+          img.getAttribute("data-inline-image-name") ||
+          img.getAttribute("alt") ||
+          "";
+        const nextName = window.prompt("Image Name", currentName);
+        if (nextName === null) return;
+        const normalized = nextName.trim();
+        if (normalized) {
+          img.setAttribute("data-inline-image-name", normalized);
+          img.setAttribute("alt", normalized);
+          img.setAttribute("title", normalized);
+        } else {
+          img.removeAttribute("data-inline-image-name");
+          img.setAttribute("alt", "Inline image");
+          img.removeAttribute("title");
+        }
+
+        // Keep explicit React state in sync so PUT payload always carries latest names.
+        if (imageKind === "middle") {
+          setMiddleImageName(normalized || null);
+        } else if (imageKind === "end" && src) {
+          setEndImages((prev) =>
+            prev.map((item) =>
+              item.url === src ? { ...item, name: normalized || null } : item,
+            ),
+          );
+        }
+        const editor = contentTextareaRefs.current[editorIndex];
+        if (editor) {
+          handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+        }
+      };
+      nameBtn.addEventListener("mousedown", runSetName);
+      nameBtn.addEventListener("click", runSetName);
+    }
     const removeBtn = actionsBar.querySelector(
       "button[data-inline-remove-id]",
     ) as HTMLButtonElement | null;
@@ -657,13 +727,7 @@ function NewsModal({
       applyInlineImageWrapperStyle(wrapper, imageKind);
       applyInlineImageElementStyle(img, imageKind);
 
-      if (imageKind === "end") {
-        attachEndInlineImageActions(wrapper, editorIndex, imageId);
-      } else {
-        wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
-          node.remove();
-        });
-      }
+      attachInlineImageActions(wrapper, editorIndex, imageId, imageKind);
     }
 
     const images = Array.from(editor.querySelectorAll("img"));
@@ -693,9 +757,12 @@ function NewsModal({
       parent.insertBefore(wrapper, img);
       wrapper.appendChild(img);
 
-      if (imageKind === "end") {
-        attachEndInlineImageActions(wrapper, editorIndex, existingPendingId);
-      }
+      attachInlineImageActions(
+        wrapper,
+        editorIndex,
+        existingPendingId,
+        imageKind,
+      );
     }
   };
 
@@ -763,9 +830,7 @@ function NewsModal({
         img.setAttribute("data-inline-image-kind", imageKind);
         applyInlineImageElementStyle(img, imageKind);
         wrapper.appendChild(img);
-        if (imageKind === "end") {
-          attachEndInlineImageActions(wrapper, blockIndex, pendingId);
-        }
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
 
 
         workingRange.insertNode(wrapper);
@@ -796,9 +861,7 @@ function NewsModal({
         img.setAttribute("data-inline-image-kind", imageKind);
         applyInlineImageElementStyle(img, imageKind);
         wrapper.appendChild(img);
-        if (imageKind === "end") {
-          attachEndInlineImageActions(wrapper, blockIndex, pendingId);
-        }
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
 
 
         editor.appendChild(wrapper);
@@ -988,6 +1051,40 @@ function NewsModal({
     return single.image_url ?? null;
   };
 
+  const collectInlineImageNames = (blocks: ContentBlock[]) => {
+    const pendingNameById = new Map<string, string>();
+    const nameByUrl = new Map<string, string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const container = document.createElement("div");
+      container.innerHTML = block.paragraph;
+      const images = Array.from(container.querySelectorAll("img"));
+      for (const image of images) {
+        const rawName =
+          image.getAttribute("data-inline-image-name") ||
+          image.getAttribute("title") ||
+          image.getAttribute("alt") ||
+          "";
+        const imageName = rawName.trim();
+        if (!imageName || imageName.toLowerCase() === "inline image") continue;
+        const pendingId = image.getAttribute("data-inline-pending-id");
+        if (pendingId) {
+          pendingNameById.set(pendingId, imageName);
+        }
+        const src = (image.getAttribute("src") || "").trim();
+        if (
+          src &&
+          !src.startsWith("blob:") &&
+          !src.startsWith("data:") &&
+          !src.startsWith("about:")
+        ) {
+          nameByUrl.set(src, imageName);
+        }
+      }
+    }
+    return { pendingNameById, nameByUrl };
+  };
+
   const extractImageUrlsFromBlocks = (blocks: ContentBlock[]): Set<string> => {
     const urls = new Set<string>();
     for (const block of blocks) {
@@ -1076,6 +1173,7 @@ function NewsModal({
 
       // Upload pending files ONLY when saving.
       let finalCover = cover;
+      const finalCoverName = (coverName || "").trim() || null;
       let finalMiddleImageUrl = middleImageUrl;
       let finalMiddleImageName = middleImageName;
       let finalEndImages: Array<EndImage | null> = [
@@ -1083,6 +1181,7 @@ function NewsModal({
         endImages[1] ?? null,
         endImages[2] ?? null,
       ];
+      const inlineImageNames = collectInlineImageNames(validBlocks);
 
       if (coverPendingFile) {
         setCoverUploading(true);
@@ -1153,12 +1252,14 @@ function NewsModal({
         }
         const uploadedName =
           (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
-        inlineUploadMap[pendingId] = { url: uploadedUrl, name: uploadedName };
+        const customName = inlineImageNames.pendingNameById.get(pendingId) || null;
+        const finalInlineName = customName || uploadedName;
+        inlineUploadMap[pendingId] = { url: uploadedUrl, name: finalInlineName };
 
         // Keep backend compatibility: map first image to middle, next up to 3 to end_images.
         if (pending.type === "middle") {
           finalMiddleImageUrl = uploadedUrl;
-          finalMiddleImageName = uploadedName;
+          finalMiddleImageName = finalInlineName;
         } else {
           const emptySlot = finalEndImages.findIndex((img) => !img?.url);
           if (emptySlot === -1) {
@@ -1166,15 +1267,32 @@ function NewsModal({
               "Maximum 5 images reached total (Thumbnail + 1 Middle Image + 3 End Images).",
             );
           }
-          finalEndImages[emptySlot] = { url: uploadedUrl, name: uploadedName };
+          finalEndImages[emptySlot] = { url: uploadedUrl, name: finalInlineName };
         }
+
       }
+
+      if (
+        finalMiddleImageUrl &&
+        inlineImageNames.nameByUrl.has(finalMiddleImageUrl)
+      ) {
+        finalMiddleImageName =
+          inlineImageNames.nameByUrl.get(finalMiddleImageUrl) || null;
+      }
+      finalEndImages = finalEndImages.map((img) => {
+        if (!img?.url) return img;
+        const overrideName = inlineImageNames.nameByUrl.get(img.url);
+        if (!overrideName) return img;
+        return { ...img, name: overrideName };
+      });
 
       const processedBlocks = validBlocks.map((block) => {
         const container = document.createElement("div");
         container.innerHTML = block.paragraph;
 
-        container.querySelectorAll("button[data-inline-remove-id]").forEach((btn) => btn.remove());
+        container
+          .querySelectorAll("button[data-inline-remove-id],button[data-inline-name-id]")
+          .forEach((btn) => btn.remove());
 
         container
           .querySelectorAll("img[data-inline-pending-id]")
@@ -1182,11 +1300,19 @@ function NewsModal({
             const id = imgNode.getAttribute("data-inline-pending-id");
             if (id && inlineUploadMap[id]) {
               imgNode.setAttribute("src", inlineUploadMap[id].url);
-              if (!imgNode.getAttribute("alt")) {
+              const currentAlt = (imgNode.getAttribute("alt") || "").trim().toLowerCase();
+              const shouldReplaceAlt =
+                !currentAlt ||
+                currentAlt === "inline image" ||
+                currentAlt === "article image";
+              if (shouldReplaceAlt) {
                 imgNode.setAttribute(
                   "alt",
                   inlineUploadMap[id].name || "Inline image",
                 );
+              }
+              if (inlineUploadMap[id].name) {
+                imgNode.setAttribute("title", inlineUploadMap[id].name);
               }
             }
             imgNode.removeAttribute("data-inline-pending-id");
@@ -1205,12 +1331,13 @@ function NewsModal({
 
         container
           .querySelectorAll(
-            "[data-inline-image],[data-inline-image-id],[data-inline-image-kind]",
+            "[data-inline-image],[data-inline-image-id],[data-inline-image-kind],[data-inline-image-name]",
           )
           .forEach((el) => {
             el.removeAttribute("data-inline-image");
             el.removeAttribute("data-inline-image-id");
             el.removeAttribute("data-inline-image-kind");
+            el.removeAttribute("data-inline-image-name");
           });
 
         return {
@@ -1250,7 +1377,7 @@ function NewsModal({
         author: author.trim(),
         title: title.trim(),
         cover: finalCover,
-        cover_name: coverName,
+        cover_name: finalCoverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
         content_blocks: processedBlocks,
@@ -1624,6 +1751,23 @@ function NewsModal({
                     </button>
 
                     <div className="absolute top-3 right-3 z-10 flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextName = window.prompt(
+                            "Image Name",
+                            coverName || "",
+                          );
+                          if (nextName === null) return;
+                          const normalized = nextName.trim();
+                          setCoverName(normalized || null);
+                        }}
+                        className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
+                        disabled={loading || coverUploading}
+                      >
+                        Image Name
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
