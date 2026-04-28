@@ -416,6 +416,11 @@ export default function CategoryPage() {
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                    e.preventDefault();
+                    window.location.href = `/news/${article.id}`;
+                  }}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image - Smaller on mobile (max-400px) */}
@@ -480,6 +485,11 @@ export default function CategoryPage() {
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                    e.preventDefault();
+                    window.location.href = `/news/${article.id}`;
+                  }}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image */}

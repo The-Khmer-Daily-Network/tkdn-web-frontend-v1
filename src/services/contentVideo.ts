@@ -83,7 +83,9 @@ export async function getContentVideos(): Promise<ContentVideoResponse> {
     return data;
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -118,7 +120,9 @@ export async function deleteContentVideo(
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -168,7 +172,9 @@ export async function uploadContentVideo({
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }

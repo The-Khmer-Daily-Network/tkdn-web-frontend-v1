@@ -335,5 +335,5 @@ export default async function NewsPage({
     }
   }
 
-  return <NewsPageContent initialNewsData={initialNewsData} />;
+  return <NewsPageContent key={idParam} initialNewsData={initialNewsData} />;
 }

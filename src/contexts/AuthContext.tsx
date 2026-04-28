@@ -28,8 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTO_LOGOUT_HOURS = 5; // Auto logout after 5 hours
-const AUTO_LOGOUT_MS = AUTO_LOGOUT_HOURS * 60 * 60 * 1000; // Convert to milliseconds
+const AUTO_LOGOUT_MS = 12 * 60 * 60 * 1000; // Auto logout after 12 hours
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -54,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up new timer if user is authenticated
     if (user && !loading) {
       autoLogoutTimerRef.current = setTimeout(() => {
-        // Auto logout after 5 hours
+        // Auto logout after 12 hours
         // Clear localStorage and user state
         logoutService();
         setUser(null);

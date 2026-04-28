@@ -1,6 +1,8 @@
 import type { UserResponse, User, LoginCredentials } from "@/types/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const AUTH_EXPIRES_AT_KEY = "authExpiresAt";
+const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 if (!API_BASE_URL) {
   console.warn(
@@ -90,6 +92,10 @@ export async function login(
       // Store user in localStorage for persistence
       if (typeof window !== "undefined") {
         localStorage.setItem("currentUser", JSON.stringify(user));
+        localStorage.setItem(
+          AUTH_EXPIRES_AT_KEY,
+          String(Date.now() + SESSION_DURATION_MS),
+        );
       }
       return user;
     }
@@ -107,6 +113,14 @@ export async function login(
 export function logout(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("currentUser");
+    localStorage.removeItem(AUTH_EXPIRES_AT_KEY);
+    // Remove common token keys in case other modules use them.
+    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("refreshToken");
   }
 }
 
@@ -119,6 +133,13 @@ export function getStoredUser(): User | null {
   }
 
   try {
+    const expiresAtRaw = localStorage.getItem(AUTH_EXPIRES_AT_KEY);
+    const expiresAt = expiresAtRaw ? Number(expiresAtRaw) : 0;
+    if (!expiresAt || Number.isNaN(expiresAt) || Date.now() >= expiresAt) {
+      logout();
+      return null;
+    }
+
     const stored = localStorage.getItem("currentUser");
     if (!stored) {
       return null;

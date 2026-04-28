@@ -223,7 +223,15 @@ export default function NewsDashboard({
     <div className="w-full space-y-6">
       {/* Main Article */}
       {mainArticle && (
-        <Link href={`/news/${mainArticle.id}`} className="w-full block">
+        <Link
+          href={`/news/${mainArticle.id}`}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            e.preventDefault();
+            window.location.href = `/news/${mainArticle.id}`;
+          }}
+          className="w-full block"
+        >
           <article className="w-full">
             {/* Mobile: Full width image with text below */}
             <div className="flex flex-col space-y-2 cursor-pointer hover:opacity-90 transition-opacity sm:hidden">
@@ -302,7 +310,7 @@ export default function NewsDashboard({
                 </div>
                 <div className="space-y-2">
                   <h1
-                    className="text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
+                    className="line-clamp-2 text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
                     
                 >
                     {mainArticle.title}
@@ -330,6 +338,11 @@ export default function NewsDashboard({
             <Link
               key={article.id}
               href={`/news/${article.id}`}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                window.location.href = `/news/${article.id}`;
+              }}
               className="cursor-pointer hover:opacity-90 transition-opacity"
           >
               {/* Mobile: Horizontal layout - image left, content right */}

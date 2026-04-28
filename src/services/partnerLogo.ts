@@ -89,10 +89,10 @@ export async function uploadPartnerLogo(
       throw new Error("Only JPG, PNG, GIF, and WebP files are allowed");
     }
 
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+    // Validate file size (20MB max)
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
     if (image.size > maxSize) {
-      throw new Error("File size must be less than 2MB");
+      throw new Error("File size is too large.");
     }
 
     // Create FormData

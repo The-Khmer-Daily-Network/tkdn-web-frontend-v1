@@ -17,6 +17,280 @@ interface NewsPageContentProps {
   initialNewsData?: News | null;
 }
 
+const ALLOWED_RICH_TEXT_TAGS = new Set([
+  "div",
+  "section",
+  "p",
+  "span",
+  "b",
+  "strong",
+  "i",
+  "em",
+  "u",
+  "a",
+  "h1",
+  "h2",
+  "blockquote",
+  "br",
+  "img",
+]);
+
+const isPresentationAttr = (attrName: string) =>
+  attrName === "class" || attrName === "style";
+
+const isSafeHref = (href: string) => {
+  const normalizedHref = href.trim().toLowerCase();
+  return (
+    normalizedHref.startsWith("http://") ||
+    normalizedHref.startsWith("https://") ||
+    normalizedHref.startsWith("mailto:") ||
+    normalizedHref.startsWith("tel:") ||
+    normalizedHref.startsWith("/")
+  );
+};
+
+const isSafeImageSrc = (src: string) => {
+  const normalizedSrc = src.trim().toLowerCase();
+  return (
+    normalizedSrc.startsWith("http://") ||
+    normalizedSrc.startsWith("https://") ||
+    normalizedSrc.startsWith("/")
+  );
+};
+
+const getImageCaptionFallback = (src: string) => {
+  if (!src) return "";
+  try {
+    const cleanPath = src.split("?")[0].split("#")[0];
+    const segment = cleanPath.split("/").filter(Boolean).pop() || "";
+    const decoded = decodeURIComponent(segment);
+    const withoutExt = decoded.replace(/\.[a-zA-Z0-9]+$/, "");
+    return withoutExt.replace(/[-_]+/g, " ").trim();
+  } catch {
+    return "";
+  }
+};
+
+const getCaptionText = (preferred?: string | null, src?: string | null) => {
+  const explicit = (preferred || "").trim();
+  if (explicit) return explicit;
+  return getImageCaptionFallback((src || "").trim());
+};
+
+const normalizeImageUrlKey = (url: string) => {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw, "http://localhost");
+    const pathname = decodeURIComponent(parsed.pathname || "");
+    const basename = pathname.split("/").filter(Boolean).pop() || "";
+    return basename.toLowerCase();
+  } catch {
+    const clean = decodeURIComponent(raw.split("?")[0].split("#")[0] || "");
+    const basename = clean.split("/").filter(Boolean).pop() || clean;
+    return basename.toLowerCase();
+  }
+};
+
+const hydrateInlineImageNames = (html: string, imageNameByUrl: Map<string, string>) => {
+  if (!html?.trim()) return html;
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return html;
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+
+  const images = Array.from(root.querySelectorAll("img"));
+  for (const image of images) {
+    const src = (image.getAttribute("src") || "").trim();
+    const srcKey = normalizeImageUrlKey(src);
+    if (!srcKey) continue;
+    const mappedName = imageNameByUrl.get(srcKey);
+    if (!mappedName) continue;
+    const alt = (image.getAttribute("alt") || "").trim().toLowerCase();
+    if (!alt || alt === "inline image" || alt === "article image") {
+      image.setAttribute("alt", mappedName);
+    }
+    image.setAttribute("title", mappedName);
+  }
+
+  return root.innerHTML;
+};
+
+const removeEndImagesFromInlineHtml = (html: string, endImageUrlKeys: Set<string>) => {
+  if (!html?.trim() || endImageUrlKeys.size === 0) return html;
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return html;
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+
+  const images = Array.from(root.querySelectorAll("img"));
+  for (const image of images) {
+    const src = (image.getAttribute("src") || "").trim();
+    const srcKey = normalizeImageUrlKey(src);
+    if (srcKey && endImageUrlKeys.has(srcKey)) {
+      image.remove();
+    }
+  }
+
+  return root.innerHTML;
+};
+
+const sanitizeRichText = (html: string): string => {
+  if (!html?.trim()) return "";
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    // Server render fallback: avoid runtime crash; client pass will sanitize.
+    return html;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return "";
+
+  const walk = (node: Node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const element = node as HTMLElement;
+    const tagName = element.tagName.toLowerCase();
+
+    if (!ALLOWED_RICH_TEXT_TAGS.has(tagName)) {
+      const parent = element.parentNode;
+      if (!parent) return;
+      const unwrappedChildren = [...element.childNodes];
+      while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+      }
+      parent.removeChild(element);
+      // Continue sanitizing children after unwrapping unsupported wrappers
+      // (e.g. <div><img/></div>) so image caption logic still runs.
+      for (const child of unwrappedChildren) {
+        walk(child);
+      }
+      return;
+    }
+
+    const attributes = [...element.attributes];
+    for (const attr of attributes) {
+      const attrName = attr.name.toLowerCase();
+
+      if (tagName === "a") {
+        if (
+          attrName !== "href" &&
+          attrName !== "target" &&
+          attrName !== "rel" &&
+          !isPresentationAttr(attrName)
+        ) {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
+
+      if (tagName === "img") {
+        if (
+          attrName !== "src" &&
+          attrName !== "alt" &&
+          attrName !== "title" &&
+          !isPresentationAttr(attrName)
+        ) {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
+
+      if (
+        tagName === "p" ||
+        tagName === "span" ||
+        tagName === "div" ||
+        tagName === "section" ||
+        tagName === "h1" ||
+        tagName === "h2" ||
+        tagName === "blockquote" ||
+        tagName === "i"
+      ) {
+        // Preserve visual structure from CMS while still removing non-presentational attrs.
+        if (!isPresentationAttr(attrName) && attrName !== "data-img-caption") {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
+
+      element.removeAttribute(attr.name);
+    }
+
+    if (tagName === "a") {
+      const href = element.getAttribute("href") || "";
+      if (!isSafeHref(href)) {
+        element.removeAttribute("href");
+      }
+      element.setAttribute("rel", "noopener noreferrer");
+      element.setAttribute("target", "_blank");
+    }
+
+    if (tagName === "img") {
+      const src = element.getAttribute("src") || "";
+      if (!isSafeImageSrc(src)) {
+        element.remove();
+        return;
+      }
+      element.setAttribute("loading", "lazy");
+      if (!element.getAttribute("alt")) {
+        element.setAttribute("alt", "Article image");
+      }
+      const captionText = (
+        element.getAttribute("title") ||
+        element.getAttribute("alt") ||
+        getImageCaptionFallback(src)
+      ).trim();
+      if (
+        captionText &&
+        captionText.toLowerCase() !== "inline image" &&
+        captionText.toLowerCase() !== "article image"
+      ) {
+        const nextSibling = element.nextElementSibling;
+        const hasCaptionAlready =
+          !!nextSibling &&
+          nextSibling.tagName.toLowerCase() === "i" &&
+          (nextSibling.getAttribute("data-img-caption") || "") === "true";
+        if (!hasCaptionAlready) {
+          const captionNode = doc.createElement("i");
+          captionNode.setAttribute("data-img-caption", "true");
+          captionNode.textContent = captionText;
+          element.insertAdjacentElement("afterend", captionNode);
+        }
+      }
+    }
+
+    if (tagName === "blockquote") {
+      const quoteText = (element.textContent || "").replace(/\u00A0/g, "").trim();
+      const hasImage = element.querySelector("img") !== null;
+      if (!quoteText && !hasImage) {
+        element.remove();
+        return;
+      }
+    }
+
+    const children = [...element.childNodes];
+    for (const child of children) {
+      walk(child);
+    }
+  };
+
+  const children = [...root.childNodes];
+  for (const child of children) {
+    walk(child);
+  }
+
+  return root.innerHTML;
+};
+
 export default function NewsPageContent({
   initialNewsData = null,
 }: NewsPageContentProps = {}) {
@@ -30,9 +304,58 @@ export default function NewsPageContent({
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [loading, setLoading] = useState(!initialNewsData);
   const [error, setError] = useState<string | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
   const hasFetchedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  // Keep local state in sync when route param or prefetched data changes.
+  // Without this, client-side navigation can render stale detail state until refresh.
+  useEffect(() => {
+    setIsVideoPlaying(false);
+    hasFetchedRef.current = null;
+
+    if (initialNewsData) {
+      setSingleNews(initialNewsData);
+      setIsNewsDetail(true);
+      setCategory(null);
+      setCategoryId(null);
+      setNews([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setSingleNews(null);
+    setIsNewsDetail(false);
+    setCategory(null);
+    setCategoryId(null);
+    setNews([]);
+    setError(null);
+    setLoading(true);
+  }, [idParam, initialNewsData]);
+
+  const handleNewsCardNavigate = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    articleId: number,
+  ) => {
+    // Keep default browser behavior for new-tab/window gestures.
+    if (
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey ||
+      e.button !== 0
+    ) {
+      return;
+    }
+    e.preventDefault();
+    window.location.href = `/news/${articleId}`;
+  };
 
   useEffect(() => {
     // If we already have initial news data, skip fetching
@@ -575,6 +898,40 @@ export default function NewsPageContent({
   if (isNewsDetail && singleNews) {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const articleUrl = `${baseUrl}/news/${singleNews.id}`;
+    const endImageUrlKeys = new Set(
+      (singleNews.end_images || [])
+        .map((img) => normalizeImageUrlKey(img?.url || ""))
+        .filter((url) => url.length > 0),
+    );
+    const inlineImageUrls = (singleNews.content_blocks || [])
+      .flatMap((block) =>
+        Array.from(
+          (block.paragraph || "").matchAll(/<img[^>]*src="([^"]+)"/gi),
+          (m) => (m[1] || "").trim(),
+        ),
+      )
+      .filter((src) => src.length > 0);
+    const hasInlineNonEndImages = inlineImageUrls.some(
+      (src) => !endImageUrlKeys.has(normalizeImageUrlKey(src)),
+    );
+    const inlineImageNameByUrl = new Map<string, string>();
+    if (singleNews.middle_image_url) {
+      const middleName = getCaptionText(
+        singleNews.middle_image_name || (singleNews as any).middleImageName,
+        singleNews.middle_image_url,
+      );
+      const middleKey = normalizeImageUrlKey(singleNews.middle_image_url);
+      if (middleName && middleKey) inlineImageNameByUrl.set(middleKey, middleName);
+    }
+    for (const endImage of singleNews.end_images || []) {
+      if (!endImage?.url) continue;
+      const endName = getCaptionText(
+        endImage.name || (endImage as any).title,
+        endImage.url,
+      );
+      const endKey = normalizeImageUrlKey(endImage.url);
+      if (endName && endKey) inlineImageNameByUrl.set(endKey, endName);
+    }
 
     // Ensure image URL is absolute
     let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
@@ -819,18 +1176,24 @@ export default function NewsPageContent({
               <img
                 src={singleNews.cover}
                 alt={singleNews.title}
-                className="w-full h-auto object-cover rounded-lg"
+                className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
               {/* Cover Image Caption – AKbalthom (article/image font) */}
-              {singleNews.cover_name && (
+              {getCaptionText(
+                singleNews.cover_name || (singleNews as any).coverName,
+                singleNews.cover,
+              ) && (
                 <p
                   className="text-sm text-gray-600 mt-2 italic"
                  
               >
-                  {singleNews.cover_name}
+                  {getCaptionText(
+                    singleNews.cover_name || (singleNews as any).coverName,
+                    singleNews.cover,
+                  )}
                 </p>
               )}
             </div>
@@ -841,11 +1204,11 @@ export default function NewsPageContent({
             singleNews.content_blocks.length > 0 && (
               <div className="prose prose-lg max-w-none mt-6 space-y-6">
                 {singleNews.content_blocks.map((block, index) => {
-                  // Split paragraph by single line breaks (\n) to create separate paragraphs with spacing
-                  // This treats each line break as a paragraph break
-                  const paragraphs = block.paragraph
-                    .split(/\n/)
-                    .filter((p) => p.trim());
+                  const paragraphSource = (block.paragraph || "").trim();
+                  const hasHtmlTags = /<[^>]+>/.test(paragraphSource);
+                  const paragraphs = hasHtmlTags
+                    ? [paragraphSource]
+                    : paragraphSource.split(/\n/).filter((p) => p.trim());
 
                   return (
                     <div key={index} className="space-y-6">
@@ -862,13 +1225,23 @@ export default function NewsPageContent({
                       {/* Block Paragraphs - Split by line breaks, each creates a new paragraph with spacing */}
                       <div className="space-y-4">
                         {paragraphs.map((paragraph, paraIndex) => (
-                          <p
+                          <div
                             key={paraIndex}
-                            className="text-base text-gray-800 leading-relaxed"
-                           
-                        >
-                            {paragraph.trim()}
-                          </p>
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[16px] [&_p]:leading-relaxed [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            dangerouslySetInnerHTML={{
+                              __html: hasHydrated
+                                ? sanitizeRichText(
+                                    hydrateInlineImageNames(
+                                      removeEndImagesFromInlineHtml(
+                                        paragraph.trim(),
+                                        endImageUrlKeys,
+                                      ),
+                                      inlineImageNameByUrl,
+                                    ),
+                                  )
+                                : paragraph.trim(),
+                            }}
+                          />
                         ))}
                       </div>
 
@@ -1028,7 +1401,8 @@ export default function NewsPageContent({
                             })()}
 
                           {/* Middle Image (if no video) */}
-                          {!singleNews.middle_video_url &&
+                          {!hasInlineNonEndImages &&
+                            !singleNews.middle_video_url &&
                             singleNews.middle_image_url && (
                               <div className="w-full my-8">
                                 <img
@@ -1037,7 +1411,7 @@ export default function NewsPageContent({
                                     singleNews.middle_image_name ||
                                     singleNews.title
                                   }
-                                  className="w-full h-auto object-cover rounded-lg"
+                                  className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
                                   onError={(e) => {
                                     (
                                       e.target as HTMLImageElement
@@ -1045,9 +1419,17 @@ export default function NewsPageContent({
                                   }}
                                 />
                                 {/* Image Caption */}
-                                {singleNews.middle_image_name && (
+                                {getCaptionText(
+                                  singleNews.middle_image_name ||
+                                    (singleNews as any).middleImageName,
+                                  singleNews.middle_image_url,
+                                ) && (
                                   <p className="text-sm text-gray-600 mt-2 italic">
-                                    {singleNews.middle_image_name}
+                                    {getCaptionText(
+                                      singleNews.middle_image_name ||
+                                        (singleNews as any).middleImageName,
+                                      singleNews.middle_image_url,
+                                    )}
                                   </p>
                                 )}
                               </div>
@@ -1061,22 +1443,29 @@ export default function NewsPageContent({
             )}
 
           {/* End Images */}
-          {singleNews.end_images && singleNews.end_images.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          {singleNews.end_images &&
+            singleNews.end_images.length > 0 && (
+            <div className="mt-8 grid grid-cols-3 gap-4">
               {singleNews.end_images.map((endImage, index) => (
                 <div key={index} className="w-full">
                   <img
                     src={endImage.url}
                     alt={endImage.name || `End image ${index + 1}`}
-                    className="w-full h-auto object-cover rounded-lg"
+                    className="h-auto w-full object-cover rounded-lg aspect-[100/63.8]"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
                   />
                   {/* End Image Caption */}
-                  {endImage.name && (
+                  {getCaptionText(
+                    endImage.name || (endImage as any).title,
+                    endImage.url,
+                  ) && (
                     <p className="text-sm text-gray-600 mt-2 italic">
-                      {endImage.name}
+                      {getCaptionText(
+                        endImage.name || (endImage as any).title,
+                        endImage.url,
+                      )}
                     </p>
                   )}
                 </div>
@@ -1141,6 +1530,7 @@ export default function NewsPageContent({
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image */}
@@ -1222,6 +1612,7 @@ export default function NewsPageContent({
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image */}

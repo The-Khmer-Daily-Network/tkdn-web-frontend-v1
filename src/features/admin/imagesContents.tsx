@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
 import { Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { getContentImages, deleteContentImage } from "@/services/contentImage";
 import type { ContentImage } from "@/types/contentImage";
@@ -195,13 +194,14 @@ export default function ImagesContents() {
               className="relative group rounded-md overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white flex flex-col"
           >
               <div className="relative aspect-square bg-gray-100 shrink-0">
-                <Image
+                <img
                   src={image.image_url}
                   alt={image.title}
-                  fill
-                  className="object-cover"
-                  sizes="20vw"
+                  className="h-full w-full object-cover"
                   loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
                 />
                 <button
                   onClick={() => handleDelete(image.id)}

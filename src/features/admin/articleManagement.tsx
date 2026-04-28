@@ -62,6 +62,8 @@ function NewsModal({
   currentUsername,
   asPage = false,
 }: NewsModalProps) {
+  const MAX_THUMBNAIL_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+  const MAX_CONTENT_IMAGE_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB per file
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [author, setAuthor] = useState("");
   const [title, setTitle] = useState("");
@@ -80,12 +82,31 @@ function NewsModal({
   const [endImages, setEndImages] = useState<EndImage[]>([]);
   const [endImageUrlInputs, setEndImageUrlInputs] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
+  const [inlineImageUploading, setInlineImageUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [middleImageUploading, setMiddleImageUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
 >(null);
+  const [activeSelection, setActiveSelection] = useState<{
+    blockIndex: number;
+  } | null>(null);
+  const [activeEditorBlockIndex, setActiveEditorBlockIndex] = useState<number | null>(
+    null,
+  );
+  const [activeTextFormat, setActiveTextFormat] = useState<{
+    bold: boolean;
+    subtitle: boolean;
+    link: boolean;
+    quote: boolean;
+  }>({
+    bold: false,
+    subtitle: false,
+    link: false,
+    quote: false,
+  });
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleImagePendingFile, setMiddleImagePendingFile] =
     useState<File | null>(null);
@@ -100,6 +121,74 @@ function NewsModal({
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentTextareaRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const inlineImageInputRef = useRef<HTMLInputElement | null>(null);
+  const savedInlineImageRangeRef = useRef<Range | null>(null);
+  const savedInlineImageBlockIndexRef = useRef<number | null>(null);
+  const inlinePendingImagesRef = useRef<
+    Record<string, { file: File; type: "middle" | "end" }>
+  >({});
+  const inlinePendingImageCounterRef = useRef(0);
+  const inlineImageInsertTypeRef = useRef<"middle" | "end">("end");
+  const removedInlineImageUrlsRef = useRef<Set<string>>(new Set());
+
+  const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+      return;
+    }
+
+    const rootEditor =
+      editor ??
+      contentTextareaRefs.current.find((el) => {
+        if (!el) return false;
+        const anchorNode = selection.anchorNode;
+        const focusNode = selection.focusNode;
+        return (
+          (!!anchorNode && el.contains(anchorNode)) ||
+          (!!focusNode && el.contains(focusNode))
+        );
+      }) ??
+      null;
+
+    if (!rootEditor) {
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+      return;
+    }
+
+    const isNodeInsideTag = (node: Node | null, tagNames: string[]) => {
+      if (!node) return false;
+      let current: Element | null =
+        node.nodeType === Node.ELEMENT_NODE
+          ? (node as Element)
+          : node.parentElement;
+
+      while (current && rootEditor.contains(current)) {
+        if (tagNames.includes(current.tagName.toLowerCase())) {
+          return true;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    };
+
+    const subtitle =
+      isNodeInsideTag(selection.anchorNode, ["h2"]) ||
+      isNodeInsideTag(selection.focusNode, ["h2"]);
+    const quote =
+      isNodeInsideTag(selection.anchorNode, ["blockquote"]) ||
+      isNodeInsideTag(selection.focusNode, ["blockquote"]);
+    const link =
+      isNodeInsideTag(selection.anchorNode, ["a"]) ||
+      isNodeInsideTag(selection.focusNode, ["a"]);
+    const bold =
+      isNodeInsideTag(selection.anchorNode, ["b", "strong"]) ||
+      isNodeInsideTag(selection.focusNode, ["b", "strong"]) ||
+      document.queryCommandState("bold");
+
+    setActiveTextFormat({ bold, subtitle, link, quote });
+  };
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -162,6 +251,9 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
+    setShowCategorySelector(false);
+    inlinePendingImagesRef.current = {};
+    removedInlineImageUrlsRef.current = new Set();
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -179,14 +271,43 @@ function NewsModal({
     el.style.height = `${el.scrollHeight}px`;
   }, [title, asPage, isOpen]);
 
+  useEffect(() => {
+    if (!activeSelection) return;
+
+    const syncSelectionState = () => {
+      const editor = contentTextareaRefs.current[activeSelection.blockIndex];
+      if (!editor) {
+        setActiveSelection(null);
+        return;
+      }
+
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const commonNode = range.commonAncestorContainer;
+      const isInsideEditor = editor.contains(commonNode);
+      if (!isInsideEditor) {
+        setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+        return;
+      }
+      syncActiveTextFormat(editor);
+    };
+
+    document.addEventListener("selectionchange", syncSelectionState);
+    return () => {
+      document.removeEventListener("selectionchange", syncSelectionState);
+    };
+  }, [activeSelection]);
+
   const queuePreviewUrl = (file: File): string => {
     const url = URL.createObjectURL(file);
     previewObjectUrlsRef.current.push(url);
     return url;
-  };
-
-  const handleAddContentBlock = () => {
-    setContentBlocks([...contentBlocks, { subtitle: null, paragraph: "" }]);
   };
 
   const handleRemoveContentBlock = (index: number) => {
@@ -203,6 +324,647 @@ function NewsModal({
     const updated = [...contentBlocks];
     updated[index] = { ...updated[index], [field]: value };
     setContentBlocks(updated);
+  };
+
+  const handleContentSelection = (
+    index: number,
+    e: React.SyntheticEvent<HTMLDivElement>,
+  ) => {
+    const target = e.currentTarget;
+    setActiveEditorBlockIndex(index);
+    requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const commonNode = range.commonAncestorContainer;
+        if (!target.contains(commonNode)) {
+          setActiveSelection(null);
+          setActiveTextFormat({
+            bold: false,
+            subtitle: false,
+            link: false,
+            quote: false,
+          });
+          return;
+        }
+        setActiveSelection({ blockIndex: index });
+        syncActiveTextFormat(target);
+        return;
+      }
+      setActiveSelection(null);
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+    });
+  };
+
+  const handleContentKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const editor = contentTextareaRefs.current[index];
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const node = selection.anchorNode;
+    let current: Element | null =
+      node?.nodeType === Node.ELEMENT_NODE
+        ? (node as Element)
+        : node?.parentElement || null;
+
+    let quoteElement: Element | null = null;
+    while (current && editor.contains(current)) {
+      if (current.tagName.toLowerCase() === "blockquote") {
+        quoteElement = current;
+        break;
+      }
+      current = current.parentElement;
+    }
+
+    if (!quoteElement) return;
+
+    // Keep existing quote unchanged; move caret to a new normal line after quote.
+    e.preventDefault();
+    const paragraph = document.createElement("p");
+    paragraph.appendChild(document.createElement("br"));
+
+    if (quoteElement.parentNode) {
+      const nextSibling = quoteElement.nextSibling;
+      if (nextSibling) {
+        quoteElement.parentNode.insertBefore(paragraph, nextSibling);
+      } else {
+        quoteElement.parentNode.appendChild(paragraph);
+      }
+    } else {
+      editor.appendChild(paragraph);
+    }
+
+    const selectionAfter = window.getSelection();
+    if (selectionAfter) {
+      const newRange = document.createRange();
+      newRange.setStart(paragraph, 0);
+      newRange.collapse(true);
+      selectionAfter.removeAllRanges();
+      selectionAfter.addRange(newRange);
+    }
+
+    requestAnimationFrame(() => {
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      syncActiveTextFormat(editor);
+    });
+  };
+
+  const handleContentEditorClick = (
+    index: number,
+    e: React.SyntheticEvent<HTMLDivElement>,
+  ) => {
+    const target = e.target as HTMLElement;
+    const removeBtn = target.closest("button[data-inline-remove-id]");
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const removeId = removeBtn.getAttribute("data-inline-remove-id");
+      const wrapper = removeBtn.closest("[data-inline-image-wrapper='true']");
+      if (wrapper) {
+        removeInlineImageFromEditor(index, wrapper, removeId);
+      }
+      return;
+    }
+    const nameBtn = target.closest("button[data-inline-name-id]");
+    if (nameBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    handleContentSelection(index, e);
+  };
+
+  const removeInlineImageFromEditor = (
+    editorIndex: number,
+    wrapper: Element,
+    pendingId: string | null,
+  ) => {
+    const imageKind =
+      wrapper.getAttribute("data-inline-image-kind") ||
+      wrapper.querySelector("img")?.getAttribute("data-inline-image-kind") ||
+      "middle";
+    if (pendingId && inlinePendingImagesRef.current[pendingId]) {
+      delete inlinePendingImagesRef.current[pendingId];
+    } else {
+      const img = wrapper.querySelector("img");
+      const src = img?.getAttribute("src") || "";
+      if (
+        src &&
+        !src.startsWith("blob:") &&
+        !src.startsWith("data:") &&
+        !src.startsWith("about:")
+      ) {
+        removedInlineImageUrlsRef.current.add(src);
+      }
+      if (imageKind === "end" && src) {
+        setEndImages((prev) => {
+          const idx = prev.findIndex((image) => image.url === src);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        });
+      }
+    }
+    wrapper.remove();
+    const editor = contentTextareaRefs.current[editorIndex];
+    if (editor) {
+      handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+      requestAnimationFrame(() => {
+        const refreshedEditor = contentTextareaRefs.current[editorIndex];
+        if (!refreshedEditor) return;
+        decorateInlineImagesInEditor(refreshedEditor, editorIndex);
+      });
+    }
+  };
+
+  const sanitizePastedHtml = (html: string) => {
+    if (!html.trim()) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+    const root = doc.body.firstElementChild;
+    if (!root) return html;
+
+    const nodes = root.querySelectorAll("*");
+    nodes.forEach((el) => {
+      const styleAttr = el.getAttribute("style");
+      if (styleAttr) {
+        const cleanedStyle = styleAttr
+          .split(";")
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .filter((part) => {
+            const prop = part.split(":")[0]?.trim().toLowerCase();
+            return prop !== "background" && prop !== "background-color";
+          })
+          .join("; ");
+        if (cleanedStyle) {
+          el.setAttribute("style", cleanedStyle);
+        } else {
+          el.removeAttribute("style");
+        }
+      }
+      el.removeAttribute("bgcolor");
+    });
+
+    return root.innerHTML;
+  };
+
+  const handleContentPaste = (
+    index: number,
+    e: React.ClipboardEvent<HTMLDivElement>,
+  ) => {
+    const clipboard = e.clipboardData;
+    const html = clipboard.getData("text/html");
+    const text = clipboard.getData("text/plain");
+    if (!html && !text) return;
+
+    e.preventDefault();
+    if (html) {
+      const cleanedHtml = sanitizePastedHtml(html);
+      document.execCommand("insertHTML", false, cleanedHtml);
+    } else {
+      document.execCommand("insertText", false, text);
+    }
+
+    requestAnimationFrame(() => {
+      const editor = contentTextareaRefs.current[index];
+      if (!editor) return;
+      decorateInlineImagesInEditor(editor, index);
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      handleContentSelection(index, {
+        currentTarget: editor,
+      } as React.SyntheticEvent<HTMLDivElement>);
+    });
+  };
+
+  const attachInlineRemoveButtonHover = (
+    wrapper: HTMLDivElement,
+    actionsBar: HTMLDivElement,
+  ) => {
+    actionsBar.style.opacity = "0";
+    actionsBar.style.transition = "opacity 150ms ease";
+    wrapper.onmouseenter = () => {
+      actionsBar.style.opacity = "1";
+    };
+    wrapper.onmouseleave = () => {
+      actionsBar.style.opacity = "0";
+    };
+  };
+
+  const createInlineImageActionsBar = (
+    imageId: string,
+    imageKind: "middle" | "end",
+  ) => {
+    const actionsBar = document.createElement("div");
+    actionsBar.style.position = "absolute";
+    actionsBar.style.top = "8px";
+    actionsBar.style.right = "8px";
+    actionsBar.style.display = "flex";
+    actionsBar.style.gap = "6px";
+    actionsBar.style.zIndex = "2";
+
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("data-inline-name-id", imageId);
+    nameBtn.textContent = "Image Name";
+    nameBtn.style.border = "1px solid #e5e7eb";
+    nameBtn.style.borderRadius = "6px";
+    nameBtn.style.background = "#ffffff";
+    nameBtn.style.color = "#374151";
+    nameBtn.style.fontSize = "11px";
+    nameBtn.style.fontWeight = "600";
+    nameBtn.style.padding = "4px 8px";
+    nameBtn.style.cursor = "pointer";
+    actionsBar.appendChild(nameBtn);
+
+    if (imageKind === "end") {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.setAttribute("data-inline-remove-id", imageId);
+      removeBtn.textContent = "Remove";
+      removeBtn.style.border = "1px solid #e5e7eb";
+      removeBtn.style.borderRadius = "6px";
+      removeBtn.style.background = "#ffffff";
+      removeBtn.style.color = "#ef4444";
+      removeBtn.style.fontSize = "11px";
+      removeBtn.style.fontWeight = "600";
+      removeBtn.style.padding = "4px 8px";
+      removeBtn.style.cursor = "pointer";
+      actionsBar.appendChild(removeBtn);
+    }
+    return actionsBar;
+  };
+
+  const applyInlineImageWrapperStyle = (
+    wrapper: HTMLDivElement,
+    imageKind: "middle" | "end",
+  ) => {
+    wrapper.contentEditable = "false";
+    wrapper.style.position = "relative";
+    if (imageKind === "end") {
+      // End images: responsive 3-up layout in editor preview.
+      wrapper.style.display = "inline-block";
+      wrapper.style.width = "calc((100% - 24px) / 3)";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.margin = "16px 8px 16px 0";
+      wrapper.style.verticalAlign = "top";
+    } else {
+      wrapper.style.display = "block";
+      wrapper.style.margin = "16px 0";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.verticalAlign = "";
+    }
+  };
+
+  const applyInlineImageElementStyle = (
+    img: HTMLImageElement,
+    imageKind: "middle" | "end",
+  ) => {
+    img.style.width = "100%";
+    img.style.maxWidth = "100%";
+    img.style.aspectRatio = "100 / 53";
+    img.style.height = "auto";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "8px";
+    img.style.display = "block";
+  };
+
+  const attachInlineImageActions = (
+    wrapper: HTMLDivElement,
+    editorIndex: number,
+    imageId: string,
+    imageKind: "middle" | "end",
+  ) => {
+    wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
+      node.remove();
+    });
+    const actionsBar = createInlineImageActionsBar(imageId, imageKind);
+    const nameBtn = actionsBar.querySelector(
+      "button[data-inline-name-id]",
+    ) as HTMLButtonElement | null;
+    if (nameBtn) {
+      const runSetName = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const img = wrapper.querySelector("img");
+        if (!img) return;
+        const src = img.getAttribute("src") || "";
+        const currentName =
+          img.getAttribute("data-inline-image-name") ||
+          img.getAttribute("alt") ||
+          "";
+        const nextName = window.prompt("Image Name", currentName);
+        if (nextName === null) return;
+        const normalized = nextName.trim();
+        if (normalized) {
+          img.setAttribute("data-inline-image-name", normalized);
+          img.setAttribute("alt", normalized);
+          img.setAttribute("title", normalized);
+        } else {
+          img.removeAttribute("data-inline-image-name");
+          img.setAttribute("alt", "Inline image");
+          img.removeAttribute("title");
+        }
+
+        // Keep explicit React state in sync so PUT payload always carries latest names.
+        if (imageKind === "middle") {
+          setMiddleImageName(normalized || null);
+        } else if (imageKind === "end" && src) {
+          setEndImages((prev) =>
+            prev.map((item) =>
+              item.url === src ? { ...item, name: normalized || null } : item,
+            ),
+          );
+        }
+        const editor = contentTextareaRefs.current[editorIndex];
+        if (editor) {
+          handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+        }
+      };
+      nameBtn.addEventListener("mousedown", runSetName);
+      nameBtn.addEventListener("click", runSetName);
+    }
+    const removeBtn = actionsBar.querySelector(
+      "button[data-inline-remove-id]",
+    ) as HTMLButtonElement | null;
+    if (removeBtn) {
+      const runRemove = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeInlineImageFromEditor(editorIndex, wrapper, imageId);
+      };
+      removeBtn.addEventListener("mousedown", runRemove);
+      removeBtn.addEventListener("click", runRemove);
+    }
+    actionsBar.setAttribute("data-inline-actions", "true");
+    attachInlineRemoveButtonHover(wrapper, actionsBar);
+    wrapper.appendChild(actionsBar);
+  };
+
+  const decorateInlineImagesInEditor = (
+    editor: HTMLDivElement,
+    editorIndex: number,
+  ) => {
+    const existingWrappers = Array.from(
+      editor.querySelectorAll<HTMLDivElement>("[data-inline-image-wrapper='true']"),
+    );
+    for (const wrapper of existingWrappers) {
+      const img = wrapper.querySelector("img");
+      if (!img) continue;
+      const imageId =
+        wrapper.getAttribute("data-inline-image-id") ||
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[imageId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind =
+        (wrapper.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        (img.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        pendingType ||
+        (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image-id", imageId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      img.setAttribute("data-inline-pending-id", imageId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      attachInlineImageActions(wrapper, editorIndex, imageId, imageKind);
+    }
+
+    const images = Array.from(editor.querySelectorAll("img"));
+    for (const img of images) {
+      if (img.closest("[data-inline-image-wrapper='true']")) continue;
+
+      const wrapper = document.createElement("div");
+      const existingPendingId =
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[existingPendingId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind = pendingType || (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image", "true");
+      wrapper.setAttribute("data-inline-image-wrapper", "true");
+      wrapper.setAttribute("data-inline-image-id", existingPendingId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      img.setAttribute("data-inline-pending-id", existingPendingId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      const parent = img.parentNode;
+      if (!parent) continue;
+      parent.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      attachInlineImageActions(
+        wrapper,
+        editorIndex,
+        existingPendingId,
+        imageKind,
+      );
+    }
+  };
+
+  const handleInlineImageButtonClick = (type: "middle" | "end") => {
+    if (loading || inlineImageUploading || activeEditorBlockIndex === null) return;
+    inlineImageInsertTypeRef.current = type;
+    savedInlineImageBlockIndexRef.current =
+      activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      savedInlineImageRangeRef.current = range.cloneRange();
+    } else {
+      savedInlineImageRangeRef.current = null;
+    }
+    if (inlineImageInputRef.current) {
+      inlineImageInputRef.current.value = "";
+      inlineImageInputRef.current.click();
+    }
+  };
+
+  const handleInlineImageFileChange = async (file?: File) => {
+    const blockIndex =
+      savedInlineImageBlockIndexRef.current ??
+      activeSelection?.blockIndex ??
+      activeEditorBlockIndex;
+    if (!file || blockIndex === null) return;
+    try {
+      setInlineImageUploading(true);
+      setError(null);
+      const pendingId = `inline-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      inlinePendingImagesRef.current[pendingId] = {
+        file,
+        type: inlineImageInsertTypeRef.current,
+      };
+      const imageKind = inlineImageInsertTypeRef.current;
+      const previewUrl = queuePreviewUrl(file);
+
+      const editor = contentTextareaRefs.current[blockIndex];
+      if (!editor) return;
+      editor.focus();
+
+      const selection = window.getSelection();
+      const range = savedInlineImageRangeRef.current;
+      const canInsertAtSavedRange =
+        !!selection &&
+        !!range &&
+        editor.contains(range.commonAncestorContainer);
+
+      if (selection && canInsertAtSavedRange && range) {
+        const workingRange = range.cloneRange();
+        workingRange.deleteContents();
+
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
+
+        const img = document.createElement("img");
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
+        wrapper.appendChild(img);
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
+
+
+        workingRange.insertNode(wrapper);
+        const caretRange = document.createRange();
+        if (imageKind === "end") {
+          caretRange.setStartAfter(wrapper);
+        } else {
+          const spacer = document.createElement("br");
+          workingRange.insertNode(spacer);
+          caretRange.setStartAfter(spacer);
+        }
+        caretRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caretRange);
+      } else {
+        // Fallback: append image at end if selection cannot be restored.
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
+
+        const img = document.createElement("img");
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
+        wrapper.appendChild(img);
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
+
+
+        editor.appendChild(wrapper);
+        if (imageKind !== "end") {
+          editor.appendChild(document.createElement("br"));
+        }
+      }
+
+      handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to upload inline image";
+      setError(errorMessage);
+    } finally {
+      setInlineImageUploading(false);
+      savedInlineImageRangeRef.current = null;
+      savedInlineImageBlockIndexRef.current = null;
+      if (inlineImageInputRef.current) {
+        inlineImageInputRef.current.value = "";
+      }
+    }
+  };
+
+  const applySelectionFormat = (
+    type: "bold" | "italic" | "link" | "subtitle" | "quote",
+  ) => {
+    const blockIndex = activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    if (blockIndex === null) return;
+    const selection = window.getSelection();
+
+    const hasSelectionText =
+      !!selection && selection.rangeCount > 0 && !selection.isCollapsed;
+
+    const normalizeLinkUrl = (rawUrl: string) => {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return null;
+      if (
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("mailto:") ||
+        trimmed.startsWith("tel:") ||
+        trimmed.startsWith("/")
+      ) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
+
+    switch (type) {
+      case "bold":
+        document.execCommand("bold");
+        break;
+      case "italic":
+        document.execCommand("italic");
+        break;
+      case "link": {
+        if (activeTextFormat.link) {
+          document.execCommand("unlink");
+          break;
+        }
+        if (!hasSelectionText) return;
+        const inputUrl = window.prompt("Enter link URL", "https://example.com");
+        if (!inputUrl) return;
+        const url = normalizeLinkUrl(inputUrl);
+        if (!url) return;
+        document.execCommand("createLink", false, url);
+        break;
+      }
+      case "subtitle":
+        if (activeTextFormat.subtitle) {
+          document.execCommand("formatBlock", false, "p");
+        } else {
+          document.execCommand("formatBlock", false, "h2");
+        }
+        break;
+      case "quote":
+        if (activeTextFormat.quote) {
+          document.execCommand("formatBlock", false, "p");
+          break;
+        }
+        if (!hasSelectionText) return;
+        document.execCommand("formatBlock", false, "blockquote");
+        break;
+      default:
+        break;
+    }
+    const editor = contentTextareaRefs.current[blockIndex];
+    if (!editor) return;
+    handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    requestAnimationFrame(() => {
+      syncActiveTextFormat();
+    });
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -300,8 +1062,67 @@ function NewsModal({
     return single.image_url ?? null;
   };
 
+  const collectInlineImageNames = (blocks: ContentBlock[]) => {
+    const pendingNameById = new Map<string, string>();
+    const nameByUrl = new Map<string, string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const container = document.createElement("div");
+      container.innerHTML = block.paragraph;
+      const images = Array.from(container.querySelectorAll("img"));
+      for (const image of images) {
+        const rawName =
+          image.getAttribute("data-inline-image-name") ||
+          image.getAttribute("title") ||
+          image.getAttribute("alt") ||
+          "";
+        const imageName = rawName.trim();
+        if (!imageName || imageName.toLowerCase() === "inline image") continue;
+        const pendingId = image.getAttribute("data-inline-pending-id");
+        if (pendingId) {
+          pendingNameById.set(pendingId, imageName);
+        }
+        const src = (image.getAttribute("src") || "").trim();
+        if (
+          src &&
+          !src.startsWith("blob:") &&
+          !src.startsWith("data:") &&
+          !src.startsWith("about:")
+        ) {
+          nameByUrl.set(src, imageName);
+        }
+      }
+    }
+    return { pendingNameById, nameByUrl };
+  };
+
+  const extractImageUrlsFromBlocks = (blocks: ContentBlock[]): Set<string> => {
+    const urls = new Set<string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const matches = block.paragraph.matchAll(/<img[^>]*src="([^"]+)"/g);
+      for (const match of matches) {
+        const src = match[1]?.trim();
+        if (!src) continue;
+        if (
+          src.startsWith("blob:") ||
+          src.startsWith("data:") ||
+          src.startsWith("about:")
+        ) {
+          continue;
+        }
+        urls.add(src);
+      }
+    }
+    return urls;
+  };
+
   const handleSelectCoverFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_THUMBNAIL_FILE_SIZE_BYTES) {
+      setError("Thumbnail image must be less than or equal to 5MB.");
+      return;
+    }
     setCoverPendingFile(file);
     setCover(queuePreviewUrl(file));
     setCoverUrlInput("");
@@ -309,6 +1130,10 @@ function NewsModal({
 
   const handleSelectMiddleImageFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_CONTENT_IMAGE_FILE_SIZE_BYTES) {
+      setError("Middle image must be less than or equal to 20MB.");
+      return;
+    }
     setMiddleImagePendingFile(file);
     setMiddleImageUrl(queuePreviewUrl(file));
     setMiddleImageUrlInput("");
@@ -318,6 +1143,10 @@ function NewsModal({
 
   const handleSelectEndImageFile = (slot: number, file?: File) => {
     if (!file) return;
+    if (file.size > MAX_CONTENT_IMAGE_FILE_SIZE_BYTES) {
+      setError("Each end image must be less than or equal to 20MB.");
+      return;
+    }
     setEndImagePendingFiles((prev) => {
       const next = [...prev];
       next[slot] = file;
@@ -367,12 +1196,15 @@ function NewsModal({
 
       // Upload pending files ONLY when saving.
       let finalCover = cover;
+      const finalCoverName = (coverName || "").trim() || null;
       let finalMiddleImageUrl = middleImageUrl;
+      let finalMiddleImageName = middleImageName;
       let finalEndImages: Array<EndImage | null> = [
         endImages[0] ?? null,
         endImages[1] ?? null,
         endImages[2] ?? null,
       ];
+      const inlineImageNames = collectInlineImageNames(validBlocks);
 
       if (coverPendingFile) {
         setCoverUploading(true);
@@ -402,40 +1234,171 @@ function NewsModal({
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
       }
 
-      // If editing and media was replaced, delete old assets from content library (best-effort).
-      if (news) {
-        const oldCover = originalCoverUrlRef.current;
-        if (coverPendingFile && oldCover && finalCover && oldCover !== finalCover) {
-          try {
-            await deleteCoverByUrlIfPresent(oldCover);
-          } catch {
-            // best-effort delete only
+      // Do not clear middle/end image slots by checking paragraph HTML.
+      // End images are managed in the dedicated Image section and may not appear inline.
+
+      // Upload inline pending images only on save, then replace temporary preview URLs.
+      const pendingInlineIds: string[] = [];
+      const seenInlineIds = new Set<string>();
+      for (const block of validBlocks) {
+        const matches = block.paragraph.matchAll(/data-inline-pending-id="([^"]+)"/g);
+        for (const match of matches) {
+          const id = match[1];
+          if (!id || seenInlineIds.has(id)) continue;
+          seenInlineIds.add(id);
+          pendingInlineIds.push(id);
+        }
+      }
+
+      const inlineUploadMap: Record<string, { url: string; name: string | null }> = {};
+      for (const pendingId of pendingInlineIds) {
+        const pending = inlinePendingImagesRef.current[pendingId];
+        if (!pending?.file) continue;
+        setInlineImageUploading(true);
+        const res = await uploadContentImage({ image: pending.file });
+        const uploaded = Array.isArray(res.data) ? res.data[0] : res.data;
+        const uploadedUrl = uploaded?.image_url;
+        if (!uploadedUrl) {
+          throw new Error("Inline image upload succeeded but URL missing");
+        }
+        const uploadedName =
+          (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
+        const customName = inlineImageNames.pendingNameById.get(pendingId) || null;
+        const finalInlineName = customName || uploadedName;
+        inlineUploadMap[pendingId] = { url: uploadedUrl, name: finalInlineName };
+
+        // Keep backend compatibility: map first image to middle, next up to 3 to end_images.
+        if (pending.type === "middle") {
+          finalMiddleImageUrl = uploadedUrl;
+          finalMiddleImageName = finalInlineName;
+        } else {
+          const emptySlot = finalEndImages.findIndex((img) => !img?.url);
+          if (emptySlot === -1) {
+            throw new Error(
+              "Maximum 5 images reached total (Thumbnail + 1 Middle Image + 3 End Images).",
+            );
           }
+          finalEndImages[emptySlot] = { url: uploadedUrl, name: finalInlineName };
         }
 
-        const oldMiddle = originalMiddleImageUrlRef.current;
-        if (
-          middleImagePendingFile &&
-          oldMiddle &&
-          finalMiddleImageUrl &&
-          oldMiddle !== finalMiddleImageUrl
-        ) {
-          try {
-            await deleteImageByUrlIfPresent(oldMiddle);
-          } catch {
-            // best-effort delete only
-          }
-        }
+      }
 
-        for (let i = 0; i < 3; i++) {
-          const oldEnd = originalEndImageUrlsRef.current[i];
-          const newEnd = finalEndImages[i]?.url ?? null;
-          if (endImagePendingFiles[i] && oldEnd && newEnd && oldEnd !== newEnd) {
-            try {
-              await deleteImageByUrlIfPresent(oldEnd);
-            } catch {
-              // best-effort delete only
+      if (
+        finalMiddleImageUrl &&
+        inlineImageNames.nameByUrl.has(finalMiddleImageUrl)
+      ) {
+        finalMiddleImageName =
+          inlineImageNames.nameByUrl.get(finalMiddleImageUrl) || null;
+      }
+      finalEndImages = finalEndImages.map((img) => {
+        if (!img?.url) return img;
+        const overrideName = inlineImageNames.nameByUrl.get(img.url);
+        if (!overrideName) return img;
+        return { ...img, name: overrideName };
+      });
+
+      const processedBlocks = validBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+
+        container
+          .querySelectorAll("button[data-inline-remove-id],button[data-inline-name-id]")
+          .forEach((btn) => btn.remove());
+
+        container
+          .querySelectorAll("img[data-inline-pending-id]")
+          .forEach((imgNode) => {
+            const id = imgNode.getAttribute("data-inline-pending-id");
+            if (id && inlineUploadMap[id]) {
+              imgNode.setAttribute("src", inlineUploadMap[id].url);
+              const currentAlt = (imgNode.getAttribute("alt") || "").trim().toLowerCase();
+              const shouldReplaceAlt =
+                !currentAlt ||
+                currentAlt === "inline image" ||
+                currentAlt === "article image";
+              if (shouldReplaceAlt) {
+                imgNode.setAttribute(
+                  "alt",
+                  inlineUploadMap[id].name || "Inline image",
+                );
+              }
+              if (inlineUploadMap[id].name) {
+                imgNode.setAttribute("title", inlineUploadMap[id].name);
+              }
             }
+            imgNode.removeAttribute("data-inline-pending-id");
+          });
+
+        container
+          .querySelectorAll("[data-inline-image-wrapper='true']")
+          .forEach((wrapper) => {
+            const imgNode = wrapper.querySelector("img");
+            if (imgNode) {
+              wrapper.replaceWith(imgNode);
+            } else {
+              wrapper.remove();
+            }
+          });
+
+        container
+          .querySelectorAll(
+            "[data-inline-image],[data-inline-image-id],[data-inline-image-kind],[data-inline-image-name]",
+          )
+          .forEach((el) => {
+            el.removeAttribute("data-inline-image");
+            el.removeAttribute("data-inline-image-id");
+            el.removeAttribute("data-inline-image-kind");
+            el.removeAttribute("data-inline-image-name");
+          });
+
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
+      const endImageUrlsToStrip = new Set(
+        finalEndImages
+          .filter((img): img is EndImage => !!img?.url)
+          .map((img) => img.url),
+      );
+      const contentBlocksWithoutEndImages = processedBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+        container.querySelectorAll("img").forEach((imgNode) => {
+          const src = (imgNode.getAttribute("src") || "").trim();
+          if (src && endImageUrlsToStrip.has(src)) {
+            imgNode.remove();
+          }
+        });
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
+      // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
+      const removedMediaUrls = new Set<string>();
+      if (news) {
+        const oldMiddle = originalMiddleImageUrlRef.current;
+        const nextMiddle = finalMiddleImageUrl ?? null;
+        if (oldMiddle && oldMiddle !== nextMiddle) {
+          removedMediaUrls.add(oldMiddle);
+        }
+
+        const oldEndUrls = new Set(
+          originalEndImageUrlsRef.current.filter(
+            (u): u is string => typeof u === "string" && u.length > 0,
+          ),
+        );
+        const nextEndUrls = new Set(
+          finalEndImages
+            .filter((img): img is EndImage => !!img?.url)
+            .map((img) => img.url),
+        );
+        for (const oldUrl of oldEndUrls) {
+          if (!nextEndUrls.has(oldUrl)) {
+            removedMediaUrls.add(oldUrl);
           }
         }
       }
@@ -445,10 +1408,10 @@ function NewsModal({
         author: author.trim(),
         title: title.trim(),
         cover: finalCover,
-        cover_name: coverName,
+        cover_name: finalCoverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
-        content_blocks: validBlocks,
+        content_blocks: contentBlocksWithoutEndImages,
         end_images:
           finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
             ? finalEndImages.filter((img): img is EndImage => !!img?.url)
@@ -457,9 +1420,9 @@ function NewsModal({
 
       // For articles: only send middle_image_url, don't send middle_video_url at all
       // Backend will automatically clear middle_video_url when middle_image_url is present
-      if (middleImageUrl) {
+      if (finalMiddleImageUrl) {
         params.middle_image_url = finalMiddleImageUrl;
-        params.middle_image_name = middleImageName;
+        params.middle_image_name = finalMiddleImageName;
       } else {
         // If no image, set to null to clear it
         params.middle_image_url = null;
@@ -473,7 +1436,47 @@ function NewsModal({
         await createAdminArticle(params);
       }
 
+      // Delete removed inline images from storage only after successful save.
+      const removedInlineUrls = new Set<string>(removedInlineImageUrlsRef.current);
+      if (news?.content_blocks) {
+        const oldInlineUrls = extractImageUrlsFromBlocks(news.content_blocks);
+        const newInlineUrls = extractImageUrlsFromBlocks(contentBlocksWithoutEndImages);
+        for (const oldUrl of oldInlineUrls) {
+          if (!newInlineUrls.has(oldUrl)) {
+            removedInlineUrls.add(oldUrl);
+          }
+        }
+      }
+      // Protect media that are still referenced by article fields.
+      const retainedMediaUrls = new Set<string>();
+      if (finalCover) retainedMediaUrls.add(finalCover);
+      if (finalMiddleImageUrl) retainedMediaUrls.add(finalMiddleImageUrl);
+      finalEndImages
+        .filter((img): img is EndImage => !!img?.url)
+        .forEach((img) => retainedMediaUrls.add(img.url));
+      for (const keptUrl of retainedMediaUrls) {
+        removedInlineUrls.delete(keptUrl);
+      }
+      for (const removedUrl of removedInlineUrls) {
+        try {
+          await deleteImageByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
+      // Delete removed middle/end images from storage only after successful save.
+      for (const removedUrl of removedMediaUrls) {
+        try {
+          await deleteImageByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
       onSuccess();
+      inlinePendingImagesRef.current = {};
+      removedInlineImageUrlsRef.current = new Set();
       onClose();
     } catch (err) {
       const errorMessage =
@@ -483,6 +1486,7 @@ function NewsModal({
       setCoverUploading(false);
       setMiddleImageUploading(false);
       setEndImageUploadingIndex(null);
+      setInlineImageUploading(false);
       setLoading(false);
     }
   };
@@ -492,9 +1496,11 @@ function NewsModal({
   categories.forEach((cat) => {
     allCategories.push({ id: cat.id, name: cat.name, isSub: false });
     cat.subcategories.forEach((sub) => {
-      allCategories.push({ id: sub.id, name: `  └ ${sub.name}`, isSub: true });
+      allCategories.push({ id: sub.id, name: `  ${sub.name}`, isSub: true });
     });
   });
+  const selectedCategoryName =
+    allCategories.find((cat) => cat.id === categoryId)?.name ?? "Select category";
 
   if (!isOpen) return null;
 
@@ -525,6 +1531,112 @@ function NewsModal({
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Article
             </h2>
+            {asPage && (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={inlineImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={(e) => handleInlineImageFileChange(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInlineImageButtonClick("middle")}
+                  disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inlineImageUploading ? "Adding..." : "Mid Image"}
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInlineImageButtonClick("end")}
+                  disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inlineImageUploading ? "Adding..." : "End Image"}
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("quote")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.quote
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Quote
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("subtitle")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.subtitle
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Subtitle
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("link")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.link
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Link
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("italic")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium italic text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  i
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("bold")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.bold
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="article-editor-form"
+                  disabled={loading || !author.trim()}
+                  className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            )}
             {!asPage && (
               <button
                 onClick={onClose}
@@ -537,6 +1649,7 @@ function NewsModal({
           </div>
 
           <form
+            id="article-editor-form"
             onSubmit={handleSubmit}
             className={
               asPage
@@ -557,37 +1670,75 @@ function NewsModal({
                 </div>
               )}
 
-              {asPage && !cover && (
-                <div className="flex items-center gap-2 text-gray-500">
+              {asPage && (
+                <div className="relative flex items-center gap-2 text-gray-500">
+                  {!cover && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (loading || coverUploading) return;
+                          const input = coverFileInputRef.current;
+                          if (!input) return;
+                          input.value = "";
+                          input.click();
+                        }}
+                        className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        disabled={loading || coverUploading}
+                        aria-label="Add thumbnail"
+                      >
+                        <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
+                          <ImageIcon className="h-[13px] w-[13px] shrink-0" />
+                          <span className="leading-none pt-1">Add thumbnail</span>
+                        </span>
+                      </button>
+                      <input
+                        ref={coverFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        className="sr-only"
+                        onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                      />
+                    </>
+                  )}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (loading || coverUploading) return;
-                      const input = coverFileInputRef.current;
-                      if (!input) return;
-                      input.value = "";
-                      input.click();
-                    }}
-                    className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-                    disabled={loading || coverUploading}
-                    aria-label="Add thumbnail"
+                    onClick={() => setShowCategorySelector((prev) => !prev)}
+                    className="pt-1 cursor-pointer h-8 rounded-md border-0 bg-[#f7f7f7] px-3 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700"
+                    disabled={loading}
                   >
-                    <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
-                      <ImageIcon className="h-[13px] w-[13px] shrink-0" />
-                      <span className="leading-none pt-1">Add thumbnail</span>
-                    </span>
+                    Category: {selectedCategoryName.trim()}
                   </button>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg"
-                    className="sr-only"
-                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                  />
+                  {showCategorySelector && (
+                    <div className="absolute top-10 left-0 z-20 max-h-64 w-[260px] overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-sm">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryId(cat.id);
+                            setShowCategorySelector(false);
+                          }}
+                          className={`w-full cursor-pointer rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                            categoryId === cat.id
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Title - Full Width */}
+              {asPage && (
+                <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                  <h3 className="text-sm font-semibold text-gray-700">Title</h3>
+                </div>
+              )}
               <div>
                 {!asPage && (
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -612,7 +1763,7 @@ function NewsModal({
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="New post"
                       rows={1}
-                      className="w-full resize-none overflow-hidden bg-transparent text-[35px] leading-[1.08] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
+                      className="w-full resize-none overflow-hidden bg-transparent text-[24px] leading-[1.3] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
                       disabled={loading}
                       maxLength={500}
                     />
@@ -641,11 +1792,28 @@ function NewsModal({
                       <img
                         src={cover}
                         alt="Cover"
-                        className="w-full h-[280px] object-cover rounded-sm"
+                        className="w-full h-auto object-cover rounded-sm"
                       />
                     </button>
 
                     <div className="absolute top-3 right-3 z-10 flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextName = window.prompt(
+                            "Image Name",
+                            coverName || "",
+                          );
+                          if (nextName === null) return;
+                          const normalized = nextName.trim();
+                          setCoverName(normalized || null);
+                        }}
+                        className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
+                        disabled={loading || coverUploading}
+                      >
+                        Image Name
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -676,7 +1844,8 @@ function NewsModal({
               )}
 
               {/* Category and Author - Side by Side */}
-              <div className="grid grid-cols-2 gap-4">
+              {!asPage && (
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Category
@@ -699,338 +1868,239 @@ function NewsModal({
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Author <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={author || ""}
-                    readOnly
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled
-                    required
-                  />
-                </div>
               </div>
+              )}
             </div>
 
               {/* Content Blocks Section */}
               <div className="space-y-4 min-w-0">
-                <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Content Blocks <span className="text-red-500">*</span>
-                    </h3>
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Content</h3>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddContentBlock}
-                    className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
-                    disabled={loading}
-                >
-                    <Plus size={14} />
-                    Add Block
-                  </button>
+                )}
+                <div className="">
+                  {!asPage && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Content Blocks <span className="text-red-500">*</span>
+                      </h3>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-3">
+                <div className={asPage ? "space-y-6" : "space-y-3"}>
                   {contentBlocks.map((block, index) => (
                     <div
                       key={index}
-                      className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      className={
+                        asPage
+                          ? "relative w-full max-w-[860px]"
+                          : "p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      }
                   >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                            <span className="text-xs font-semibold text-blue-600">
-                              {index + 1}
+                      {!asPage && (
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                              <span className="text-xs font-semibold text-blue-600">
+                                {index + 1}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              Block {index + 1}
                             </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700">
-                            Block {index + 1}
-                          </span>
+                          {contentBlocks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveContentBlock(index)}
+                              className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
+                              disabled={loading}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        {contentBlocks.length > 1 && (
+                      )}
+                      {asPage && contentBlocks.length > 1 && (
+                        <div className="absolute right-0 top-0">
                           <button
                             type="button"
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                        >
+                          >
                             Remove
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="space-y-2.5">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Subtitle{" "}
-                            <span className="text-gray-400 font-normal">
-                              (Optional)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            value={block.subtitle || ""}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "subtitle",
-                                e.target.value || null,
-                              )
-                            }
-                            placeholder="Enter a subtitle for this block (optional)..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Content <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={block.paragraph}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "paragraph",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Enter the main content for this block..."
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                            required
-                          />
-                        </div>
+                        {asPage ? (
+                          <div className="relative w-full">
+                            <div className="pointer-events-none mb-2 block text-sm text-gray-500 md:hidden">
+                              {index === 0 ? "Content" : `Content ${index + 1}`}
+                            </div>
+                            <div className="pointer-events-none absolute -left-20 top-2 hidden md:block">
+                              <span className="block text-sm text-gray-500">
+                                {index === 0 ? "Content" : `Content ${index + 1}`}
+                              </span>
+                            </div>
+                            <div className="absolute -left-3 top-0 hidden h-full w-px bg-gray-300 md:block" />
+                            <div
+                              ref={(el) => {
+                                contentTextareaRefs.current[index] = el;
+                                if (!el) return;
+                                const nextHtml = block.paragraph || "";
+                                const isFocused = document.activeElement === el;
+                                if (!isFocused && el.innerHTML !== nextHtml) {
+                                  el.innerHTML = nextHtml;
+                                }
+                                decorateInlineImagesInEditor(el, index);
+                              }}
+                              contentEditable={!loading}
+                              suppressContentEditableWarning
+                              onFocus={(e) =>
+                                decorateInlineImagesInEditor(e.currentTarget, index)
+                              }
+                              onInput={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.currentTarget.innerHTML,
+                                )
+                              }
+                              onPaste={(e) => handleContentPaste(index, e)}
+                              onSelect={(e) => handleContentSelection(index, e)}
+                              onMouseUp={(e) => handleContentSelection(index, e)}
+                              onKeyDown={(e) => handleContentKeyDown(index, e)}
+                              onKeyUp={(e) => handleContentSelection(index, e)}
+                              onClick={(e) => handleContentEditorClick(index, e)}
+                              onBlur={() => {
+                                setActiveSelection(null);
+                                setActiveEditorBlockIndex(null);
+                                setActiveTextFormat({
+                                  bold: false,
+                                  subtitle: false,
+                                  link: false,
+                                  quote: false,
+                                });
+                              }}
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Content <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={block.paragraph}
+                              onChange={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Enter the main content for this block..."
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* Images & Media Section - right column (vertical column layout) */}
-            <div className="order-3 lg:col-span-2 space-y-4 min-w-0">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Images & Media
-                </h3>
-              </div>
-
-              {/* Middle Image */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Middle Image
-                </label>
-                {middleImageUrl ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <img
-                        src={middleImageUrl}
-                        alt="Middle"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMiddleImageUrl(null);
-                          setMiddleImageName(null);
-                          setMiddleImageUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || middleImageUploading}
-                    >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Image Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={middleImageName || ""}
-                          onChange={(e) =>
-                            setMiddleImageName(e.target.value || null)
-                          }
-                          placeholder="Enter image name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => middleImageFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || middleImageUploading}
-                    >
-                        {middleImageUploading ? "Uploading..." : "Change Image"}
-                      </button>
-                      <input
-                        ref={middleImageFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectMiddleImageFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => middleImageFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || middleImageUploading}
-                  >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Middle Image
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={middleImageFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) =>
-                        handleSelectMiddleImageFile(e.target.files?.[0])
-                      }
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={middleImageUrlInput}
-                      onChange={(e) => handleMiddleImageUrlChange(e.target.value)}
-                      placeholder="Enter image URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
+              {/* End Images Section */}
+              <div className="space-y-4 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Image</h3>
                   </div>
                 )}
-              </div>
-
-              {/* End Images (stacked slots) */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  End Images{" "}
-                  <span className="text-xs font-normal text-gray-500">
-                    (Max 3)
-                  </span>
-                </label>
-                <div className="space-y-3">
-                  {[0, 1, 2].map((slotIndex) => {
-                    const img = endImages[slotIndex];
-                    const isUploading = endImageUploadingIndex === slotIndex;
+                <div className="w-full max-w-[860px] grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[0, 1, 2].map((slot) => {
+                    const slotImage = endImages[slot];
                     return (
-                      <div key={slotIndex} className="space-y-2">
-                        {img ? (
+                      <div
+                        key={slot}
+                        className="rounded-md border border-gray-200 bg-white p-2"
+                      >
+                        {slotImage?.url ? (
                           <>
-                            <div className="relative group">
-                              <div className="relative aspect-square rounded-lg border border-gray-300 overflow-hidden bg-gray-100">
-                                <img
-                                  src={img.url}
-                                  alt={img.name || `End ${slotIndex + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEndImage(slotIndex)}
-                                  className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                                  disabled={loading || isUploading}
+                            <img
+                              src={slotImage.url}
+                              alt={slotImage.name || `End image ${slot + 1}`}
+                              className="w-full rounded-md object-cover aspect-[100/53]"
+                            />
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
                               >
-                                  <X size={10} />
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Name{" "}
-                                <span className="text-gray-400 font-normal">
-                                  (Optional)
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                value={img.name || ""}
-                                onChange={(e) => {
-                                  const updated = [...endImages];
-                                  updated[slotIndex] = {
-                                    ...updated[slotIndex],
-                                    name: e.target.value || null,
-                                  };
-                                  setEndImages(updated);
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextName = window.prompt(
+                                    "Image Name",
+                                    slotImage.name || "",
+                                  );
+                                  if (nextName === null) return;
+                                  const normalized = nextName.trim();
+                                  setEndImages((prev) => {
+                                    const next = [...prev];
+                                    if (!next[slot]) return prev;
+                                    next[slot] = {
+                                      ...next[slot],
+                                      name: normalized || null,
+                                    };
+                                    return next;
+                                  });
                                 }}
-                                placeholder="Enter name (optional)..."
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                                disabled={loading || isUploading}
-                              />
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
+                              >
+                                Image Name
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEndImage(slot)}
+                                className="cursor-pointer rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                                disabled={loading}
+                              >
+                                Remove
+                              </button>
                             </div>
                           </>
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                endImageFileInputRefs.current[slotIndex]?.click()
-                              }
-                              className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                              disabled={loading || isUploading}
+                          <button
+                            type="button"
+                            onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                            className="flex h-[110px] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 text-xs text-gray-500 hover:bg-gray-50"
+                            disabled={loading}
                           >
-                              <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                                  <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                                </div>
-                                <p className="text-xs font-medium text-gray-700 mb-0.5">
-                                  {isUploading
-                                    ? "Uploading..."
-                                    : `Select End Image ${slotIndex + 1}`}
-                                </p>
-                                {!isUploading && (
-                                  <p className="text-[11px] text-gray-500">
-                                    Click to upload from your computer
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg"
-                              className="hidden"
-                              ref={(el) => {
-                                endImageFileInputRefs.current[slotIndex] = el;
-                              }}
-                              onChange={(e) =>
-                                handleSelectEndImageFile(
-                                  slotIndex,
-                                  e.target.files?.[0],
-                                )
-                              }
-                            />
-                          </>
+                            Add End Image
+                          </button>
                         )}
+                        <input
+                          ref={(el) => {
+                            endImageFileInputRefs.current[slot] = el;
+                          }}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg"
+                          className="sr-only"
+                          onChange={(e) => handleSelectEndImageFile(slot, e.target.files?.[0])}
+                        />
                       </div>
                     );
                   })}
@@ -1039,13 +2109,14 @@ function NewsModal({
             </div>
 
             {error && (
-              <div className="order-4 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="order-3 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
             {/* Footer Actions */}
-            <div className="order-5 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            {!asPage && (
+            <div className="order-4 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
@@ -1066,6 +2137,7 @@ function NewsModal({
                     : "Create Article"}
               </button>
             </div>
+            )}
           </form>
         </div>
       </div>
@@ -1527,7 +2599,7 @@ export default function ArticleManagement() {
                     setItemsPerPage(value);
                     setCurrentPage(1);
                   }}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
+                  className="cursor-pointer px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
               >
                   {PER_PAGE_OPTIONS.map((option) => (
                     <option key={option} value={option}>

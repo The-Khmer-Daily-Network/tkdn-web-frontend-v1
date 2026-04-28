@@ -60,7 +60,9 @@ export async function getContentImages(): Promise<ContentImageResponse> {
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -95,7 +97,9 @@ export async function deleteContentImage(
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -122,10 +126,10 @@ export async function uploadContentImage({
       throw new Error("Only JPG, PNG, and JPEG files are allowed");
     }
 
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+    // Validate file size (20MB max)
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
     if (image.size > maxSize) {
-      throw new Error("File size must be less than 2MB");
+      throw new Error("File size must be less than or equal to 20MB");
     }
 
     // Create FormData
@@ -157,7 +161,9 @@ export async function uploadContentImage({
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -302,7 +308,7 @@ export async function uploadMultipleContentImages({
 
     // Validate all files
     const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+    const maxSize = 20 * 1024 * 1024; // 20MB in bytes
 
     for (const image of images) {
       if (!allowedTypes.includes(image.type)) {
@@ -311,7 +317,9 @@ export async function uploadMultipleContentImages({
         );
       }
       if (image.size > maxSize) {
-        throw new Error(`${image.name}: File size must be less than 2MB`);
+        throw new Error(
+          `${image.name}: File size must be less than or equal to 20MB`,
+        );
       }
     }
 
@@ -346,7 +354,9 @@ export async function uploadMultipleContentImages({
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
