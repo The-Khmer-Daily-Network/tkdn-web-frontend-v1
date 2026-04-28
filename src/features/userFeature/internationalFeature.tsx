@@ -129,6 +129,11 @@ export default function InternationalFeature({
           <Link
             key={article.id}
             href={`/news/${article.id}`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              window.location.href = `/news/${article.id}`;
+            }}
             className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
         >
             <div className="relative max-[400px]:w-[150px] w-[200px] sm:w-[250px] h-[140px] shrink-0 rounded-xl overflow-hidden bg-gray-200 group">

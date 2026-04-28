@@ -18,6 +18,10 @@ interface NewsPageContentProps {
 }
 
 const ALLOWED_RICH_TEXT_TAGS = new Set([
+  "div",
+  "section",
+  "p",
+  "span",
   "b",
   "strong",
   "i",
@@ -30,6 +34,9 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
   "br",
   "img",
 ]);
+
+const isPresentationAttr = (attrName: string) =>
+  attrName === "class" || attrName === "style";
 
 const isSafeHref = (href: string) => {
   const normalizedHref = href.trim().toLowerCase();
@@ -175,14 +182,41 @@ const sanitizeRichText = (html: string): string => {
       const attrName = attr.name.toLowerCase();
 
       if (tagName === "a") {
-        if (attrName !== "href" && attrName !== "target" && attrName !== "rel") {
+        if (
+          attrName !== "href" &&
+          attrName !== "target" &&
+          attrName !== "rel" &&
+          !isPresentationAttr(attrName)
+        ) {
           element.removeAttribute(attr.name);
         }
         continue;
       }
 
       if (tagName === "img") {
-        if (attrName !== "src" && attrName !== "alt" && attrName !== "title") {
+        if (
+          attrName !== "src" &&
+          attrName !== "alt" &&
+          attrName !== "title" &&
+          !isPresentationAttr(attrName)
+        ) {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
+
+      if (
+        tagName === "p" ||
+        tagName === "span" ||
+        tagName === "div" ||
+        tagName === "section" ||
+        tagName === "h1" ||
+        tagName === "h2" ||
+        tagName === "blockquote" ||
+        tagName === "i"
+      ) {
+        // Preserve visual structure from CMS while still removing non-presentational attrs.
+        if (!isPresentationAttr(attrName) && attrName !== "data-img-caption") {
           element.removeAttribute(attr.name);
         }
         continue;
@@ -270,9 +304,58 @@ export default function NewsPageContent({
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [loading, setLoading] = useState(!initialNewsData);
   const [error, setError] = useState<string | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
   const hasFetchedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  // Keep local state in sync when route param or prefetched data changes.
+  // Without this, client-side navigation can render stale detail state until refresh.
+  useEffect(() => {
+    setIsVideoPlaying(false);
+    hasFetchedRef.current = null;
+
+    if (initialNewsData) {
+      setSingleNews(initialNewsData);
+      setIsNewsDetail(true);
+      setCategory(null);
+      setCategoryId(null);
+      setNews([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setSingleNews(null);
+    setIsNewsDetail(false);
+    setCategory(null);
+    setCategoryId(null);
+    setNews([]);
+    setError(null);
+    setLoading(true);
+  }, [idParam, initialNewsData]);
+
+  const handleNewsCardNavigate = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    articleId: number,
+  ) => {
+    // Keep default browser behavior for new-tab/window gestures.
+    if (
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey ||
+      e.button !== 0
+    ) {
+      return;
+    }
+    e.preventDefault();
+    window.location.href = `/news/${articleId}`;
+  };
 
   useEffect(() => {
     // If we already have initial news data, skip fetching
@@ -1121,11 +1204,11 @@ export default function NewsPageContent({
             singleNews.content_blocks.length > 0 && (
               <div className="prose prose-lg max-w-none mt-6 space-y-6">
                 {singleNews.content_blocks.map((block, index) => {
-                  // Split paragraph by single line breaks (\n) to create separate paragraphs with spacing
-                  // This treats each line break as a paragraph break
-                  const paragraphs = block.paragraph
-                    .split(/\n/)
-                    .filter((p) => p.trim());
+                  const paragraphSource = (block.paragraph || "").trim();
+                  const hasHtmlTags = /<[^>]+>/.test(paragraphSource);
+                  const paragraphs = hasHtmlTags
+                    ? [paragraphSource]
+                    : paragraphSource.split(/\n/).filter((p) => p.trim());
 
                   return (
                     <div key={index} className="space-y-6">
@@ -1144,17 +1227,19 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[16px] [&_p]:leading-relaxed [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
-                              __html: sanitizeRichText(
-                                hydrateInlineImageNames(
-                                  removeEndImagesFromInlineHtml(
-                                    paragraph.trim(),
-                                    endImageUrlKeys,
-                                  ),
-                                  inlineImageNameByUrl,
-                                ),
-                              ),
+                              __html: hasHydrated
+                                ? sanitizeRichText(
+                                    hydrateInlineImageNames(
+                                      removeEndImagesFromInlineHtml(
+                                        paragraph.trim(),
+                                        endImageUrlKeys,
+                                      ),
+                                      inlineImageNameByUrl,
+                                    ),
+                                  )
+                                : paragraph.trim(),
                             }}
                           />
                         ))}
@@ -1445,6 +1530,7 @@ export default function NewsPageContent({
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image */}
@@ -1526,6 +1612,7 @@ export default function NewsPageContent({
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
+                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
               >
                   {/* Article Image */}

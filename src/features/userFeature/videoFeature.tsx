@@ -135,6 +135,11 @@ export default function VideoFeature({
           <Link
             key={video.id}
             href={`/news/${video.id}`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              window.location.href = `/news/${video.id}`;
+            }}
             className="bg-white rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow block"
         >
             <div className="relative w-full aspect-video bg-gray-200 group">

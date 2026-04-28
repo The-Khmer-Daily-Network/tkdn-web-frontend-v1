@@ -228,6 +228,11 @@ export default function VideoDashboard() {
           {mainVideo && (
             <Link
               href={`/news/${mainVideo.id}`}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                window.location.href = `/news/${mainVideo.id}`;
+              }}
               className="block cursor-pointer hover:opacity-90 transition-opacity"
           >
               <div className="w-full space-y-4">
@@ -325,6 +330,11 @@ export default function VideoDashboard() {
               <Link
                 key={video.id}
                 href={`/news/${video.id}`}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  window.location.href = `/news/${video.id}`;
+                }}
                 className="block cursor-pointer hover:opacity-90 transition-opacity"
             >
                 <div className="space-y-2">
@@ -414,6 +424,11 @@ export default function VideoDashboard() {
               <Link
                 key={video.id}
                 href={`/news/${video.id}`}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  window.location.href = `/news/${video.id}`;
+                }}
                 className="block cursor-pointer hover:opacity-90 transition-opacity"
             >
                 <div className="space-y-3">
