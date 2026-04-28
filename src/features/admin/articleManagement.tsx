@@ -62,6 +62,8 @@ function NewsModal({
   currentUsername,
   asPage = false,
 }: NewsModalProps) {
+  const MAX_THUMBNAIL_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+  const MAX_CONTENT_IMAGE_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB per file
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [author, setAuthor] = useState("");
   const [title, setTitle] = useState("");
@@ -605,11 +607,20 @@ function NewsModal({
   ) => {
     wrapper.contentEditable = "false";
     wrapper.style.position = "relative";
-    wrapper.style.display = "block";
-    wrapper.style.margin = "16px 0";
-    wrapper.style.width = "100%";
-    wrapper.style.maxWidth = "100%";
-    wrapper.style.verticalAlign = "";
+    if (imageKind === "end") {
+      // End images: responsive 3-up layout in editor preview.
+      wrapper.style.display = "inline-block";
+      wrapper.style.width = "calc((100% - 24px) / 3)";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.margin = "16px 8px 16px 0";
+      wrapper.style.verticalAlign = "top";
+    } else {
+      wrapper.style.display = "block";
+      wrapper.style.margin = "16px 0";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.verticalAlign = "";
+    }
   };
 
   const applyInlineImageElementStyle = (
@@ -1108,6 +1119,10 @@ function NewsModal({
 
   const handleSelectCoverFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_THUMBNAIL_FILE_SIZE_BYTES) {
+      setError("Thumbnail image must be less than or equal to 5MB.");
+      return;
+    }
     setCoverPendingFile(file);
     setCover(queuePreviewUrl(file));
     setCoverUrlInput("");
@@ -1115,6 +1130,10 @@ function NewsModal({
 
   const handleSelectMiddleImageFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_CONTENT_IMAGE_FILE_SIZE_BYTES) {
+      setError("Middle image must be less than or equal to 20MB.");
+      return;
+    }
     setMiddleImagePendingFile(file);
     setMiddleImageUrl(queuePreviewUrl(file));
     setMiddleImageUrlInput("");
@@ -1124,6 +1143,10 @@ function NewsModal({
 
   const handleSelectEndImageFile = (slot: number, file?: File) => {
     if (!file) return;
+    if (file.size > MAX_CONTENT_IMAGE_FILE_SIZE_BYTES) {
+      setError("Each end image must be less than or equal to 20MB.");
+      return;
+    }
     setEndImagePendingFiles((prev) => {
       const next = [...prev];
       next[slot] = file;
@@ -1211,20 +1234,8 @@ function NewsModal({
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
       }
 
-      // Free legacy slots for images that were removed from edited content,
-      // so adding a new image after deleting an old one acts as replacement.
-      const referencedExistingInlineUrls = extractImageUrlsFromBlocks(validBlocks);
-      if (
-        finalMiddleImageUrl &&
-        !referencedExistingInlineUrls.has(finalMiddleImageUrl)
-      ) {
-        finalMiddleImageUrl = null;
-        finalMiddleImageName = null;
-      }
-      finalEndImages = finalEndImages.map((img) => {
-        if (!img?.url) return null;
-        return referencedExistingInlineUrls.has(img.url) ? img : null;
-      });
+      // Do not clear middle/end image slots by checking paragraph HTML.
+      // End images are managed in the dedicated Image section and may not appear inline.
 
       // Upload inline pending images only on save, then replace temporary preview URLs.
       const pendingInlineIds: string[] = [];
@@ -1346,6 +1357,26 @@ function NewsModal({
         };
       });
 
+      const endImageUrlsToStrip = new Set(
+        finalEndImages
+          .filter((img): img is EndImage => !!img?.url)
+          .map((img) => img.url),
+      );
+      const contentBlocksWithoutEndImages = processedBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+        container.querySelectorAll("img").forEach((imgNode) => {
+          const src = (imgNode.getAttribute("src") || "").trim();
+          if (src && endImageUrlsToStrip.has(src)) {
+            imgNode.remove();
+          }
+        });
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
       // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
       const removedMediaUrls = new Set<string>();
       if (news) {
@@ -1380,7 +1411,7 @@ function NewsModal({
         cover_name: finalCoverName,
         subtitle: null,
         // date_time_post will be auto-set by backend
-        content_blocks: processedBlocks,
+        content_blocks: contentBlocksWithoutEndImages,
         end_images:
           finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
             ? finalEndImages.filter((img): img is EndImage => !!img?.url)
@@ -1409,12 +1440,22 @@ function NewsModal({
       const removedInlineUrls = new Set<string>(removedInlineImageUrlsRef.current);
       if (news?.content_blocks) {
         const oldInlineUrls = extractImageUrlsFromBlocks(news.content_blocks);
-        const newInlineUrls = extractImageUrlsFromBlocks(processedBlocks);
+        const newInlineUrls = extractImageUrlsFromBlocks(contentBlocksWithoutEndImages);
         for (const oldUrl of oldInlineUrls) {
           if (!newInlineUrls.has(oldUrl)) {
             removedInlineUrls.add(oldUrl);
           }
         }
+      }
+      // Protect media that are still referenced by article fields.
+      const retainedMediaUrls = new Set<string>();
+      if (finalCover) retainedMediaUrls.add(finalCover);
+      if (finalMiddleImageUrl) retainedMediaUrls.add(finalMiddleImageUrl);
+      finalEndImages
+        .filter((img): img is EndImage => !!img?.url)
+        .forEach((img) => retainedMediaUrls.add(img.url));
+      for (const keptUrl of retainedMediaUrls) {
+        removedInlineUrls.delete(keptUrl);
       }
       for (const removedUrl of removedInlineUrls) {
         try {
@@ -1693,6 +1734,11 @@ function NewsModal({
               )}
 
               {/* Title - Full Width */}
+              {asPage && (
+                <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                  <h3 className="text-sm font-semibold text-gray-700">Title</h3>
+                </div>
+              )}
               <div>
                 {!asPage && (
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -1828,6 +1874,11 @@ function NewsModal({
 
               {/* Content Blocks Section */}
               <div className="space-y-4 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Content</h3>
+                  </div>
+                )}
                 <div className="">
                   {!asPage && (
                     <div className="flex items-center gap-2">
@@ -1963,6 +2014,96 @@ function NewsModal({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* End Images Section */}
+              <div className="space-y-4 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Image</h3>
+                  </div>
+                )}
+                <div className="w-full max-w-[860px] grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[0, 1, 2].map((slot) => {
+                    const slotImage = endImages[slot];
+                    return (
+                      <div
+                        key={slot}
+                        className="rounded-md border border-gray-200 bg-white p-2"
+                      >
+                        {slotImage?.url ? (
+                          <>
+                            <img
+                              src={slotImage.url}
+                              alt={slotImage.name || `End image ${slot + 1}`}
+                              className="w-full rounded-md object-cover aspect-[100/53]"
+                            />
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
+                              >
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextName = window.prompt(
+                                    "Image Name",
+                                    slotImage.name || "",
+                                  );
+                                  if (nextName === null) return;
+                                  const normalized = nextName.trim();
+                                  setEndImages((prev) => {
+                                    const next = [...prev];
+                                    if (!next[slot]) return prev;
+                                    next[slot] = {
+                                      ...next[slot],
+                                      name: normalized || null,
+                                    };
+                                    return next;
+                                  });
+                                }}
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
+                              >
+                                Image Name
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEndImage(slot)}
+                                className="cursor-pointer rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                                disabled={loading}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                            className="flex h-[110px] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 text-xs text-gray-500 hover:bg-gray-50"
+                            disabled={loading}
+                          >
+                            Add End Image
+                          </button>
+                        )}
+                        <input
+                          ref={(el) => {
+                            endImageFileInputRefs.current[slot] = el;
+                          }}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg"
+                          className="sr-only"
+                          onChange={(e) => handleSelectEndImageFile(slot, e.target.files?.[0])}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

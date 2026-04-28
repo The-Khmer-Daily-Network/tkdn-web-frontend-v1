@@ -70,6 +70,21 @@ const getCaptionText = (preferred?: string | null, src?: string | null) => {
   return getImageCaptionFallback((src || "").trim());
 };
 
+const normalizeImageUrlKey = (url: string) => {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw, "http://localhost");
+    const pathname = decodeURIComponent(parsed.pathname || "");
+    const basename = pathname.split("/").filter(Boolean).pop() || "";
+    return basename.toLowerCase();
+  } catch {
+    const clean = decodeURIComponent(raw.split("?")[0].split("#")[0] || "");
+    const basename = clean.split("/").filter(Boolean).pop() || clean;
+    return basename.toLowerCase();
+  }
+};
+
 const hydrateInlineImageNames = (html: string, imageNameByUrl: Map<string, string>) => {
   if (!html?.trim()) return html;
   if (typeof window === "undefined" || typeof DOMParser === "undefined") {
@@ -83,14 +98,37 @@ const hydrateInlineImageNames = (html: string, imageNameByUrl: Map<string, strin
   const images = Array.from(root.querySelectorAll("img"));
   for (const image of images) {
     const src = (image.getAttribute("src") || "").trim();
-    if (!src) continue;
-    const mappedName = imageNameByUrl.get(src);
+    const srcKey = normalizeImageUrlKey(src);
+    if (!srcKey) continue;
+    const mappedName = imageNameByUrl.get(srcKey);
     if (!mappedName) continue;
     const alt = (image.getAttribute("alt") || "").trim().toLowerCase();
     if (!alt || alt === "inline image" || alt === "article image") {
       image.setAttribute("alt", mappedName);
     }
     image.setAttribute("title", mappedName);
+  }
+
+  return root.innerHTML;
+};
+
+const removeEndImagesFromInlineHtml = (html: string, endImageUrlKeys: Set<string>) => {
+  if (!html?.trim() || endImageUrlKeys.size === 0) return html;
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return html;
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+
+  const images = Array.from(root.querySelectorAll("img"));
+  for (const image of images) {
+    const src = (image.getAttribute("src") || "").trim();
+    const srcKey = normalizeImageUrlKey(src);
+    if (srcKey && endImageUrlKeys.has(srcKey)) {
+      image.remove();
+    }
   }
 
   return root.innerHTML;
@@ -777,8 +815,21 @@ export default function NewsPageContent({
   if (isNewsDetail && singleNews) {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const articleUrl = `${baseUrl}/news/${singleNews.id}`;
-    const hasInlineContentImages = (singleNews.content_blocks || []).some((block) =>
-      /<img[\s>]/i.test(block.paragraph || ""),
+    const endImageUrlKeys = new Set(
+      (singleNews.end_images || [])
+        .map((img) => normalizeImageUrlKey(img?.url || ""))
+        .filter((url) => url.length > 0),
+    );
+    const inlineImageUrls = (singleNews.content_blocks || [])
+      .flatMap((block) =>
+        Array.from(
+          (block.paragraph || "").matchAll(/<img[^>]*src="([^"]+)"/gi),
+          (m) => (m[1] || "").trim(),
+        ),
+      )
+      .filter((src) => src.length > 0);
+    const hasInlineNonEndImages = inlineImageUrls.some(
+      (src) => !endImageUrlKeys.has(normalizeImageUrlKey(src)),
     );
     const inlineImageNameByUrl = new Map<string, string>();
     if (singleNews.middle_image_url) {
@@ -786,7 +837,8 @@ export default function NewsPageContent({
         singleNews.middle_image_name || (singleNews as any).middleImageName,
         singleNews.middle_image_url,
       );
-      if (middleName) inlineImageNameByUrl.set(singleNews.middle_image_url, middleName);
+      const middleKey = normalizeImageUrlKey(singleNews.middle_image_url);
+      if (middleName && middleKey) inlineImageNameByUrl.set(middleKey, middleName);
     }
     for (const endImage of singleNews.end_images || []) {
       if (!endImage?.url) continue;
@@ -794,7 +846,8 @@ export default function NewsPageContent({
         endImage.name || (endImage as any).title,
         endImage.url,
       );
-      if (endName) inlineImageNameByUrl.set(endImage.url, endName);
+      const endKey = normalizeImageUrlKey(endImage.url);
+      if (endName && endKey) inlineImageNameByUrl.set(endKey, endName);
     }
 
     // Ensure image URL is absolute
@@ -1095,7 +1148,10 @@ export default function NewsPageContent({
                             dangerouslySetInnerHTML={{
                               __html: sanitizeRichText(
                                 hydrateInlineImageNames(
-                                  paragraph.trim(),
+                                  removeEndImagesFromInlineHtml(
+                                    paragraph.trim(),
+                                    endImageUrlKeys,
+                                  ),
                                   inlineImageNameByUrl,
                                 ),
                               ),
@@ -1260,7 +1316,7 @@ export default function NewsPageContent({
                             })()}
 
                           {/* Middle Image (if no video) */}
-                          {!hasInlineContentImages &&
+                          {!hasInlineNonEndImages &&
                             !singleNews.middle_video_url &&
                             singleNews.middle_image_url && (
                               <div className="w-full my-8">
@@ -1302,10 +1358,9 @@ export default function NewsPageContent({
             )}
 
           {/* End Images */}
-          {!hasInlineContentImages &&
-            singleNews.end_images &&
+          {singleNews.end_images &&
             singleNews.end_images.length > 0 && (
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="mt-8 grid grid-cols-3 gap-4">
               {singleNews.end_images.map((endImage, index) => (
                 <div key={index} className="w-full">
                   <img

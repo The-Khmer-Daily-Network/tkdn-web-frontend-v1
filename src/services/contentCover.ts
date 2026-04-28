@@ -59,7 +59,9 @@ export async function getContentCovers(): Promise<ContentCoverResponse> {
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -94,7 +96,9 @@ export async function deleteContentCover(
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }
@@ -211,7 +215,9 @@ export async function uploadContentCover({
     return response.json();
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
-      throw new Error(`Your file is higher than 2MB`);
+      throw new Error(
+        `Network error: Unable to connect to API. Please check your connection and API server.`,
+      );
     }
     throw error;
   }

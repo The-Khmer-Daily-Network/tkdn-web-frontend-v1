@@ -83,10 +83,10 @@ export default function UploadImageModal({
         continue;
       }
 
-      // Validate file size (max 2MB)
-      const maxSizeBytes = 2 * 1024 * 1024;
+      // Validate file size (max 20MB)
+      const maxSizeBytes = 20 * 1024 * 1024;
       if (file.size > maxSizeBytes) {
-        errors.push(`${file.name}: File size must be less than 2MB.`);
+        errors.push(`${file.name}: File size must be less than or equal to 20MB.`);
         continue;
       }
 
