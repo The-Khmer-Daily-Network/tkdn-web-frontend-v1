@@ -43,6 +43,32 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
+const decodeHtmlEntities = (input: string) => {
+  if (typeof window === "undefined") {
+    return input
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
+  }
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = input;
+  return textarea.value;
+};
+
+const toPlainPreviewText = (value: string) => {
+  // Some payloads are double-encoded (&amp;lt;div...), decode twice.
+  const decoded = decodeHtmlEntities(decodeHtmlEntities(value || ""));
+  if (typeof window !== "undefined" && typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(`<div>${decoded}</div>`, "text/html");
+    const text = doc.body.textContent || "";
+    return text.replace(/\s+/g, " ").trim();
+  }
+  return decoded.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
 interface NewsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -2499,10 +2525,12 @@ export default function ArticleManagement() {
                       </h3>
                       <div className="relative h-10 mt-0.5">
                         <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
-                          {article.content_blocks?.find((block) => block.paragraph?.trim())
-                            ?.paragraph ||
-                            article.subtitle ||
-                            ""}
+                          {toPlainPreviewText(
+                            article.content_blocks?.find((block) => block.paragraph?.trim())
+                              ?.paragraph ||
+                              article.subtitle ||
+                              "",
+                          )}
                         </p>
                         <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
