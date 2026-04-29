@@ -11,6 +11,8 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const inFlightAdminArticlesRequests = new Map<string, Promise<NewsResponse>>();
 const inFlightAdminArticleByIdRequests = new Map<string, Promise<NewsSingleResponse>>();
+const inFlightAdminVideosRequests = new Map<string, Promise<NewsResponse>>();
+const inFlightAdminVideoByIdRequests = new Map<string, Promise<NewsSingleResponse>>();
 
 if (!API_BASE_URL) {
   console.warn(
@@ -248,6 +250,111 @@ export async function getAdminArticleById(
 }
 
 /**
+ * Fetch all admin videos
+ * @param categoryId - Optional category ID to filter videos by category
+ */
+export async function getAdminVideos(
+  categoryId?: number,
+  page?: number,
+  perPage?: number,
+): Promise<NewsResponse> {
+  try {
+    let url = getApiUrl("/admin/videos");
+    const params = new URLSearchParams();
+    if (categoryId !== undefined) params.set("category_id", String(categoryId));
+    if (page !== undefined) params.set("page", String(page));
+    if (perPage !== undefined) params.set("per_page", String(perPage));
+    const query = params.toString();
+    if (query) url += `?${query}`;
+
+    const existingRequest = inFlightAdminVideosRequests.get(url);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const requestPromise = (async () => {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        credentials: "omit",
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch admin videos: ${response.status} ${response.statusText}. ${errorText}`,
+        );
+      }
+
+      return response.json();
+    })();
+
+    inFlightAdminVideosRequests.set(url, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      inFlightAdminVideosRequests.delete(url);
+    }
+  } catch (error) {
+    console.warn("Admin videos fetch failed, using empty fallback:", error);
+    return { success: false, data: [] };
+  }
+}
+
+/**
+ * Fetch a single admin video by ID
+ */
+export async function getAdminVideoById(
+  id: number,
+): Promise<NewsSingleResponse> {
+  try {
+    const url = getApiUrl(`/admin/videos/${id}`);
+
+    const existingRequest = inFlightAdminVideoByIdRequests.get(url);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const requestPromise = (async () => {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        credentials: "omit",
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch admin video: ${response.status} ${response.statusText}. ${errorText}`,
+        );
+      }
+
+      return response.json();
+    })();
+
+    inFlightAdminVideoByIdRequests.set(url, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      inFlightAdminVideoByIdRequests.delete(url);
+    }
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * Create a new news/article
  */
 export async function createNews(
@@ -309,6 +416,44 @@ export async function createAdminArticle(
       const errorText = await response.text();
       throw new Error(
         `Failed to create admin article: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create a new admin video
+ */
+export async function createAdminVideo(
+  params: NewsCreateParams,
+): Promise<NewsCreateResponse> {
+  try {
+    const url = getApiUrl("/admin/videos");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(params),
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to create admin video: ${response.status} ${response.statusText}. ${errorText}`,
       );
     }
 
@@ -387,6 +532,45 @@ export async function updateAdminArticle(
       const errorText = await response.text();
       throw new Error(
         `Failed to update admin article: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Update an admin video
+ */
+export async function updateAdminVideo(
+  id: number,
+  params: NewsUpdateParams,
+): Promise<NewsUpdateResponse> {
+  try {
+    const url = getApiUrl(`/admin/videos/${id}`);
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(params),
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to update admin video: ${response.status} ${response.statusText}. ${errorText}`,
       );
     }
 
@@ -496,6 +680,43 @@ export async function deleteAdminArticle(
       const errorText = await response.text();
       throw new Error(
         `Failed to delete admin article: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error(
+        `Network error: Unable to connect to API. Please check if NEXT_PUBLIC_API_BASE_URL is set correctly and the API server is running.`,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete an admin video
+ */
+export async function deleteAdminVideo(
+  id: number,
+): Promise<NewsDeleteResponse> {
+  try {
+    const url = getApiUrl(`/admin/videos/${id}`);
+
+    const response = await fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to delete admin video: ${response.status} ${response.statusText}. ${errorText}`,
       );
     }
 

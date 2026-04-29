@@ -43,6 +43,32 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
+const decodeHtmlEntities = (input: string) => {
+  if (typeof window === "undefined") {
+    return input
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
+  }
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = input;
+  return textarea.value;
+};
+
+const toPlainPreviewText = (value: string) => {
+  // Some payloads are double-encoded (&amp;lt;div...), decode twice.
+  const decoded = decodeHtmlEntities(decodeHtmlEntities(value || ""));
+  if (typeof window !== "undefined" && typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(`<div>${decoded}</div>`, "text/html");
+    const text = doc.body.textContent || "";
+    return text.replace(/\s+/g, " ").trim();
+  }
+  return decoded.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
+
 interface NewsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -490,26 +516,68 @@ function NewsModal({
     const root = doc.body.firstElementChild;
     if (!root) return html;
 
-    const nodes = root.querySelectorAll("*");
+    const allowedTags = new Set([
+      "b",
+      "strong",
+      "i",
+      "em",
+      "a",
+      "h2",
+      "blockquote",
+      "p",
+      "br",
+    ]);
+
+    const isSafeHref = (value: string) => {
+      const href = value.trim().toLowerCase();
+      return (
+        href.startsWith("http://") ||
+        href.startsWith("https://") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        href.startsWith("/")
+      );
+    };
+
+    const nodes = Array.from(root.querySelectorAll("*")).reverse();
     nodes.forEach((el) => {
-      const styleAttr = el.getAttribute("style");
-      if (styleAttr) {
-        const cleanedStyle = styleAttr
-          .split(";")
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .filter((part) => {
-            const prop = part.split(":")[0]?.trim().toLowerCase();
-            return prop !== "background" && prop !== "background-color";
-          })
-          .join("; ");
-        if (cleanedStyle) {
-          el.setAttribute("style", cleanedStyle);
-        } else {
-          el.removeAttribute("style");
+      const tag = el.tagName.toLowerCase();
+
+      if (!allowedTags.has(tag)) {
+        if (tag === "img") {
+          el.remove();
+          return;
         }
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
+        return;
       }
-      el.removeAttribute("bgcolor");
+
+      Array.from(el.attributes).forEach((attr) => {
+        const attrName = attr.name.toLowerCase();
+        if (tag === "a" && attrName === "href") return;
+        el.removeAttribute(attr.name);
+      });
+
+      if (tag === "a") {
+        const href = (el.getAttribute("href") || "").trim();
+        if (!href || !isSafeHref(href)) {
+          const parent = el.parentNode;
+          if (!parent) return;
+          while (el.firstChild) {
+            parent.insertBefore(el.firstChild, el);
+          }
+          parent.removeChild(el);
+          return;
+        }
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener noreferrer");
+      }
     });
 
     return root.innerHTML;
@@ -2499,10 +2567,12 @@ export default function ArticleManagement() {
                       </h3>
                       <div className="relative h-10 mt-0.5">
                         <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
-                          {article.content_blocks?.find((block) => block.paragraph?.trim())
-                            ?.paragraph ||
-                            article.subtitle ||
-                            ""}
+                          {toPlainPreviewText(
+                            article.content_blocks?.find((block) => block.paragraph?.trim())
+                              ?.paragraph ||
+                              article.subtitle ||
+                              "",
+                          )}
                         </p>
                         <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button

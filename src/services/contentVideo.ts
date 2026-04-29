@@ -141,6 +141,11 @@ export async function uploadContentVideo({
   title,
 }: UploadContentVideoParams): Promise<UploadContentVideoResponse> {
   try {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (video.size > maxSize) {
+      throw new Error("Video file size must be less than 100MB");
+    }
+
     const url = getApiUrl("/videos-content");
 
     // Create FormData

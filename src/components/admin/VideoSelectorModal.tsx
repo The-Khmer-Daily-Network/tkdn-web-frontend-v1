@@ -20,13 +20,25 @@ interface VideoSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (video: ContentVideo) => void; // Required: callback when a video is selected
+  allowUpload?: boolean;
 }
 
 export default function VideoSelectorModal({
   isOpen,
   onClose,
   onSelect,
+  allowUpload = true,
 }: VideoSelectorModalProps) {
+  const isYouTubeUrl = (url: string) => /youtube\.com|youtu\.be/.test(url || "");
+  const getYouTubeThumbnail = (url: string) => {
+    const match =
+      url.match(/(?:youtu\.be\/)([^&\n?#]+)/) ||
+      url.match(/(?:youtube\.com\/watch\?v=)([^&\n?#]+)/) ||
+      url.match(/(?:youtube\.com\/embed\/)([^&\n?#]+)/) ||
+      url.match(/(?:youtube\.com\/shorts\/)([^&\n?#]+)/);
+    const videoId = match?.[1]?.split("&")[0]?.split("?")[0]?.trim();
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+  };
   const [videos, setVideos] = useState<ContentVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,13 +223,15 @@ export default function VideoSelectorModal({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleUpload}
-                className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
-            >
-                <Plus size={14} />
-                Upload Video
-              </button>
+              {allowUpload && (
+                <button
+                  onClick={handleUpload}
+                  className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium shadow-sm text-xs"
+                >
+                  <Plus size={14} />
+                  Upload Video
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -252,12 +266,14 @@ export default function VideoSelectorModal({
                   <p className="text-gray-500 mb-4 text-sm">
                     No content videos found.
                   </p>
-                  <button
-                    onClick={handleUpload}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
-                >
-                    Upload Your First Video
-                  </button>
+                  {allowUpload && (
+                    <button
+                      onClick={handleUpload}
+                      className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+                    >
+                      Upload Your First Video
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -287,6 +303,29 @@ export default function VideoSelectorModal({
                           <p className="text-[10px] text-gray-500 px-2 text-center">
                             Video failed to load
                           </p>
+                        </div>
+                      ) : isYouTubeUrl(video.video_url) ? (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleVideoClick(video);
+                          }}
+                          className="w-full h-full cursor-pointer relative bg-black"
+                        >
+                          {getYouTubeThumbnail(video.video_url) ? (
+                            <img
+                              src={getYouTubeThumbnail(video.video_url) || ""}
+                              alt={video.title || "YouTube video"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white text-[10px] px-2 text-center">
+                              YouTube video
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <Play size={20} className="text-white" fill="currentColor" />
+                          </div>
                         </div>
                       ) : (
                         <>
@@ -431,11 +470,13 @@ export default function VideoSelectorModal({
       </div>
 
       {/* Upload Modal */}
-      <UploadVideoModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onUploadSuccess={handleUploadSuccess}
-      />
+      {allowUpload && (
+        <UploadVideoModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          onUploadSuccess={handleUploadSuccess}
+        />
+      )}
     </>
   );
 }

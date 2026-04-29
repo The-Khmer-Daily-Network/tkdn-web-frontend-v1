@@ -33,6 +33,8 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
   "blockquote",
   "br",
   "img",
+  "video",
+  "source",
 ]);
 
 const isPresentationAttr = (attrName: string) =>
@@ -57,6 +59,8 @@ const isSafeImageSrc = (src: string) => {
     normalizedSrc.startsWith("/")
   );
 };
+
+const resolveVideoUrl = (url: string | null | undefined) => (url || "").trim();
 
 const getImageCaptionFallback = (src: string) => {
   if (!src) return "";
@@ -204,6 +208,25 @@ const sanitizeRichText = (html: string): string => {
         }
         continue;
       }
+      if (tagName === "video") {
+        if (
+          attrName !== "src" &&
+          attrName !== "controls" &&
+          attrName !== "playsinline" &&
+          attrName !== "preload" &&
+          attrName !== "poster" &&
+          !isPresentationAttr(attrName)
+        ) {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
+      if (tagName === "source") {
+        if (attrName !== "src" && attrName !== "type") {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
 
       if (
         tagName === "p" ||
@@ -215,8 +238,8 @@ const sanitizeRichText = (html: string): string => {
         tagName === "blockquote" ||
         tagName === "i"
       ) {
-        // Preserve visual structure from CMS while still removing non-presentational attrs.
-        if (!isPresentationAttr(attrName) && attrName !== "data-img-caption") {
+        // Enforce frontend typography; remove inline style/class from CMS content.
+        if (attrName !== "data-img-caption") {
           element.removeAttribute(attr.name);
         }
         continue;
@@ -266,6 +289,19 @@ const sanitizeRichText = (html: string): string => {
           element.insertAdjacentElement("afterend", captionNode);
         }
       }
+    }
+    if (tagName === "video") {
+      const src = element.getAttribute("src") || "";
+      if (src && !isSafeImageSrc(src)) {
+        element.remove();
+        return;
+      }
+      if (src) {
+        element.setAttribute("src", resolveVideoUrl(src));
+      }
+      element.setAttribute("controls", "true");
+      element.setAttribute("playsinline", "true");
+      element.setAttribute("preload", "metadata");
     }
 
     if (tagName === "blockquote") {
@@ -914,6 +950,15 @@ export default function NewsPageContent({
     const hasInlineNonEndImages = inlineImageUrls.some(
       (src) => !endImageUrlKeys.has(normalizeImageUrlKey(src)),
     );
+    const inlineVideoUrls = (singleNews.content_blocks || [])
+      .flatMap((block) =>
+        Array.from(
+          (block.paragraph || "").matchAll(/<video[^>]*src="([^"]+)"/gi),
+          (m) => (m[1] || "").trim(),
+        ),
+      )
+      .filter((src) => src.length > 0);
+    const hasInlineVideos = inlineVideoUrls.length > 0;
     const inlineImageNameByUrl = new Map<string, string>();
     if (singleNews.middle_image_url) {
       const middleName = getCaptionText(
@@ -1227,7 +1272,7 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[16px] [&_p]:leading-relaxed [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[16px] [&_p]:leading-relaxed [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[21px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: hasHydrated
                                 ? sanitizeRichText(
@@ -1250,8 +1295,11 @@ export default function NewsPageContent({
                         <>
                           {/* Middle Video */}
                           {singleNews.middle_video_url &&
+                            !hasInlineVideos &&
                             (() => {
-                              const videoUrl = singleNews.middle_video_url;
+                              const videoUrl = resolveVideoUrl(
+                                singleNews.middle_video_url,
+                              );
                               const isYouTube = isYouTubeUrl(videoUrl);
                               const embedUrl = isYouTube
                                 ? convertToYouTubeEmbed(videoUrl)
@@ -1260,7 +1308,23 @@ export default function NewsPageContent({
 
                               return (
                                 <div className="w-full my-8">
-                                  {isVideoPlaying && !isYouTube ? (
+                                  {isVideoPlaying && isYouTube && embedUrl ? (
+                                    <div className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden">
+                                      <iframe
+                                        src={embedUrl}
+                                        title={singleNews.title}
+                                        className="absolute top-0 left-0 w-full h-full"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                        allowFullScreen
+                                      />
+                                      <button
+                                        onClick={() => setIsVideoPlaying(false)}
+                                        className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded hover:bg-opacity-70 transition-all z-30"
+                                      >
+                                        × Close
+                                      </button>
+                                    </div>
+                                  ) : isVideoPlaying && !isYouTube ? (
                                     /* Video Player - Show when clicked (only for direct videos) */
                                     <div className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden">
                                       {/* Direct Video from Storage - Use HTML5 video element */}
@@ -1302,17 +1366,7 @@ export default function NewsPageContent({
                                     /* Thumbnail with Play Button - Show before click */
                                     <div
                                       onClick={() => {
-                                        if (isYouTube) {
-                                          // For YouTube videos, open directly in new tab
-                                          window.open(
-                                            videoUrl,
-                                            "_blank",
-                                            "noopener,noreferrer",
-                                          );
-                                        } else {
-                                          // For direct videos, play inline
-                                          setIsVideoPlaying(true);
-                                        }
+                                        setIsVideoPlaying(true);
                                       }}
                                       className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden cursor-pointer group"
                                   >

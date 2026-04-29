@@ -28,6 +28,19 @@ function getApiUrl(path: string): string {
   return `${baseUrl}${apiPath}`;
 }
 
+function getPlainPreviewText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function NewsDashboard({
   allNews = [],
   loading = false,
@@ -322,7 +335,7 @@ export default function NewsDashboard({
                       className="text-xs text-gray-700 line-clamp-3"
                      
                   >
-                      {mainArticle.content_blocks[0].paragraph}
+                      {getPlainPreviewText(mainArticle.content_blocks[0].paragraph)}
                     </p>
                   )}
               </div>
