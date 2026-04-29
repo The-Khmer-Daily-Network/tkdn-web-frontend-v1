@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -8,13 +8,18 @@ import {
   Trash2,
   X,
   Image as ImageIcon,
-  Video as VideoIcon,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { getNews, createNews, updateNews, deleteNews } from "@/services/news";
+import {
+  getAdminVideos,
+  getAdminVideoById,
+  createAdminVideo,
+  updateAdminVideo,
+  deleteAdminVideo,
+} from "@/services/news";
 import { getCategories } from "@/services/category";
 import {
   deleteContentCover,
@@ -34,14 +39,40 @@ import {
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
-import VideoSelectorModal from "@/components/admin/VideoSelectorModal";
 import ImageSelectorModal from "@/components/admin/ImageSelectorModal";
+import VideoSelectorModal from "@/components/admin/VideoSelectorModal";
 import type { ContentCover } from "@/types/contentCover";
-import type { ContentVideo } from "@/types/contentVideo";
 import type { ContentImage } from "@/types/contentImage";
+import type { ContentVideo } from "@/types/contentVideo";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ITEMS_PER_PAGE = 15;
+const PER_PAGE_OPTIONS = [30, 50, 100] as const;
+
+const decodeHtmlEntities = (input: string) => {
+  if (typeof window === "undefined") {
+    return input
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'");
+  }
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = input;
+  return textarea.value;
+};
+
+const toPlainPreviewText = (value: string) => {
+  // Some payloads are double-encoded (&amp;lt;div...), decode twice.
+  const decoded = decodeHtmlEntities(decodeHtmlEntities(value || ""));
+  if (typeof window !== "undefined" && typeof DOMParser !== "undefined") {
+    const doc = new DOMParser().parseFromString(`<div>${decoded}</div>`, "text/html");
+    const text = doc.body.textContent || "";
+    return text.replace(/\s+/g, " ").trim();
+  }
+  return decoded.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+};
 
 interface NewsModalProps {
   isOpen: boolean;
@@ -62,6 +93,9 @@ function NewsModal({
   currentUsername,
   asPage = false,
 }: NewsModalProps) {
+  const MAX_THUMBNAIL_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+  const MAX_CONTENT_IMAGE_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB per file
+  const MAX_MIDDLE_VIDEO_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [author, setAuthor] = useState("");
   const [title, setTitle] = useState("");
@@ -69,7 +103,6 @@ function NewsModal({
   const [coverName, setCoverName] = useState<string | null>(null);
   const [coverUrlInput, setCoverUrlInput] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [dateTimePost, setDateTimePost] = useState("");
   const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>([
     { subtitle: null, paragraph: "" },
   ]);
@@ -79,12 +112,31 @@ function NewsModal({
   const [endImages, setEndImages] = useState<EndImage[]>([]);
   const [endImageUrlInputs, setEndImageUrlInputs] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
+  const [inlineImageUploading, setInlineImageUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
   const [middleVideoUploading, setMiddleVideoUploading] = useState(false);
   const [endImageUploadingIndex, setEndImageUploadingIndex] = useState<
     number | null
 >(null);
+  const [activeSelection, setActiveSelection] = useState<{
+    blockIndex: number;
+  } | null>(null);
+  const [activeEditorBlockIndex, setActiveEditorBlockIndex] = useState<number | null>(
+    null,
+  );
+  const [activeTextFormat, setActiveTextFormat] = useState<{
+    bold: boolean;
+    subtitle: boolean;
+    link: boolean;
+    quote: boolean;
+  }>({
+    bold: false,
+    subtitle: false,
+    link: false,
+    quote: false,
+  });
   const [coverPendingFile, setCoverPendingFile] = useState<File | null>(null);
   const [middleVideoPendingFile, setMiddleVideoPendingFile] =
     useState<File | null>(null);
@@ -98,6 +150,77 @@ function NewsModal({
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleVideoFileInputRef = useRef<HTMLInputElement | null>(null);
   const endImageFileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentTextareaRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const inlineImageInputRef = useRef<HTMLInputElement | null>(null);
+  const savedInlineImageRangeRef = useRef<Range | null>(null);
+  const savedInlineImageBlockIndexRef = useRef<number | null>(null);
+  const inlinePendingImagesRef = useRef<
+    Record<string, { file: File; type: "middle" | "end" }>
+  >({});
+  const inlinePendingVideosRef = useRef<Record<string, { file: File }>>({});
+  const inlinePendingImageCounterRef = useRef(0);
+  const inlineImageInsertTypeRef = useRef<"middle" | "end">("end");
+  const removedInlineImageUrlsRef = useRef<Set<string>>(new Set());
+  const removedInlineVideoUrlsRef = useRef<Set<string>>(new Set());
+
+  const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+      return;
+    }
+
+    const rootEditor =
+      editor ??
+      contentTextareaRefs.current.find((el) => {
+        if (!el) return false;
+        const anchorNode = selection.anchorNode;
+        const focusNode = selection.focusNode;
+        return (
+          (!!anchorNode && el.contains(anchorNode)) ||
+          (!!focusNode && el.contains(focusNode))
+        );
+      }) ??
+      null;
+
+    if (!rootEditor) {
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+      return;
+    }
+
+    const isNodeInsideTag = (node: Node | null, tagNames: string[]) => {
+      if (!node) return false;
+      let current: Element | null =
+        node.nodeType === Node.ELEMENT_NODE
+          ? (node as Element)
+          : node.parentElement;
+
+      while (current && rootEditor.contains(current)) {
+        if (tagNames.includes(current.tagName.toLowerCase())) {
+          return true;
+        }
+        current = current.parentElement;
+      }
+      return false;
+    };
+
+    const subtitle =
+      isNodeInsideTag(selection.anchorNode, ["h2"]) ||
+      isNodeInsideTag(selection.focusNode, ["h2"]);
+    const quote =
+      isNodeInsideTag(selection.anchorNode, ["blockquote"]) ||
+      isNodeInsideTag(selection.focusNode, ["blockquote"]);
+    const link =
+      isNodeInsideTag(selection.anchorNode, ["a"]) ||
+      isNodeInsideTag(selection.focusNode, ["a"]);
+    const bold =
+      isNodeInsideTag(selection.anchorNode, ["b", "strong"]) ||
+      isNodeInsideTag(selection.focusNode, ["b", "strong"]) ||
+      document.queryCommandState("bold");
+
+    setActiveTextFormat({ bold, subtitle, link, quote });
+  };
 
   // Modal states
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
@@ -105,6 +228,7 @@ function NewsModal({
   const [isEndImageModalOpen, setIsEndImageModalOpen] = useState(false);
 
   useEffect(() => {
+    // Clear any pending local previews/files when switching item or opening.
     previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     previewObjectUrlsRef.current = [];
     setCoverPendingFile(null);
@@ -154,6 +278,11 @@ function NewsModal({
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
+    setShowCategorySelector(false);
+    inlinePendingImagesRef.current = {};
+    inlinePendingVideosRef.current = {};
+    removedInlineImageUrlsRef.current = new Set();
+    removedInlineVideoUrlsRef.current = new Set();
   }, [news, isOpen, currentUsername]);
 
   useEffect(() => {
@@ -163,14 +292,51 @@ function NewsModal({
     };
   }, []);
 
+  useEffect(() => {
+    if (!asPage) return;
+    const el = titleTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title, asPage, isOpen]);
+
+  useEffect(() => {
+    if (!activeSelection) return;
+
+    const syncSelectionState = () => {
+      const editor = contentTextareaRefs.current[activeSelection.blockIndex];
+      if (!editor) {
+        setActiveSelection(null);
+        return;
+      }
+
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      const commonNode = range.commonAncestorContainer;
+      const isInsideEditor = editor.contains(commonNode);
+      if (!isInsideEditor) {
+        setActiveSelection(null);
+        setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+        return;
+      }
+      syncActiveTextFormat(editor);
+    };
+
+    document.addEventListener("selectionchange", syncSelectionState);
+    return () => {
+      document.removeEventListener("selectionchange", syncSelectionState);
+    };
+  }, [activeSelection]);
+
   const queuePreviewUrl = (file: File): string => {
     const url = URL.createObjectURL(file);
     previewObjectUrlsRef.current.push(url);
     return url;
-  };
-
-  const handleAddContentBlock = () => {
-    setContentBlocks([...contentBlocks, { subtitle: null, paragraph: "" }]);
   };
 
   const handleRemoveContentBlock = (index: number) => {
@@ -187,6 +353,831 @@ function NewsModal({
     const updated = [...contentBlocks];
     updated[index] = { ...updated[index], [field]: value };
     setContentBlocks(updated);
+  };
+
+  const handleContentSelection = (
+    index: number,
+    e: React.SyntheticEvent<HTMLDivElement>,
+  ) => {
+    const target = e.currentTarget;
+    setActiveEditorBlockIndex(index);
+    requestAnimationFrame(() => {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const commonNode = range.commonAncestorContainer;
+        if (!target.contains(commonNode)) {
+          setActiveSelection(null);
+          setActiveTextFormat({
+            bold: false,
+            subtitle: false,
+            link: false,
+            quote: false,
+          });
+          return;
+        }
+        setActiveSelection({ blockIndex: index });
+        syncActiveTextFormat(target);
+        return;
+      }
+      setActiveSelection(null);
+      setActiveTextFormat({ bold: false, subtitle: false, link: false, quote: false });
+    });
+  };
+
+  const handleContentKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    const editor = contentTextareaRefs.current[index];
+    if (!editor) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const node = selection.anchorNode;
+    let current: Element | null =
+      node?.nodeType === Node.ELEMENT_NODE
+        ? (node as Element)
+        : node?.parentElement || null;
+
+    let quoteElement: Element | null = null;
+    while (current && editor.contains(current)) {
+      if (current.tagName.toLowerCase() === "blockquote") {
+        quoteElement = current;
+        break;
+      }
+      current = current.parentElement;
+    }
+
+    if (!quoteElement) return;
+
+    // Keep existing quote unchanged; move caret to a new normal line after quote.
+    e.preventDefault();
+    const paragraph = document.createElement("p");
+    paragraph.appendChild(document.createElement("br"));
+
+    if (quoteElement.parentNode) {
+      const nextSibling = quoteElement.nextSibling;
+      if (nextSibling) {
+        quoteElement.parentNode.insertBefore(paragraph, nextSibling);
+      } else {
+        quoteElement.parentNode.appendChild(paragraph);
+      }
+    } else {
+      editor.appendChild(paragraph);
+    }
+
+    const selectionAfter = window.getSelection();
+    if (selectionAfter) {
+      const newRange = document.createRange();
+      newRange.setStart(paragraph, 0);
+      newRange.collapse(true);
+      selectionAfter.removeAllRanges();
+      selectionAfter.addRange(newRange);
+    }
+
+    requestAnimationFrame(() => {
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      syncActiveTextFormat(editor);
+    });
+  };
+
+  const handleContentEditorClick = (
+    index: number,
+    e: React.SyntheticEvent<HTMLDivElement>,
+  ) => {
+    const target = e.target as HTMLElement;
+    const removeBtn = target.closest("button[data-inline-remove-id]");
+    if (removeBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const removeId = removeBtn.getAttribute("data-inline-remove-id");
+      const wrapper = removeBtn.closest("[data-inline-image-wrapper='true']");
+      if (wrapper) {
+        removeInlineImageFromEditor(index, wrapper, removeId);
+      }
+      return;
+    }
+    const nameBtn = target.closest("button[data-inline-name-id]");
+    if (nameBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const removeVideoBtn = target.closest("button[data-inline-video-remove-id]");
+    if (removeVideoBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const removeId = removeVideoBtn.getAttribute("data-inline-video-remove-id");
+      const wrapper = removeVideoBtn.closest("[data-inline-video-wrapper='true']");
+      if (wrapper) {
+        removeInlineVideoFromEditor(index, wrapper, removeId);
+      }
+      return;
+    }
+    handleContentSelection(index, e);
+  };
+
+  const removeInlineImageFromEditor = (
+    editorIndex: number,
+    wrapper: Element,
+    pendingId: string | null,
+  ) => {
+    const imageKind =
+      wrapper.getAttribute("data-inline-image-kind") ||
+      wrapper.querySelector("img")?.getAttribute("data-inline-image-kind") ||
+      "middle";
+    if (pendingId && inlinePendingImagesRef.current[pendingId]) {
+      delete inlinePendingImagesRef.current[pendingId];
+    } else {
+      const img = wrapper.querySelector("img");
+      const src = img?.getAttribute("src") || "";
+      if (
+        src &&
+        !src.startsWith("blob:") &&
+        !src.startsWith("data:") &&
+        !src.startsWith("about:")
+      ) {
+        removedInlineImageUrlsRef.current.add(src);
+      }
+      if (imageKind === "end" && src) {
+        setEndImages((prev) => {
+          const idx = prev.findIndex((image) => image.url === src);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next.splice(idx, 1);
+          return next;
+        });
+      }
+    }
+    wrapper.remove();
+    const editor = contentTextareaRefs.current[editorIndex];
+    if (editor) {
+      handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+      requestAnimationFrame(() => {
+        const refreshedEditor = contentTextareaRefs.current[editorIndex];
+        if (!refreshedEditor) return;
+        decorateInlineImagesInEditor(refreshedEditor, editorIndex);
+      });
+    }
+  };
+
+  const removeInlineVideoFromEditor = (
+    editorIndex: number,
+    wrapper: Element,
+    pendingId: string | null,
+  ) => {
+    const video = wrapper.querySelector("video");
+    const src = (video?.getAttribute("src") || "").trim();
+    if (pendingId && inlinePendingVideosRef.current[pendingId]) {
+      delete inlinePendingVideosRef.current[pendingId];
+      setMiddleVideoPendingFile(null);
+    } else if (
+      src &&
+      !src.startsWith("blob:") &&
+      !src.startsWith("data:") &&
+      !src.startsWith("about:")
+    ) {
+      removedInlineVideoUrlsRef.current.add(src);
+    }
+    if (src && middleVideoUrl === src) {
+      setMiddleVideoUrl(null);
+      setMiddleVideoName(null);
+      setMiddleVideoPendingFile(null);
+      setMiddleVideoUrlInput("");
+    }
+    wrapper.remove();
+    const editor = contentTextareaRefs.current[editorIndex];
+    if (editor) {
+      handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+      requestAnimationFrame(() => {
+        const refreshedEditor = contentTextareaRefs.current[editorIndex];
+        if (!refreshedEditor) return;
+        decorateInlineImagesInEditor(refreshedEditor, editorIndex);
+      });
+    }
+  };
+
+  const sanitizePastedHtml = (html: string) => {
+    if (!html.trim()) return html;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+    const root = doc.body.firstElementChild;
+    if (!root) return html;
+
+    const allowedTags = new Set([
+      "b",
+      "strong",
+      "i",
+      "em",
+      "a",
+      "h2",
+      "blockquote",
+      "p",
+      "br",
+    ]);
+
+    const isSafeHref = (value: string) => {
+      const href = value.trim().toLowerCase();
+      return (
+        href.startsWith("http://") ||
+        href.startsWith("https://") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        href.startsWith("/")
+      );
+    };
+
+    const nodes = Array.from(root.querySelectorAll("*")).reverse();
+    nodes.forEach((el) => {
+      const tag = el.tagName.toLowerCase();
+
+      if (!allowedTags.has(tag)) {
+        if (tag === "img") {
+          el.remove();
+          return;
+        }
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
+        return;
+      }
+
+      Array.from(el.attributes).forEach((attr) => {
+        const attrName = attr.name.toLowerCase();
+        if (tag === "a" && attrName === "href") return;
+        el.removeAttribute(attr.name);
+      });
+
+      if (tag === "a") {
+        const href = (el.getAttribute("href") || "").trim();
+        if (!href || !isSafeHref(href)) {
+          const parent = el.parentNode;
+          if (!parent) return;
+          while (el.firstChild) {
+            parent.insertBefore(el.firstChild, el);
+          }
+          parent.removeChild(el);
+          return;
+        }
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener noreferrer");
+      }
+    });
+
+    return root.innerHTML;
+  };
+
+  const handleContentPaste = (
+    index: number,
+    e: React.ClipboardEvent<HTMLDivElement>,
+  ) => {
+    const clipboard = e.clipboardData;
+    const html = clipboard.getData("text/html");
+    const text = clipboard.getData("text/plain");
+    if (!html && !text) return;
+
+    e.preventDefault();
+    if (html) {
+      const cleanedHtml = sanitizePastedHtml(html);
+      document.execCommand("insertHTML", false, cleanedHtml);
+    } else {
+      document.execCommand("insertText", false, text);
+    }
+
+    requestAnimationFrame(() => {
+      const editor = contentTextareaRefs.current[index];
+      if (!editor) return;
+      decorateInlineImagesInEditor(editor, index);
+      handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+      handleContentSelection(index, {
+        currentTarget: editor,
+      } as React.SyntheticEvent<HTMLDivElement>);
+    });
+  };
+
+  const attachInlineRemoveButtonHover = (
+    wrapper: HTMLDivElement,
+    actionsBar: HTMLDivElement,
+  ) => {
+    actionsBar.style.opacity = "0";
+    actionsBar.style.transition = "opacity 150ms ease";
+    wrapper.onmouseenter = () => {
+      actionsBar.style.opacity = "1";
+    };
+    wrapper.onmouseleave = () => {
+      actionsBar.style.opacity = "0";
+    };
+  };
+
+  const createInlineImageActionsBar = (
+    imageId: string,
+    imageKind: "middle" | "end",
+  ) => {
+    const actionsBar = document.createElement("div");
+    actionsBar.style.position = "absolute";
+    actionsBar.style.top = "8px";
+    actionsBar.style.right = "8px";
+    actionsBar.style.display = "flex";
+    actionsBar.style.gap = "6px";
+    actionsBar.style.zIndex = "2";
+
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("data-inline-name-id", imageId);
+    nameBtn.textContent = "Image Name";
+    nameBtn.style.border = "1px solid #e5e7eb";
+    nameBtn.style.borderRadius = "6px";
+    nameBtn.style.background = "#ffffff";
+    nameBtn.style.color = "#374151";
+    nameBtn.style.fontSize = "11px";
+    nameBtn.style.fontWeight = "600";
+    nameBtn.style.padding = "4px 8px";
+    nameBtn.style.cursor = "pointer";
+    actionsBar.appendChild(nameBtn);
+
+    if (imageKind === "end") {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.setAttribute("data-inline-remove-id", imageId);
+      removeBtn.textContent = "Remove";
+      removeBtn.style.border = "1px solid #e5e7eb";
+      removeBtn.style.borderRadius = "6px";
+      removeBtn.style.background = "#ffffff";
+      removeBtn.style.color = "#ef4444";
+      removeBtn.style.fontSize = "11px";
+      removeBtn.style.fontWeight = "600";
+      removeBtn.style.padding = "4px 8px";
+      removeBtn.style.cursor = "pointer";
+      actionsBar.appendChild(removeBtn);
+    }
+    return actionsBar;
+  };
+
+  const createInlineVideoActionsBar = (videoId: string) => {
+    const actionsBar = document.createElement("div");
+    actionsBar.style.position = "absolute";
+    actionsBar.style.top = "8px";
+    actionsBar.style.right = "8px";
+    actionsBar.style.display = "flex";
+    actionsBar.style.gap = "6px";
+    actionsBar.style.zIndex = "2";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.setAttribute("data-inline-video-remove-id", videoId);
+    removeBtn.textContent = "Remove";
+    removeBtn.style.border = "1px solid #e5e7eb";
+    removeBtn.style.borderRadius = "6px";
+    removeBtn.style.background = "#ffffff";
+    removeBtn.style.color = "#ef4444";
+    removeBtn.style.fontSize = "11px";
+    removeBtn.style.fontWeight = "600";
+    removeBtn.style.padding = "4px 8px";
+    removeBtn.style.cursor = "pointer";
+    actionsBar.appendChild(removeBtn);
+
+    return actionsBar;
+  };
+
+  const applyInlineImageWrapperStyle = (
+    wrapper: HTMLDivElement,
+    imageKind: "middle" | "end",
+  ) => {
+    wrapper.contentEditable = "false";
+    wrapper.style.position = "relative";
+    if (imageKind === "end") {
+      // End images: responsive 3-up layout in editor preview.
+      wrapper.style.display = "inline-block";
+      wrapper.style.width = "calc((100% - 24px) / 3)";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.margin = "16px 8px 16px 0";
+      wrapper.style.verticalAlign = "top";
+    } else {
+      wrapper.style.display = "block";
+      wrapper.style.margin = "16px 0";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.verticalAlign = "";
+    }
+  };
+
+  const applyInlineImageElementStyle = (
+    img: HTMLImageElement,
+    imageKind: "middle" | "end",
+  ) => {
+    img.style.width = "100%";
+    img.style.maxWidth = "100%";
+    img.style.aspectRatio = "100 / 53";
+    img.style.height = "auto";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "8px";
+    img.style.display = "block";
+  };
+
+  const attachInlineImageActions = (
+    wrapper: HTMLDivElement,
+    editorIndex: number,
+    imageId: string,
+    imageKind: "middle" | "end",
+  ) => {
+    wrapper.querySelectorAll("[data-inline-actions='true']").forEach((node) => {
+      node.remove();
+    });
+    const actionsBar = createInlineImageActionsBar(imageId, imageKind);
+    const nameBtn = actionsBar.querySelector(
+      "button[data-inline-name-id]",
+    ) as HTMLButtonElement | null;
+    if (nameBtn) {
+      const runSetName = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const img = wrapper.querySelector("img");
+        if (!img) return;
+        const src = img.getAttribute("src") || "";
+        const currentName =
+          img.getAttribute("data-inline-image-name") ||
+          img.getAttribute("alt") ||
+          "";
+        const nextName = window.prompt("Image Name", currentName);
+        if (nextName === null) return;
+        const normalized = nextName.trim();
+        if (normalized) {
+          img.setAttribute("data-inline-image-name", normalized);
+          img.setAttribute("alt", normalized);
+          img.setAttribute("title", normalized);
+        } else {
+          img.removeAttribute("data-inline-image-name");
+          img.setAttribute("alt", "Inline image");
+          img.removeAttribute("title");
+        }
+
+        // Keep explicit React state in sync so PUT payload always carries latest names.
+        if (imageKind === "middle") {
+          setMiddleVideoName(normalized || null);
+        } else if (imageKind === "end" && src) {
+          setEndImages((prev) =>
+            prev.map((item) =>
+              item.url === src ? { ...item, name: normalized || null } : item,
+            ),
+          );
+        }
+        const editor = contentTextareaRefs.current[editorIndex];
+        if (editor) {
+          handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+        }
+      };
+      nameBtn.addEventListener("mousedown", runSetName);
+      nameBtn.addEventListener("click", runSetName);
+    }
+    const removeBtn = actionsBar.querySelector(
+      "button[data-inline-remove-id]",
+    ) as HTMLButtonElement | null;
+    if (removeBtn) {
+      const runRemove = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeInlineImageFromEditor(editorIndex, wrapper, imageId);
+      };
+      removeBtn.addEventListener("mousedown", runRemove);
+      removeBtn.addEventListener("click", runRemove);
+    }
+    actionsBar.setAttribute("data-inline-actions", "true");
+    attachInlineRemoveButtonHover(wrapper, actionsBar);
+    wrapper.appendChild(actionsBar);
+  };
+
+  const attachInlineVideoActions = (
+    wrapper: HTMLDivElement,
+    editorIndex: number,
+    videoId: string,
+  ) => {
+    wrapper.querySelectorAll("[data-inline-video-actions='true']").forEach((node) => {
+      node.remove();
+    });
+    const actionsBar = createInlineVideoActionsBar(videoId);
+    const removeBtn = actionsBar.querySelector(
+      "button[data-inline-video-remove-id]",
+    ) as HTMLButtonElement | null;
+    if (removeBtn) {
+      const runRemove = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeInlineVideoFromEditor(editorIndex, wrapper, videoId);
+      };
+      removeBtn.addEventListener("mousedown", runRemove);
+      removeBtn.addEventListener("click", runRemove);
+    }
+    actionsBar.setAttribute("data-inline-video-actions", "true");
+    attachInlineRemoveButtonHover(wrapper, actionsBar);
+    wrapper.appendChild(actionsBar);
+  };
+
+  const decorateInlineImagesInEditor = (
+    editor: HTMLDivElement,
+    editorIndex: number,
+  ) => {
+    const existingWrappers = Array.from(
+      editor.querySelectorAll<HTMLDivElement>("[data-inline-image-wrapper='true']"),
+    );
+    for (const wrapper of existingWrappers) {
+      const img = wrapper.querySelector("img");
+      if (!img) continue;
+      const imageId =
+        wrapper.getAttribute("data-inline-image-id") ||
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[imageId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind =
+        (wrapper.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        (img.getAttribute("data-inline-image-kind") as "middle" | "end" | null) ||
+        pendingType ||
+        (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image-id", imageId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      img.setAttribute("data-inline-pending-id", imageId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      attachInlineImageActions(wrapper, editorIndex, imageId, imageKind);
+    }
+
+    const images = Array.from(editor.querySelectorAll("img"));
+    for (const img of images) {
+      if (img.closest("[data-inline-image-wrapper='true']")) continue;
+
+      const wrapper = document.createElement("div");
+      const existingPendingId =
+        img.getAttribute("data-inline-pending-id") ||
+        `inline-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      const src = img.getAttribute("src") || "";
+      const pendingType = inlinePendingImagesRef.current[existingPendingId]?.type;
+      const knownEndImage = !!src && endImages.some((endImg) => endImg.url === src);
+      const imageKind = pendingType || (knownEndImage ? "end" : "middle");
+
+      wrapper.setAttribute("data-inline-image", "true");
+      wrapper.setAttribute("data-inline-image-wrapper", "true");
+      wrapper.setAttribute("data-inline-image-id", existingPendingId);
+      wrapper.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageWrapperStyle(wrapper, imageKind);
+      img.setAttribute("data-inline-pending-id", existingPendingId);
+      img.setAttribute("data-inline-image-kind", imageKind);
+      applyInlineImageElementStyle(img, imageKind);
+
+      const parent = img.parentNode;
+      if (!parent) continue;
+      parent.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      attachInlineImageActions(
+        wrapper,
+        editorIndex,
+        existingPendingId,
+        imageKind,
+      );
+    }
+
+    const existingVideoWrappers = Array.from(
+      editor.querySelectorAll<HTMLDivElement>("[data-inline-video-wrapper='true']"),
+    );
+    for (const wrapper of existingVideoWrappers) {
+      const video = wrapper.querySelector("video");
+      if (!video) continue;
+      const videoId =
+        wrapper.getAttribute("data-inline-video-id") ||
+        video.getAttribute("data-inline-pending-video-id") ||
+        `inline-video-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      wrapper.setAttribute("data-inline-video-wrapper", "true");
+      wrapper.setAttribute("data-inline-video-id", videoId);
+      video.setAttribute("data-inline-pending-video-id", videoId);
+      wrapper.style.display = "block";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.margin = "16px 0";
+      wrapper.style.position = "relative";
+      attachInlineVideoActions(wrapper, editorIndex, videoId);
+    }
+
+    const videos = Array.from(editor.querySelectorAll("video"));
+    for (const video of videos) {
+      if (video.closest("[data-inline-video-wrapper='true']")) continue;
+      const wrapper = document.createElement("div");
+      const videoId =
+        video.getAttribute("data-inline-pending-video-id") ||
+        `inline-video-existing-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      wrapper.setAttribute("data-inline-video-wrapper", "true");
+      wrapper.setAttribute("data-inline-video-id", videoId);
+      wrapper.style.display = "block";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "100%";
+      wrapper.style.margin = "16px 0";
+      wrapper.style.position = "relative";
+      video.setAttribute("data-inline-pending-video-id", videoId);
+      const parent = video.parentNode;
+      if (!parent) continue;
+      parent.insertBefore(wrapper, video);
+      wrapper.appendChild(video);
+      attachInlineVideoActions(wrapper, editorIndex, videoId);
+    }
+  };
+
+  const handleInlineImageButtonClick = (type: "middle" | "end") => {
+    if (loading || inlineImageUploading || activeEditorBlockIndex === null) return;
+    inlineImageInsertTypeRef.current = type;
+    savedInlineImageBlockIndexRef.current =
+      activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      savedInlineImageRangeRef.current = range.cloneRange();
+    } else {
+      savedInlineImageRangeRef.current = null;
+    }
+    if (inlineImageInputRef.current) {
+      inlineImageInputRef.current.value = "";
+      inlineImageInputRef.current.click();
+    }
+  };
+
+  const handleInlineImageFileChange = async (file?: File) => {
+    const blockIndex =
+      savedInlineImageBlockIndexRef.current ??
+      activeSelection?.blockIndex ??
+      activeEditorBlockIndex;
+    if (!file || blockIndex === null) return;
+    try {
+      setInlineImageUploading(true);
+      setError(null);
+      const pendingId = `inline-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+      inlinePendingImagesRef.current[pendingId] = {
+        file,
+        type: inlineImageInsertTypeRef.current,
+      };
+      const imageKind = inlineImageInsertTypeRef.current;
+      const previewUrl = queuePreviewUrl(file);
+
+      const editor = contentTextareaRefs.current[blockIndex];
+      if (!editor) return;
+      editor.focus();
+
+      const selection = window.getSelection();
+      const range = savedInlineImageRangeRef.current;
+      const canInsertAtSavedRange =
+        !!selection &&
+        !!range &&
+        editor.contains(range.commonAncestorContainer);
+
+      if (selection && canInsertAtSavedRange && range) {
+        const workingRange = range.cloneRange();
+        workingRange.deleteContents();
+
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
+
+        const img = document.createElement("img");
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
+        wrapper.appendChild(img);
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
+
+
+        workingRange.insertNode(wrapper);
+        const caretRange = document.createRange();
+        if (imageKind === "end") {
+          caretRange.setStartAfter(wrapper);
+        } else {
+          const spacer = document.createElement("br");
+          workingRange.insertNode(spacer);
+          caretRange.setStartAfter(spacer);
+        }
+        caretRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caretRange);
+      } else {
+        // Fallback: append image at end if selection cannot be restored.
+        const wrapper = document.createElement("div");
+        wrapper.setAttribute("data-inline-image", "true");
+        wrapper.setAttribute("data-inline-image-wrapper", "true");
+        wrapper.setAttribute("data-inline-image-id", pendingId);
+        wrapper.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageWrapperStyle(wrapper, imageKind);
+
+        const img = document.createElement("img");
+        img.src = previewUrl;
+        img.alt = file.name || "Inline image";
+        img.setAttribute("data-inline-pending-id", pendingId);
+        img.setAttribute("data-inline-image-kind", imageKind);
+        applyInlineImageElementStyle(img, imageKind);
+        wrapper.appendChild(img);
+        attachInlineImageActions(wrapper, blockIndex, pendingId, imageKind);
+
+
+        editor.appendChild(wrapper);
+        if (imageKind !== "end") {
+          editor.appendChild(document.createElement("br"));
+        }
+      }
+
+      handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to upload inline image";
+      setError(errorMessage);
+    } finally {
+      setInlineImageUploading(false);
+      savedInlineImageRangeRef.current = null;
+      savedInlineImageBlockIndexRef.current = null;
+      if (inlineImageInputRef.current) {
+        inlineImageInputRef.current.value = "";
+      }
+    }
+  };
+
+  const applySelectionFormat = (
+    type: "bold" | "italic" | "link" | "subtitle" | "quote",
+  ) => {
+    const blockIndex = activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    if (blockIndex === null) return;
+    const selection = window.getSelection();
+
+    const hasSelectionText =
+      !!selection && selection.rangeCount > 0 && !selection.isCollapsed;
+
+    const normalizeLinkUrl = (rawUrl: string) => {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return null;
+      if (
+        trimmed.startsWith("http://") ||
+        trimmed.startsWith("https://") ||
+        trimmed.startsWith("mailto:") ||
+        trimmed.startsWith("tel:") ||
+        trimmed.startsWith("/")
+      ) {
+        return trimmed;
+      }
+      return `https://${trimmed}`;
+    };
+
+    switch (type) {
+      case "bold":
+        document.execCommand("bold");
+        break;
+      case "italic":
+        document.execCommand("italic");
+        break;
+      case "link": {
+        if (activeTextFormat.link) {
+          document.execCommand("unlink");
+          break;
+        }
+        if (!hasSelectionText) return;
+        const inputUrl = window.prompt("Enter link URL", "https://example.com");
+        if (!inputUrl) return;
+        const url = normalizeLinkUrl(inputUrl);
+        if (!url) return;
+        document.execCommand("createLink", false, url);
+        break;
+      }
+      case "subtitle":
+        if (activeTextFormat.subtitle) {
+          document.execCommand("formatBlock", false, "p");
+        } else {
+          document.execCommand("formatBlock", false, "h2");
+        }
+        break;
+      case "quote":
+        if (activeTextFormat.quote) {
+          document.execCommand("formatBlock", false, "p");
+          break;
+        }
+        if (!hasSelectionText) return;
+        document.execCommand("formatBlock", false, "blockquote");
+        break;
+      default:
+        break;
+    }
+    const editor = contentTextareaRefs.current[blockIndex];
+    if (!editor) return;
+    handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    requestAnimationFrame(() => {
+      syncActiveTextFormat();
+    });
   };
 
   const handleSelectCover = (cover: ContentCover) => {
@@ -208,6 +1199,7 @@ function NewsModal({
       setEndImages([...endImages, { url: image.image_url, name: null }]); // Don't auto-fill name, let user input it
       // Clear URL inputs when selecting from library
       setEndImageUrlInputs([""]);
+      setEndImagePendingFiles([null, null, null]);
     }
   };
 
@@ -260,23 +1252,87 @@ function NewsModal({
     setEndImages(validUrls.map((url) => ({ url, name: null })));
   };
 
-  const getUploadedUrl = (
-    data: unknown,
-    key: "image_url" | "video_url",
-  ): string | null => {
+  const getUploadedImageUrl = (data: unknown): string | null => {
     if (!data) return null;
     if (Array.isArray(data)) {
-      const first = data[0] as Record<string, unknown> | undefined;
-      const value = first?.[key];
-      return typeof value === "string" ? value : null;
+      const first = data[0] as { image_url?: string } | undefined;
+      return first?.image_url ?? null;
     }
-    const single = data as Record<string, unknown>;
-    const value = single[key];
-    return typeof value === "string" ? value : null;
+    const single = data as { image_url?: string };
+    return single.image_url ?? null;
+  };
+
+  const getUploadedVideoUrl = (data: unknown): string | null => {
+    if (!data) return null;
+    if (Array.isArray(data)) {
+      const first = data[0] as { video_url?: string } | undefined;
+      return first?.video_url ?? null;
+    }
+    const single = data as { video_url?: string };
+    return single.video_url ?? null;
+  };
+
+  const collectInlineImageNames = (blocks: ContentBlock[]) => {
+    const pendingNameById = new Map<string, string>();
+    const nameByUrl = new Map<string, string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const container = document.createElement("div");
+      container.innerHTML = block.paragraph;
+      const images = Array.from(container.querySelectorAll("img"));
+      for (const image of images) {
+        const rawName =
+          image.getAttribute("data-inline-image-name") ||
+          image.getAttribute("title") ||
+          image.getAttribute("alt") ||
+          "";
+        const imageName = rawName.trim();
+        if (!imageName || imageName.toLowerCase() === "inline image") continue;
+        const pendingId = image.getAttribute("data-inline-pending-id");
+        if (pendingId) {
+          pendingNameById.set(pendingId, imageName);
+        }
+        const src = (image.getAttribute("src") || "").trim();
+        if (
+          src &&
+          !src.startsWith("blob:") &&
+          !src.startsWith("data:") &&
+          !src.startsWith("about:")
+        ) {
+          nameByUrl.set(src, imageName);
+        }
+      }
+    }
+    return { pendingNameById, nameByUrl };
+  };
+
+  const extractImageUrlsFromBlocks = (blocks: ContentBlock[]): Set<string> => {
+    const urls = new Set<string>();
+    for (const block of blocks) {
+      if (!block?.paragraph) continue;
+      const matches = block.paragraph.matchAll(/<img[^>]*src="([^"]+)"/g);
+      for (const match of matches) {
+        const src = match[1]?.trim();
+        if (!src) continue;
+        if (
+          src.startsWith("blob:") ||
+          src.startsWith("data:") ||
+          src.startsWith("about:")
+        ) {
+          continue;
+        }
+        urls.add(src);
+      }
+    }
+    return urls;
   };
 
   const handleSelectCoverFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_THUMBNAIL_FILE_SIZE_BYTES) {
+      setError("Thumbnail image must be less than or equal to 5MB.");
+      return;
+    }
     setCoverPendingFile(file);
     setCover(queuePreviewUrl(file));
     setCoverUrlInput("");
@@ -284,13 +1340,93 @@ function NewsModal({
 
   const handleSelectMiddleVideoFile = (file?: File) => {
     if (!file) return;
+    if (file.size > MAX_MIDDLE_VIDEO_FILE_SIZE_BYTES) {
+      setError("Middle video must be less than or equal to 100MB.");
+      return;
+    }
+    const blockIndex =
+      savedInlineImageBlockIndexRef.current ??
+      activeSelection?.blockIndex ??
+      activeEditorBlockIndex;
+    if (blockIndex === null) {
+      setError("Select a content position before adding Mid Video.");
+      return;
+    }
+
+    const previewUrl = queuePreviewUrl(file);
+    const pendingId = `inline-video-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+    inlinePendingVideosRef.current[pendingId] = { file };
     setMiddleVideoPendingFile(file);
-    setMiddleVideoUrl(queuePreviewUrl(file));
+    setMiddleVideoUrl(previewUrl);
+    setMiddleVideoName(file.name || null);
     setMiddleVideoUrlInput("");
+
+    const editor = contentTextareaRefs.current[blockIndex];
+    if (!editor) return;
+    editor.focus();
+
+    const selection = window.getSelection();
+    const range = savedInlineImageRangeRef.current;
+    const canInsertAtSavedRange =
+      !!selection &&
+      !!range &&
+      editor.contains(range.commonAncestorContainer);
+
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-inline-video-wrapper", "true");
+    wrapper.setAttribute("data-inline-video-id", pendingId);
+    wrapper.style.display = "block";
+    wrapper.style.width = "100%";
+    wrapper.style.maxWidth = "100%";
+    wrapper.style.margin = "16px 0";
+    wrapper.style.position = "relative";
+
+    const video = document.createElement("video");
+    video.setAttribute("src", previewUrl);
+    video.setAttribute("controls", "true");
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("preload", "metadata");
+    video.setAttribute("data-inline-pending-video-id", pendingId);
+    video.style.width = "100%";
+    video.style.maxWidth = "100%";
+    video.style.aspectRatio = "100 / 53";
+    video.style.height = "auto";
+    video.style.objectFit = "cover";
+    video.style.borderRadius = "8px";
+    video.style.display = "block";
+    wrapper.appendChild(video);
+    attachInlineVideoActions(wrapper, blockIndex, pendingId);
+
+    if (selection && canInsertAtSavedRange && range) {
+      const workingRange = range.cloneRange();
+      workingRange.deleteContents();
+      workingRange.insertNode(wrapper);
+      const spacer = document.createElement("br");
+      workingRange.insertNode(spacer);
+      const caretRange = document.createRange();
+      caretRange.setStartAfter(spacer);
+      caretRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(caretRange);
+    } else {
+      editor.appendChild(wrapper);
+      editor.appendChild(document.createElement("br"));
+    }
+
+    handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
+    savedInlineImageRangeRef.current = null;
+    savedInlineImageBlockIndexRef.current = null;
+    if (middleVideoFileInputRef.current) {
+      middleVideoFileInputRef.current.value = "";
+    }
   };
 
   const handleSelectEndImageFile = (slot: number, file?: File) => {
     if (!file) return;
+    if (file.size > MAX_CONTENT_IMAGE_FILE_SIZE_BYTES) {
+      setError("Each end image must be less than or equal to 20MB.");
+      return;
+    }
     setEndImagePendingFiles((prev) => {
       const next = [...prev];
       next[slot] = file;
@@ -330,13 +1466,8 @@ function NewsModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim() || !author.trim()) {
-      setError("Title and author are required");
-      return;
-    }
-
-    if (!middleVideoUrl) {
-      setError("Middle video is required for video articles");
+    if (!author.trim()) {
+      setError("Author is required");
       return;
     }
 
@@ -353,27 +1484,35 @@ function NewsModal({
 
       // Upload pending files ONLY when saving.
       let finalCover = cover;
+      const finalCoverName = (coverName || "").trim() || null;
       let finalMiddleVideoUrl = middleVideoUrl;
+      let finalMiddleVideoName = middleVideoName;
       let finalEndImages: Array<EndImage | null> = [
         endImages[0] ?? null,
         endImages[1] ?? null,
         endImages[2] ?? null,
       ];
+      const inlineImageNames = collectInlineImageNames(validBlocks);
+      const hasInlinePendingVideo = validBlocks.some((block) =>
+        /data-inline-pending-video-id="([^"]+)"/.test(block.paragraph || ""),
+      );
 
       if (coverPendingFile) {
         setCoverUploading(true);
         const res = await uploadContentCover({ image: coverPendingFile });
-        const url = getUploadedUrl(res.data, "image_url");
-        if (!url) throw new Error("Cover upload succeeded but URL missing");
-        finalCover = url;
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("Cover upload succeeded but URL missing");
+        finalCover = imageUrl;
       }
 
-      if (middleVideoPendingFile) {
+      if (middleVideoPendingFile && !hasInlinePendingVideo) {
         setMiddleVideoUploading(true);
         const res = await uploadContentVideo({ video: middleVideoPendingFile });
-        const url = getUploadedUrl(res.data, "video_url");
-        if (!url) throw new Error("Video upload succeeded but URL missing");
-        finalMiddleVideoUrl = url;
+        const videoUrl = getUploadedVideoUrl(res.data);
+        if (!videoUrl) {
+          throw new Error("Middle video upload succeeded but URL missing");
+        }
+        finalMiddleVideoUrl = videoUrl;
       }
 
       for (let i = 0; i < 3; i++) {
@@ -381,45 +1520,231 @@ function NewsModal({
         if (!file) continue;
         setEndImageUploadingIndex(i);
         const res = await uploadContentImage({ image: file });
-        const url = getUploadedUrl(res.data, "image_url");
-        if (!url) throw new Error("End image upload succeeded but URL missing");
-        finalEndImages[i] = { url, name: finalEndImages[i]?.name ?? null };
+        const imageUrl = getUploadedImageUrl(res.data);
+        if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
+        finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
       }
 
-      // If editing and media was replaced, delete old assets from content library (best-effort).
-      if (news) {
-        const oldCover = originalCoverUrlRef.current;
-        if (coverPendingFile && oldCover && finalCover && oldCover !== finalCover) {
-          try {
-            await deleteCoverByUrlIfPresent(oldCover);
-          } catch {
-            // best-effort delete only
+      // Do not clear middle/end image slots by checking paragraph HTML.
+      // End images are managed in the dedicated Image section and may not appear inline.
+
+      // Upload inline pending images only on save, then replace temporary preview URLs.
+      const pendingInlineIds: string[] = [];
+      const seenInlineIds = new Set<string>();
+      const pendingInlineVideoIds: string[] = [];
+      const seenInlineVideoIds = new Set<string>();
+      for (const block of validBlocks) {
+        const matches = block.paragraph.matchAll(/data-inline-pending-id="([^"]+)"/g);
+        for (const match of matches) {
+          const id = match[1];
+          if (!id || seenInlineIds.has(id)) continue;
+          seenInlineIds.add(id);
+          pendingInlineIds.push(id);
+        }
+        const videoMatches = block.paragraph.matchAll(
+          /data-inline-pending-video-id="([^"]+)"/g,
+        );
+        for (const match of videoMatches) {
+          const id = match[1];
+          if (!id || seenInlineVideoIds.has(id)) continue;
+          seenInlineVideoIds.add(id);
+          pendingInlineVideoIds.push(id);
+        }
+      }
+
+      const inlineUploadMap: Record<string, { url: string; name: string | null }> = {};
+      for (const pendingId of pendingInlineIds) {
+        const pending = inlinePendingImagesRef.current[pendingId];
+        if (!pending?.file) continue;
+        setInlineImageUploading(true);
+        const res = await uploadContentImage({ image: pending.file });
+        const uploaded = Array.isArray(res.data) ? res.data[0] : res.data;
+        const uploadedUrl = uploaded?.image_url;
+        if (!uploadedUrl) {
+          throw new Error("Inline image upload succeeded but URL missing");
+        }
+        const uploadedName =
+          (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
+        const customName = inlineImageNames.pendingNameById.get(pendingId) || null;
+        const finalInlineName = customName || uploadedName;
+        inlineUploadMap[pendingId] = { url: uploadedUrl, name: finalInlineName };
+
+        // Keep backend compatibility: map first image to middle, next up to 3 to end_images.
+        if (pending.type === "middle") {
+          finalMiddleVideoUrl = uploadedUrl;
+          finalMiddleVideoName = finalInlineName;
+        } else {
+          const emptySlot = finalEndImages.findIndex((img) => !img?.url);
+          if (emptySlot === -1) {
+            throw new Error(
+              "Maximum 5 images reached total (Thumbnail + 1 Middle Video + 3 End Images).",
+            );
           }
+          finalEndImages[emptySlot] = { url: uploadedUrl, name: finalInlineName };
         }
 
-        const oldVideo = originalMiddleVideoUrlRef.current;
-        if (
-          middleVideoPendingFile &&
-          oldVideo &&
-          finalMiddleVideoUrl &&
-          oldVideo !== finalMiddleVideoUrl
-        ) {
-          try {
-            await deleteVideoByUrlIfPresent(oldVideo);
-          } catch {
-            // best-effort delete only
-          }
+      }
+      const inlineVideoUploadMap: Record<
+        string,
+        { url: string; name: string | null }
+      > = {};
+      for (const pendingId of pendingInlineVideoIds) {
+        const pending = inlinePendingVideosRef.current[pendingId];
+        if (!pending?.file) continue;
+        setMiddleVideoUploading(true);
+        const res = await uploadContentVideo({ video: pending.file });
+        const uploaded = Array.isArray(res.data) ? res.data[0] : res.data;
+        const uploadedUrl = uploaded?.video_url;
+        if (!uploadedUrl) {
+          throw new Error("Inline video upload succeeded but URL missing");
         }
+        const uploadedName =
+          (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
+        inlineVideoUploadMap[pendingId] = { url: uploadedUrl, name: uploadedName };
+        finalMiddleVideoUrl = uploadedUrl;
+        finalMiddleVideoName = uploadedName || finalMiddleVideoName;
+      }
 
-        for (let i = 0; i < 3; i++) {
-          const oldEnd = originalEndImageUrlsRef.current[i];
-          const newEnd = finalEndImages[i]?.url ?? null;
-          if (endImagePendingFiles[i] && oldEnd && newEnd && oldEnd !== newEnd) {
-            try {
-              await deleteImageByUrlIfPresent(oldEnd);
-            } catch {
-              // best-effort delete only
+      if (
+        finalMiddleVideoUrl &&
+        inlineImageNames.nameByUrl.has(finalMiddleVideoUrl)
+      ) {
+        finalMiddleVideoName =
+          inlineImageNames.nameByUrl.get(finalMiddleVideoUrl) || null;
+      }
+      finalEndImages = finalEndImages.map((img) => {
+        if (!img?.url) return img;
+        const overrideName = inlineImageNames.nameByUrl.get(img.url);
+        if (!overrideName) return img;
+        return { ...img, name: overrideName };
+      });
+
+      const processedBlocks = validBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+
+        container
+          .querySelectorAll("button[data-inline-remove-id],button[data-inline-name-id]")
+          .forEach((btn) => btn.remove());
+
+        container
+          .querySelectorAll("img[data-inline-pending-id]")
+          .forEach((imgNode) => {
+            const id = imgNode.getAttribute("data-inline-pending-id");
+            if (id && inlineUploadMap[id]) {
+              imgNode.setAttribute("src", inlineUploadMap[id].url);
+              const currentAlt = (imgNode.getAttribute("alt") || "").trim().toLowerCase();
+              const shouldReplaceAlt =
+                !currentAlt ||
+                currentAlt === "inline image" ||
+                currentAlt === "article image";
+              if (shouldReplaceAlt) {
+                imgNode.setAttribute(
+                  "alt",
+                  inlineUploadMap[id].name || "Inline image",
+                );
+              }
+              if (inlineUploadMap[id].name) {
+                imgNode.setAttribute("title", inlineUploadMap[id].name);
+              }
             }
+            imgNode.removeAttribute("data-inline-pending-id");
+          });
+        container
+          .querySelectorAll("video[data-inline-pending-video-id]")
+          .forEach((videoNode) => {
+            const id = videoNode.getAttribute("data-inline-pending-video-id");
+            if (id && inlineVideoUploadMap[id]) {
+              videoNode.setAttribute("src", inlineVideoUploadMap[id].url);
+              videoNode.setAttribute("controls", "true");
+              videoNode.setAttribute("playsinline", "true");
+              videoNode.setAttribute("preload", "metadata");
+            }
+            videoNode.removeAttribute("data-inline-pending-video-id");
+          });
+
+        container
+          .querySelectorAll("[data-inline-image-wrapper='true']")
+          .forEach((wrapper) => {
+            const imgNode = wrapper.querySelector("img");
+            if (imgNode) {
+              wrapper.replaceWith(imgNode);
+            } else {
+              wrapper.remove();
+            }
+          });
+        container
+          .querySelectorAll("[data-inline-video-wrapper='true']")
+          .forEach((wrapper) => {
+            const videoNode = wrapper.querySelector("video");
+            if (videoNode) {
+              wrapper.replaceWith(videoNode);
+            } else {
+              wrapper.remove();
+            }
+          });
+
+        container
+          .querySelectorAll(
+            "[data-inline-image],[data-inline-image-id],[data-inline-image-kind],[data-inline-image-name],[data-inline-video-wrapper],[data-inline-video-id]",
+          )
+          .forEach((el) => {
+            el.removeAttribute("data-inline-image");
+            el.removeAttribute("data-inline-image-id");
+            el.removeAttribute("data-inline-image-kind");
+            el.removeAttribute("data-inline-image-name");
+            el.removeAttribute("data-inline-video-wrapper");
+            el.removeAttribute("data-inline-video-id");
+          });
+
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
+      const endImageUrlsToStrip = new Set(
+        finalEndImages
+          .filter((img): img is EndImage => !!img?.url)
+          .map((img) => img.url),
+      );
+      const contentBlocksWithoutEndImages = processedBlocks.map((block) => {
+        const container = document.createElement("div");
+        container.innerHTML = block.paragraph;
+        container.querySelectorAll("img").forEach((imgNode) => {
+          const src = (imgNode.getAttribute("src") || "").trim();
+          if (src && endImageUrlsToStrip.has(src)) {
+            imgNode.remove();
+          }
+        });
+        return {
+          ...block,
+          paragraph: container.innerHTML,
+        };
+      });
+
+      // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
+      const removedMediaUrls = new Set<string>();
+      if (news) {
+        const oldMiddle = originalMiddleVideoUrlRef.current;
+        const nextMiddle = finalMiddleVideoUrl ?? null;
+        if (oldMiddle && oldMiddle !== nextMiddle) {
+          removedMediaUrls.add(oldMiddle);
+        }
+
+        const oldEndUrls = new Set(
+          originalEndImageUrlsRef.current.filter(
+            (u): u is string => typeof u === "string" && u.length > 0,
+          ),
+        );
+        const nextEndUrls = new Set(
+          finalEndImages
+            .filter((img): img is EndImage => !!img?.url)
+            .map((img) => img.url),
+        );
+        for (const oldUrl of oldEndUrls) {
+          if (!nextEndUrls.has(oldUrl)) {
+            removedMediaUrls.add(oldUrl);
           }
         }
       }
@@ -429,43 +1754,131 @@ function NewsModal({
         author: author.trim(),
         title: title.trim(),
         cover: finalCover,
-        cover_name: coverName,
+        cover_name: finalCoverName,
         subtitle: null,
-        content_blocks: validBlocks,
+        // date_time_post will be auto-set by backend
+        content_blocks: contentBlocksWithoutEndImages,
         end_images:
           finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
             ? finalEndImages.filter((img): img is EndImage => !!img?.url)
             : undefined,
       };
 
-      // For videos: only send middle_video_url, don't send middle_image_url at all
-      // Backend will automatically clear middle_image_url when middle_video_url is present
-      if (middleVideoUrl) {
+      // For articles: only send middle_video_url, don't send middle_video_url at all
+      // Backend will automatically clear middle_video_url when middle_video_url is present
+      if (finalMiddleVideoUrl) {
         params.middle_video_url = finalMiddleVideoUrl;
-        params.middle_video_name = middleVideoName;
+        params.middle_video_name = finalMiddleVideoName;
       } else {
-        // If no video, set to null to clear it
+        // If no image, set to null to clear it
         params.middle_video_url = null;
         params.middle_video_name = null;
       }
-      // Do NOT include middle_image_url or middle_image_name in the request
+      // Do NOT include middle_video_url or middle_video_name in the request
 
       if (news) {
-        await updateNews(news.id, params);
+        await updateAdminVideo(news.id, params);
       } else {
-        await createNews(params);
+        await createAdminVideo(params);
+      }
+
+      // Delete removed inline images from storage only after successful save.
+      const removedInlineUrls = new Set<string>(removedInlineImageUrlsRef.current);
+      if (news?.content_blocks) {
+        const oldInlineUrls = extractImageUrlsFromBlocks(news.content_blocks);
+        const newInlineUrls = extractImageUrlsFromBlocks(contentBlocksWithoutEndImages);
+        for (const oldUrl of oldInlineUrls) {
+          if (!newInlineUrls.has(oldUrl)) {
+            removedInlineUrls.add(oldUrl);
+          }
+        }
+      }
+      // Protect media that are still referenced by article fields.
+      const retainedMediaUrls = new Set<string>();
+      if (finalCover) retainedMediaUrls.add(finalCover);
+      if (finalMiddleVideoUrl) retainedMediaUrls.add(finalMiddleVideoUrl);
+      finalEndImages
+        .filter((img): img is EndImage => !!img?.url)
+        .forEach((img) => retainedMediaUrls.add(img.url));
+      for (const keptUrl of retainedMediaUrls) {
+        removedInlineUrls.delete(keptUrl);
+      }
+      for (const removedUrl of removedInlineUrls) {
+        try {
+          await deleteImageByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
+      // Delete removed inline videos from storage only after successful save.
+      const removedInlineVideoUrls = new Set<string>(removedInlineVideoUrlsRef.current);
+      if (news?.content_blocks) {
+        const oldInlineVideoUrls = new Set<string>();
+        for (const block of news.content_blocks) {
+          for (const match of (block.paragraph || "").matchAll(
+            /<video[^>]*src="([^"]+)"/g,
+          )) {
+            const src = (match[1] || "").trim();
+            if (!src) continue;
+            oldInlineVideoUrls.add(src);
+          }
+        }
+        const newInlineVideoUrls = new Set<string>();
+        for (const block of contentBlocksWithoutEndImages) {
+          for (const match of (block.paragraph || "").matchAll(
+            /<video[^>]*src="([^"]+)"/g,
+          )) {
+            const src = (match[1] || "").trim();
+            if (!src) continue;
+            newInlineVideoUrls.add(src);
+          }
+        }
+        for (const oldUrl of oldInlineVideoUrls) {
+          if (!newInlineVideoUrls.has(oldUrl)) {
+            removedInlineVideoUrls.add(oldUrl);
+          }
+        }
+      }
+      for (const keptUrl of retainedMediaUrls) {
+        removedInlineVideoUrls.delete(keptUrl);
+      }
+      for (const removedUrl of removedInlineVideoUrls) {
+        try {
+          await deleteVideoByUrlIfPresent(removedUrl);
+        } catch {
+          // best-effort delete only
+        }
+      }
+
+      // Delete removed middle/end images from storage only after successful save.
+      for (const removedUrl of removedMediaUrls) {
+        try {
+          await deleteVideoByUrlIfPresent(removedUrl);
+        } catch {
+          try {
+            await deleteImageByUrlIfPresent(removedUrl);
+          } catch {
+            // best-effort delete only
+          }
+        }
       }
 
       onSuccess();
+      inlinePendingImagesRef.current = {};
+      inlinePendingVideosRef.current = {};
+      removedInlineImageUrlsRef.current = new Set();
+      removedInlineVideoUrlsRef.current = new Set();
       onClose();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to save video article";
+        err instanceof Error ? err.message : "Failed to save article";
       setError(errorMessage);
     } finally {
       setCoverUploading(false);
       setMiddleVideoUploading(false);
       setEndImageUploadingIndex(null);
+      setInlineImageUploading(false);
       setLoading(false);
     }
   };
@@ -475,9 +1888,11 @@ function NewsModal({
   categories.forEach((cat) => {
     allCategories.push({ id: cat.id, name: cat.name, isSub: false });
     cat.subcategories.forEach((sub) => {
-      allCategories.push({ id: sub.id, name: `  └ ${sub.name}`, isSub: true });
+      allCategories.push({ id: sub.id, name: `  ${sub.name}`, isSub: true });
     });
   });
+  const selectedCategoryName =
+    allCategories.find((cat) => cat.id === categoryId)?.name ?? "Select category";
 
   if (!isOpen) return null;
 
@@ -485,7 +1900,7 @@ function NewsModal({
     <>
       {!asPage && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-100"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
           onClick={onClose}
         />
       )}
@@ -493,21 +1908,156 @@ function NewsModal({
         className={
           asPage
             ? "relative"
-            : "fixed inset-0 z-100 flex items-center justify-center p-4"
+            : "fixed inset-0 z-50 flex items-center justify-center p-4"
         }
     >
         <div
           className={
             asPage
-              ? "bg-white w-full min-h-screen overflow-y-auto"
-              : "bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              ? "bg-[#f7f7f7] w-full min-h-screen"
+              : "bg-[#f7f7f7] rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
           }
           onClick={(e) => e.stopPropagation()}
       >
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white">
+          <div className="sticky top-0 z-50 flex items-center justify-between p-4 border-b border-gray-200 bg-[#f7f7f7]/98">
             <h2 className="text-xl font-semibold text-gray-900">
               {news ? "Edit" : "Create"} Video Article
             </h2>
+            {asPage && (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={inlineImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={(e) => handleInlineImageFileChange(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (
+                      loading ||
+                      middleVideoUploading ||
+                      activeEditorBlockIndex === null
+                    )
+                      return;
+                    savedInlineImageBlockIndexRef.current =
+                      activeSelection?.blockIndex ?? activeEditorBlockIndex;
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                      const range = selection.getRangeAt(0);
+                      savedInlineImageRangeRef.current = range.cloneRange();
+                    } else {
+                      savedInlineImageRangeRef.current = null;
+                    }
+                    const input = middleVideoFileInputRef.current;
+                    if (!input) return;
+                    input.value = "";
+                    input.click();
+                  }}
+                  disabled={
+                    loading || middleVideoUploading || activeEditorBlockIndex === null
+                  }
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {middleVideoUploading ? "Adding..." : "Mid Video"}
+                </button>
+                <input
+                  ref={middleVideoFileInputRef}
+                  type="file"
+                  accept="video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
+                  className="hidden"
+                  onChange={(e) => handleSelectMiddleVideoFile(e.target.files?.[0])}
+                />
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInlineImageButtonClick("end")}
+                  disabled={loading || inlineImageUploading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {inlineImageUploading ? "Adding..." : "End Image"}
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("quote")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.quote
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Quote
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("subtitle")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.subtitle
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Subtitle
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("link")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.link
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  Link
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("italic")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium italic text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  i
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applySelectionFormat("bold")}
+                  disabled={loading || activeEditorBlockIndex === null}
+                  className={`cursor-pointer rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    activeTextFormat.bold
+                      ? "bg-gray-200 text-gray-900 hover:bg-gray-300"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="article-editor-form"
+                  disabled={loading || !author.trim()}
+                  className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            )}
             {!asPage && (
               <button
                 onClick={onClose}
@@ -520,42 +2070,203 @@ function NewsModal({
           </div>
 
           <form
+            id="article-editor-form"
             onSubmit={handleSubmit}
-            className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] gap-6"
+            className={
+              asPage
+                ? "mx-auto w-full max-w-[980px] px-6 md:px-10 py-8 grid grid-cols-1 gap-8"
+                : "p-6 grid grid-cols-1 gap-6"
+            }
         >
             {/* Left column: keep Details + Content Blocks together */}
             <div className="min-w-0 space-y-6">
               {/* Basic Information Section */}
-              <div className="space-y-4 min-w-0">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Details
-                </h3>
-              </div>
+              <div className="order-2 space-y-4 min-w-0">
+              {!asPage && (
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
+                  <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Details
+                  </h3>
+                </div>
+              )}
+
+              {asPage && (
+                <div className="relative flex items-center gap-2 text-gray-500">
+                  {!cover && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (loading || coverUploading) return;
+                          const input = coverFileInputRef.current;
+                          if (!input) return;
+                          input.value = "";
+                          input.click();
+                        }}
+                        className="cursor-pointer h-8 w-[140px] rounded-md border-0 bg-[#f7f7f7] px-0 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700 focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                        disabled={loading || coverUploading}
+                        aria-label="Add thumbnail"
+                      >
+                        <span className="inline-flex h-full w-full items-center justify-center gap-1.5 leading-none">
+                          <ImageIcon className="h-[13px] w-[13px] shrink-0" />
+                          <span className="leading-none pt-1">Add thumbnail</span>
+                        </span>
+                      </button>
+                      <input
+                        ref={coverFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        className="sr-only"
+                        onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                      />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCategorySelector((prev) => !prev)}
+                    className="pt-1 cursor-pointer h-8 rounded-md border-0 bg-[#f7f7f7] px-3 text-[14px] font-medium text-gray-500 outline-none ring-0 transition-colors hover:bg-[#ececec] hover:text-gray-700"
+                    disabled={loading}
+                  >
+                    Category: {selectedCategoryName.trim()}
+                  </button>
+                  {showCategorySelector && (
+                    <div className="absolute top-10 left-0 z-20 max-h-64 w-[260px] overflow-y-auto rounded-md border border-gray-200 bg-white p-1 shadow-sm">
+                      {allCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryId(cat.id);
+                            setShowCategorySelector(false);
+                          }}
+                          className={`w-full cursor-pointer rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${
+                            categoryId === cat.id
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Title - Full Width */}
+              {asPage && (
+                <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                  <h3 className="text-sm font-semibold text-gray-700">Title</h3>
+                </div>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Article Title <span className="text-red-500">*</span>
-                  <span className="text-xs font-normal text-gray-500 ml-2">
-                    ({title.length}/160 characters)
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Enter a compelling article title..."
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                  disabled={loading}
-                  required
-                  maxLength={160}
-                />
+                {!asPage && (
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Article Title
+                    <span className="text-xs font-normal text-gray-500 ml-2">
+                      ({title.length}/500 characters)
+                    </span>
+                  </label>
+                )}
+                {asPage ? (
+                  <div className="relative w-full max-w-[860px]">
+                    <div className="pointer-events-none absolute -left-15 top-2">
+                      <span className="block text-sm text-gray-500">Title</span>
+                      <span className="mt-1 block text-[11px] text-gray-400">
+                        {title.length}/500
+                      </span>
+                    </div>
+                    <div className="absolute -left-3 top-0 h-full w-px bg-gray-300" />
+                    <textarea
+                      ref={titleTextareaRef}
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="New post"
+                      rows={1}
+                      className="w-full resize-none overflow-hidden bg-transparent text-[24px] leading-[1.3] font-normal text-black placeholder:text-gray-500 outline-none border-0 pt-[16px] px-0 pb-0"
+                      disabled={loading}
+                      maxLength={500}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Enter a compelling article title..."
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+                    disabled={loading}
+                    maxLength={500}
+                  />
+                )}
               </div>
 
+              {asPage && cover && (
+                <div className="pt-2">
+                  <div className="group relative w-full max-w-[860px]">
+                    <button
+                      type="button"
+                      className="cursor-pointer block w-full text-left"
+                      aria-label="Toggle thumbnail actions"
+                    >
+                      <img
+                        src={cover}
+                        alt="Cover"
+                        className="w-full h-auto object-cover rounded-sm"
+                      />
+                    </button>
+
+                    <div className="absolute top-3 right-3 z-10 flex items-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextName = window.prompt(
+                            "Image Name",
+                            coverName || "",
+                          );
+                          if (nextName === null) return;
+                          const normalized = nextName.trim();
+                          setCoverName(normalized || null);
+                        }}
+                        className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
+                        disabled={loading || coverUploading}
+                      >
+                        Image Name
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          coverFileInputRef.current?.click();
+                        }}
+                        className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
+                        disabled={loading || coverUploading}
+                      >
+                        {coverUploading ? "Uploading..." : "Change"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCover(null);
+                          setCoverName(null);
+                          setCoverUrlInput("");
+                        }}
+                        className="cursor-pointer rounded-md border border-red-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                        disabled={loading || coverUploading}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Category and Author - Side by Side */}
-              <div className="grid grid-cols-2 gap-4">
+              {!asPage && (
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Category
@@ -578,444 +2289,239 @@ function NewsModal({
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Author <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={author || ""}
-                    readOnly
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-gray-900"
-                    disabled
-                    required
-                  />
-                </div>
               </div>
+              )}
             </div>
 
               {/* Content Blocks Section */}
               <div className="space-y-4 min-w-0">
-                <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Content Blocks <span className="text-red-500">*</span>
-                    </h3>
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Content</h3>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddContentBlock}
-                    className="cursor-pointer px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 font-medium"
-                    disabled={loading}
-                >
-                    <Plus size={14} />
-                    Add Block
-                  </button>
+                )}
+                <div className="">
+                  {!asPage && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-6 bg-blue-600 rounded"></div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Content Blocks <span className="text-red-500">*</span>
+                      </h3>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-3">
+                <div className={asPage ? "space-y-6" : "space-y-3"}>
                   {contentBlocks.map((block, index) => (
                     <div
                       key={index}
-                      className="p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      className={
+                        asPage
+                          ? "relative w-full max-w-[860px]"
+                          : "p-4 border border-gray-300 rounded-lg bg-white hover:border-blue-400 hover:shadow-sm transition-all"
+                      }
                   >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
-                            <span className="text-xs font-semibold text-blue-600">
-                              {index + 1}
+                      {!asPage && (
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center">
+                              <span className="text-xs font-semibold text-blue-600">
+                                {index + 1}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">
+                              Block {index + 1}
                             </span>
                           </div>
-                          <span className="text-sm font-medium text-gray-700">
-                            Block {index + 1}
-                          </span>
+                          {contentBlocks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveContentBlock(index)}
+                              className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
+                              disabled={loading}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
-                        {contentBlocks.length > 1 && (
+                      )}
+                      {asPage && contentBlocks.length > 1 && (
+                        <div className="absolute right-0 top-0">
                           <button
                             type="button"
                             onClick={() => handleRemoveContentBlock(index)}
                             className="cursor-pointer px-2 py-1 text-xs text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors font-medium"
                             disabled={loading}
-                        >
+                          >
                             Remove
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="space-y-2.5">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Subtitle{" "}
-                            <span className="text-gray-400 font-normal">
-                              (Optional)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            value={block.subtitle || ""}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "subtitle",
-                                e.target.value || null,
-                              )
-                            }
-                            placeholder="Enter a subtitle for this block (optional)..."
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Content <span className="text-red-500">*</span>
-                          </label>
-                          <textarea
-                            value={block.paragraph}
-                            onChange={(e) =>
-                              handleUpdateContentBlock(
-                                index,
-                                "paragraph",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Enter the main content for this block..."
-                            rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
-                            disabled={loading}
-                            required
-                          />
-                        </div>
+                        {asPage ? (
+                          <div className="relative w-full">
+                            <div className="pointer-events-none mb-2 block text-sm text-gray-500 md:hidden">
+                              {index === 0 ? "Content" : `Content ${index + 1}`}
+                            </div>
+                            <div className="pointer-events-none absolute -left-20 top-2 hidden md:block">
+                              <span className="block text-sm text-gray-500">
+                                {index === 0 ? "Content" : `Content ${index + 1}`}
+                              </span>
+                            </div>
+                            <div className="absolute -left-3 top-0 hidden h-full w-px bg-gray-300 md:block" />
+                            <div
+                              ref={(el) => {
+                                contentTextareaRefs.current[index] = el;
+                                if (!el) return;
+                                const nextHtml = block.paragraph || "";
+                                const isFocused = document.activeElement === el;
+                                if (!isFocused && el.innerHTML !== nextHtml) {
+                                  el.innerHTML = nextHtml;
+                                }
+                                decorateInlineImagesInEditor(el, index);
+                              }}
+                              contentEditable={!loading}
+                              suppressContentEditableWarning
+                              onFocus={(e) =>
+                                decorateInlineImagesInEditor(e.currentTarget, index)
+                              }
+                              onInput={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.currentTarget.innerHTML,
+                                )
+                              }
+                              onPaste={(e) => handleContentPaste(index, e)}
+                              onSelect={(e) => handleContentSelection(index, e)}
+                              onMouseUp={(e) => handleContentSelection(index, e)}
+                              onKeyDown={(e) => handleContentKeyDown(index, e)}
+                              onKeyUp={(e) => handleContentSelection(index, e)}
+                              onClick={(e) => handleContentEditorClick(index, e)}
+                              onBlur={() => {
+                                setActiveSelection(null);
+                                setActiveEditorBlockIndex(null);
+                                setActiveTextFormat({
+                                  bold: false,
+                                  subtitle: false,
+                                  link: false,
+                                  quote: false,
+                                });
+                              }}
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Content <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                              value={block.paragraph}
+                              onChange={(e) =>
+                                handleUpdateContentBlock(
+                                  index,
+                                  "paragraph",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Enter the main content for this block..."
+                              rows={4}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-sm text-gray-900 placeholder:text-gray-400 bg-white"
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
 
-            {/* Images & Video Section - right column */}
-            <div className="space-y-4 min-w-0 lg:border-l lg:border-gray-200 lg:pl-6">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-gray-200">
-                <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Images & Video
-                </h3>
-              </div>
-
-              {/* Cover Image */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cover Image
-                </label>
-                {cover ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <img
-                        src={cover}
-                        alt="Cover"
-                        className="w-32 h-32 object-cover rounded-lg border border-gray-300 shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCover(null);
-                          setCoverName(null);
-                          setCoverUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || coverUploading}
-                    >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Image Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={coverName || ""}
-                          onChange={(e) => setCoverName(e.target.value || null)}
-                          placeholder="Enter image name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => coverFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || coverUploading}
-                    >
-                        {coverUploading ? "Uploading..." : "Change Image"}
-                      </button>
-                      <input
-                        ref={coverFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectCoverFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => coverFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || coverUploading}
-                  >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <ImageIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Cover Image
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={coverFileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg"
-                      className="hidden"
-                      onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={coverUrlInput}
-                      onChange={(e) => handleCoverUrlChange(e.target.value)}
-                      placeholder="Enter image URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
+              {/* End Images Section */}
+              <div className="space-y-4 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Image</h3>
                   </div>
                 )}
-              </div>
-
-              {/* Middle Video */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Middle Video <span className="text-red-500">*</span>
-                </label>
-                {middleVideoUrl ? (
-                  <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="relative shrink-0">
-                      <video
-                        src={middleVideoUrl}
-                        controls
-                        className="w-48 h-32 rounded-lg border border-gray-300 shadow-sm bg-black object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMiddleVideoUrl(null);
-                          setMiddleVideoName(null);
-                          setMiddleVideoUrlInput("");
-                        }}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                        disabled={loading || middleVideoUploading}
-                    >
-                        <X size={12} />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Video Name{" "}
-                          <span className="text-gray-400 font-normal">
-                            (Optional)
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={middleVideoName || ""}
-                          onChange={(e) =>
-                            setMiddleVideoName(e.target.value || null)
-                          }
-                          placeholder="Enter video name (optional)..."
-                          className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                          disabled={loading}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => middleVideoFileInputRef.current?.click()}
-                        className="cursor-pointer px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
-                        disabled={loading || middleVideoUploading}
-                    >
-                        {middleVideoUploading ? "Uploading..." : "Change Video"}
-                      </button>
-                      <input
-                        ref={middleVideoFileInputRef}
-                        type="file"
-                        accept="video/mp4,video/webm,video/quicktime"
-                        className="hidden"
-                        onChange={(e) =>
-                          handleSelectMiddleVideoFile(e.target.files?.[0])
-                        }
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => middleVideoFileInputRef.current?.click()}
-                      className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                      disabled={loading || middleVideoUploading}
-                  >
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                          <VideoIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          Select Middle Video
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Click to upload from your computer
-                        </p>
-                      </div>
-                    </button>
-                    <input
-                      ref={middleVideoFileInputRef}
-                      type="file"
-                      accept="video/mp4,video/webm,video/quicktime"
-                      className="hidden"
-                      onChange={(e) =>
-                        handleSelectMiddleVideoFile(e.target.files?.[0])
-                      }
-                    />
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 border-t border-gray-300"></div>
-                      <span className="text-xs text-gray-500">OR</span>
-                      <div className="flex-1 border-t border-gray-300"></div>
-                    </div>
-                    <input
-                      type="url"
-                      value={middleVideoUrlInput}
-                      onChange={(e) => handleMiddleVideoUrlChange(e.target.value)}
-                      placeholder="Enter video URL..."
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* End Images (stacked slots) */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  End Images{" "}
-                  <span className="text-xs font-normal text-gray-500">
-                    (Max 3)
-                  </span>
-                </label>
-                <div className="space-y-3">
-                  {[0, 1, 2].map((slotIndex) => {
-                    const img = endImages[slotIndex];
-                    const isUploading = endImageUploadingIndex === slotIndex;
+                <div className="w-full max-w-[860px] grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {[0, 1, 2].map((slot) => {
+                    const slotImage = endImages[slot];
                     return (
-                      <div key={slotIndex} className="space-y-2">
-                        {img ? (
+                      <div
+                        key={slot}
+                        className="rounded-md border border-gray-200 bg-white p-2"
+                      >
+                        {slotImage?.url ? (
                           <>
-                            <div className="relative group">
-                              <div className="relative aspect-square rounded-lg border border-gray-300 overflow-hidden bg-gray-100">
-                                <img
-                                  src={img.url}
-                                  alt={img.name || `End ${slotIndex + 1}`}
-                                  className="w-full h-full object-cover"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEndImage(slotIndex)}
-                                  className="absolute top-1.5 right-1.5 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100 shadow-md"
-                                  disabled={loading || isUploading}
+                            <img
+                              src={slotImage.url}
+                              alt={slotImage.name || `End image ${slot + 1}`}
+                              className="w-full rounded-md object-cover aspect-[100/53]"
+                            />
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
                               >
-                                  <X size={10} />
-                                </button>
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Name{" "}
-                                <span className="text-gray-400 font-normal">
-                                  (Optional)
-                                </span>
-                              </label>
-                              <input
-                                type="text"
-                                value={img.name || ""}
-                                onChange={(e) => {
-                                  const updated = [...endImages];
-                                  updated[slotIndex] = {
-                                    ...updated[slotIndex],
-                                    name: e.target.value || null,
-                                  };
-                                  setEndImages(updated);
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextName = window.prompt(
+                                    "Image Name",
+                                    slotImage.name || "",
+                                  );
+                                  if (nextName === null) return;
+                                  const normalized = nextName.trim();
+                                  setEndImages((prev) => {
+                                    const next = [...prev];
+                                    if (!next[slot]) return prev;
+                                    next[slot] = {
+                                      ...next[slot],
+                                      name: normalized || null,
+                                    };
+                                    return next;
+                                  });
                                 }}
-                                placeholder="Enter name (optional)..."
-                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                                disabled={loading || isUploading}
-                              />
+                                className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                disabled={loading}
+                              >
+                                Image Name
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveEndImage(slot)}
+                                className="cursor-pointer rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                                disabled={loading}
+                              >
+                                Remove
+                              </button>
                             </div>
                           </>
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                endImageFileInputRefs.current[slotIndex]?.click()
-                              }
-                              className="cursor-pointer w-full border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 hover:border-blue-400 hover:bg-blue-50/30 transition-colors text-center group"
-                              disabled={loading || isUploading}
+                          <button
+                            type="button"
+                            onClick={() => endImageFileInputRefs.current[slot]?.click()}
+                            className="flex h-[110px] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-gray-300 text-xs text-gray-500 hover:bg-gray-50"
+                            disabled={loading}
                           >
-                              <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mb-2 group-hover:bg-blue-100 transition-colors">
-                                  <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
-                                </div>
-                                <p className="text-xs font-medium text-gray-700 mb-0.5">
-                                  {isUploading
-                                    ? "Uploading..."
-                                    : `Select End Image ${slotIndex + 1}`}
-                                </p>
-                                {!isUploading && (
-                                  <p className="text-[11px] text-gray-500">
-                                    Click to upload from your computer
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg"
-                              className="hidden"
-                              ref={(el) => {
-                                endImageFileInputRefs.current[slotIndex] = el;
-                              }}
-                              onChange={(e) =>
-                                handleSelectEndImageFile(
-                                  slotIndex,
-                                  e.target.files?.[0],
-                                )
-                              }
-                            />
-                          </>
+                            Add End Image
+                          </button>
                         )}
+                        <input
+                          ref={(el) => {
+                            endImageFileInputRefs.current[slot] = el;
+                          }}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg"
+                          className="sr-only"
+                          onChange={(e) => handleSelectEndImageFile(slot, e.target.files?.[0])}
+                        />
                       </div>
                     );
                   })}
@@ -1023,15 +2529,15 @@ function NewsModal({
               </div>
             </div>
 
-
             {error && (
-              <div className="order-4 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="order-3 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
             {/* Footer Actions */}
-            <div className="order-5 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            {!asPage && (
+            <div className="order-4 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
@@ -1042,10 +2548,8 @@ function NewsModal({
               </button>
               <button
                 type="submit"
-                disabled={
-                  loading || !title.trim() || !author.trim() || !middleVideoUrl
-                }
-                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
+                disabled={loading || !author.trim()}
+                className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
             >
                 {loading
                   ? "Saving..."
@@ -1054,6 +2558,7 @@ function NewsModal({
                     : "Create Video Article"}
               </button>
             </div>
+            )}
           </form>
         </div>
       </div>
@@ -1069,6 +2574,7 @@ function NewsModal({
         isOpen={isMiddleVideoModalOpen}
         onClose={() => setIsMiddleVideoModalOpen(false)}
         onSelect={handleSelectMiddleVideo}
+        allowUpload={false}
       />
 
       <ImageSelectorModal
@@ -1091,56 +2597,132 @@ export default function VideoManagement() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Ref to track if fetch has been called to prevent duplicate calls in React Strict Mode
-  const hasFetchedRef = useRef(false);
+  const [itemsPerPage, setItemsPerPage] =
+    useState<(typeof PER_PAGE_OPTIONS)[number]>(30);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedArticle, setSelectedArticle] = useState<News | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const hasFetchedInitialArticlesRef = useRef(false);
+  const hasFetchedCategoriesRef = useRef(false);
+  const hasPassedFirstPaginationEffectRef = useRef(false);
   const mode = searchParams.get("mode");
   const editId = Number(searchParams.get("id"));
   const isCreatePage = mode === "create";
   const isEditPage = mode === "edit" && Number.isFinite(editId);
-  const selectedArticle = isEditPage
-    ? articles.find((article) => article.id === editId) || null
-    : null;
 
-  useEffect(() => {
-    // Prevent duplicate calls in React Strict Mode (development)
-    if (hasFetchedRef.current) {
-      return;
-    }
-
-    hasFetchedRef.current = true;
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchArticles = async (
+    page: number = currentPage,
+    perPage: number = itemsPerPage,
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      const [newsResponse, categoriesResponse] = await Promise.all([
-        getNews(),
-        getCategories(),
-      ]);
-
-      // Filter articles: middle_video_url is not null
-      const filteredArticles = newsResponse.data.filter(
-        (article) => article.middle_video_url !== null,
-      );
+      const newsResponse = await getAdminVideos(undefined, page, perPage);
 
       // Sort articles by date (latest first) - so numbering goes from highest to lowest
-      const sortedArticles = filteredArticles.sort((a, b) => {
+      const sortedArticles = newsResponse.data.sort((a, b) => {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
         return dateB - dateA; // Descending order (latest first)
       });
 
+      const pagination = newsResponse.pagination;
       setArticles(sortedArticles);
-      setCategories(categoriesResponse.categories);
-      setCurrentPage(1); // Reset to first page when data is fetched
+      setTotalItems(pagination?.total ?? sortedArticles.length);
+      setTotalPages(
+        pagination?.last_page ??
+          Math.max(1, Math.ceil(sortedArticles.length / perPage)),
+      );
+      setCurrentPage(pagination?.current_page ?? page);
     } catch (err) {
       console.error("Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasFetchedCategoriesRef.current) return;
+    hasFetchedCategoriesRef.current = true;
+
+    const fetchCategoriesData = async () => {
+      try {
+        const categoriesResponse = await getCategories();
+        setCategories(categoriesResponse.categories);
+      } catch {
+        setCategories([]);
+      }
+    };
+
+    fetchCategoriesData();
+  }, []);
+
+  useEffect(() => {
+    if (hasFetchedInitialArticlesRef.current) return;
+    if (isCreatePage || isEditPage) {
+      setLoading(false);
+      return;
+    }
+    hasFetchedInitialArticlesRef.current = true;
+    fetchArticles(currentPage, itemsPerPage);
+  }, [isCreatePage, isEditPage]);
+
+  useEffect(() => {
+    if (isCreatePage || isEditPage) return;
+    if (!hasPassedFirstPaginationEffectRef.current) {
+      hasPassedFirstPaginationEffectRef.current = true;
+      return;
+    }
+    fetchArticles(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage, isCreatePage, isEditPage]);
+
+  useEffect(() => {
+    if (!isEditPage) {
+      setSelectedArticle(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchSelectedArticle = async () => {
+      try {
+        setEditLoading(true);
+        const response = await getAdminVideoById(editId);
+        if (isMounted) {
+          setSelectedArticle(response.data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch selected article",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setEditLoading(false);
+        }
+      }
+    };
+
+    fetchSelectedArticle();
+    return () => {
+      isMounted = false;
+    };
+  }, [isEditPage, editId]);
+
+  const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endIndex =
+    totalItems === 0 ? 0 : Math.min((currentPage - 1) * itemsPerPage + articles.length, totalItems);
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      // Scroll to top of content area
+      const contentArea = document.querySelector(".flex-1.overflow-y-auto");
+      if (contentArea) {
+        contentArea.scrollTop = 0;
+      }
     }
   };
 
@@ -1156,64 +2738,23 @@ export default function VideoManagement() {
     router.push(pathname);
   };
 
-  // Calculate pagination data with useMemo for performance
-  const paginatedData = useMemo(() => {
-    const totalPages = Math.ceil(articles.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedArticles = articles.slice(startIndex, endIndex);
-
-    return {
-      paginatedArticles,
-      totalPages,
-      totalItems: articles.length,
-      startIndex: startIndex + 1,
-      endIndex: Math.min(endIndex, articles.length),
-    };
-  }, [articles, currentPage]);
-
-  // Reset to page 1 if current page is out of bounds
-  useEffect(() => {
-    if (
-      paginatedData.totalPages > 0 &&
-      currentPage > paginatedData.totalPages
-    ) {
-      setCurrentPage(1);
-    }
-  }, [paginatedData.totalPages, currentPage]);
-
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= paginatedData.totalPages) {
-      setCurrentPage(page);
-      // Scroll to top of content area
-      const contentArea = document.querySelector(".flex-1.overflow-y-auto");
-      if (contentArea) {
-        contentArea.scrollTop = 0;
-      }
-    }
-  };
-
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this video article?")) {
+    if (!confirm("Are you sure you want to delete this article?")) {
       return;
     }
 
     try {
       setDeletingId(id);
-      await deleteNews(id);
-
-      // Remove the deleted item from the state
-      const updatedArticles = articles.filter((article) => article.id !== id);
-      setArticles(updatedArticles);
-
-      // Adjust page if needed (if we deleted the last item on the current page)
-      const newTotalPages = Math.ceil(updatedArticles.length / ITEMS_PER_PAGE);
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
+      await deleteAdminVideo(id);
+      const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      if (nextPage !== currentPage) {
+        setCurrentPage(nextPage);
+      } else {
+        await fetchArticles(nextPage, itemsPerPage);
       }
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete video article";
+        err instanceof Error ? err.message : "Failed to delete article";
       alert(errorMessage);
     } finally {
       setDeletingId(null);
@@ -1235,7 +2776,9 @@ export default function VideoManagement() {
     };
   };
 
-  if (loading) {
+  const shouldShowLoading = isEditPage ? editLoading : loading;
+
+  if (shouldShowLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <p className="text-gray-600">Loading video articles...</p>
@@ -1248,7 +2791,7 @@ export default function VideoManagement() {
       <div className="flex flex-col items-center justify-center h-screen">
         <p className="text-red-600 mb-4">Error: {error}</p>
         <button
-          onClick={fetchData}
+          onClick={() => fetchArticles()}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
       >
           Retry
@@ -1256,16 +2799,19 @@ export default function VideoManagement() {
       </div>
     );
   }
+  
 
   if (isCreatePage || isEditPage) {
     return (
-      <div className="min-h-screen overflow-y-auto bg-[#f7f7f7]">
+      <div className="h-screen overflow-y-auto bg-[#f7f7f7]">
         <NewsModal
           isOpen
           asPage
           onClose={closeEditorPage}
           onSuccess={async () => {
-            await fetchData();
+            if (!isCreatePage) {
+              await fetchArticles();
+            }
             closeEditorPage();
           }}
           news={isEditPage ? selectedArticle : null}
@@ -1279,13 +2825,6 @@ export default function VideoManagement() {
   return (
     <div className="relative h-screen flex flex-col bg-[#f7f7f7]">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Video Management
-          </h2>
-        </div>
-      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto bg-[#f7f7f7]">
@@ -1312,20 +2851,20 @@ export default function VideoManagement() {
             {/* Table Header */}
             <div className="sticky top-0 z-20 h-16 bg-[#f7f7f7] border-b border-gray-200 px-6 flex items-center shadow-[0_2px_3px_rgba(15,23,42,0.06)]">
               <div className="grid h-full w-full grid-cols-[50px_130px_minmax(280px,3fr)_90px_1fr_1fr_120px_88px] gap-[5px] text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                <div className="flex h-full items-center justify-center">No.</div>
-                <div className="flex h-full items-center justify-center">Cover Image</div>
-                <div className="flex h-full items-center justify-center">Title</div>
-                <div className="flex h-full items-center justify-center">Visibility</div>
-                <div className="flex h-full items-center justify-center">Category</div>
-                <div className="flex h-full items-center justify-center">Author</div>
-                <div className="flex h-full items-center justify-center">Upload Date</div>
+                <div className="flex h-full items-center justify-left">No.</div>
+                <div className="flex h-full items-center justify-left">Cover Image</div>
+                <div className="flex h-full items-center justify-left">Title</div>
+                <div className="flex h-full items-center justify-left">Visibility</div>
+                <div className="flex h-full items-center justify-left">Category</div>
+                <div className="flex h-full items-center justify-left">Author</div>
+                <div className="flex h-full items-center justify-left">Upload Date</div>
                 <div className="flex h-full items-center justify-center">View</div>
               </div>
             </div>
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {paginatedData.paginatedArticles.map((article, index) => (
+              {articles.map((article, index) => (
                 <div
                   key={article.id}
                   className="group px-6 h-[85px] hover:bg-[#ececec] transition-colors"
@@ -1337,10 +2876,7 @@ export default function VideoManagement() {
                       onClick={() => handleEditArticle(article)}
                     >
                       <span className="text-xs font-medium text-gray-900">
-                        {paginatedData.totalItems -
-                          paginatedData.startIndex -
-                          index +
-                          1}
+                        {totalItems - (currentPage - 1) * itemsPerPage - index}
                       </span>
                     </div>
 
@@ -1372,7 +2908,7 @@ export default function VideoManagement() {
 
                     {/* Title */}
                     <div
-                      className="cursor-pointer pl-1"
+                      className="cursor-pointer"
                       onClick={() => handleEditArticle(article)}
                     >
                       <h3 className="text-[13px] font-semibold text-gray-900 leading-5 line-clamp-1">
@@ -1380,12 +2916,14 @@ export default function VideoManagement() {
                       </h3>
                       <div className="relative h-10 mt-0.5">
                         <p className="absolute inset-0 text-[13px] text-gray-500 leading-5 line-clamp-2 group-hover:opacity-0 transition-opacity">
-                          {article.content_blocks?.find((block) => block.paragraph?.trim())
-                            ?.paragraph ||
-                            article.subtitle ||
-                            ""}
+                          {toPlainPreviewText(
+                            article.content_blocks?.find((block) => block.paragraph?.trim())
+                              ?.paragraph ||
+                              article.subtitle ||
+                              "",
+                          )}
                         </p>
-                        <div className="absolute inset-0 w-full flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute inset-0 flex items-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1412,7 +2950,7 @@ export default function VideoManagement() {
                     </div>
 
                     {/* Visibility */}
-                    <div className="pl-2">
+                    <div>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                         Visible
                       </span>
@@ -1450,7 +2988,7 @@ export default function VideoManagement() {
                     </div>
 
                     {/* View */}
-                    <div className="text-center">
+                    <div className="pr-1 text-center">
                       <button
                         type="button"
                         className="cursor-pointer text-xs font-medium text-blue-600 hover:text-blue-700"
@@ -1467,25 +3005,32 @@ export default function VideoManagement() {
         )}
 
         {/* Pagination - Table Style */}
-        {articles.length > 0 && (
+        {totalItems > 0 && (
           <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
             <div className="flex items-center justify-between">
               {/* Left side: Rows per page */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-700">Rows per page:</span>
                 <select
-                  value={ITEMS_PER_PAGE}
-                  disabled
-                  className="px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700 cursor-not-allowed"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    const value = Number(e.target.value) as (typeof PER_PAGE_OPTIONS)[number];
+                    setItemsPerPage(value);
+                    setCurrentPage(1);
+                  }}
+                  className="cursor-pointer px-2 py-1 text-sm border border-gray-300 rounded bg-white text-gray-700"
               >
-                  <option value={15}>15</option>
+                  {PER_PAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* Center: Page info */}
               <div className="text-sm text-gray-700">
-                {paginatedData.startIndex}-{paginatedData.endIndex} of{" "}
-                {paginatedData.totalItems}
+                {startIndex}-{endIndex} of {totalItems}
               </div>
 
               {/* Right side: Navigation buttons */}
@@ -1513,7 +3058,7 @@ export default function VideoManagement() {
                 {/* Next Button */}
                 <button
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Next page"
               >
@@ -1522,8 +3067,8 @@ export default function VideoManagement() {
 
                 {/* Last Page Button */}
                 <button
-                  onClick={() => goToPage(paginatedData.totalPages)}
-                  disabled={currentPage === paginatedData.totalPages}
+                  onClick={() => goToPage(totalPages)}
+                  disabled={currentPage === totalPages}
                   className="cursor-pointer flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Last page"
               >
@@ -1534,10 +3079,9 @@ export default function VideoManagement() {
           </div>
         )}
       </div>
-
       <button
         onClick={handleCreateArticle}
-        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-white text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
+        className="cursor-pointer fixed bottom-15 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full border border-gray-300 bg-[#f7f7f7] text-black shadow-md transition-colors hover:bg-[#f2f2f2] active:bg-[#e9e9e9]"
         aria-label="Create video article"
         title="Create video article"
       >

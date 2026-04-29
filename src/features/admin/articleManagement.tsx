@@ -516,26 +516,68 @@ function NewsModal({
     const root = doc.body.firstElementChild;
     if (!root) return html;
 
-    const nodes = root.querySelectorAll("*");
+    const allowedTags = new Set([
+      "b",
+      "strong",
+      "i",
+      "em",
+      "a",
+      "h2",
+      "blockquote",
+      "p",
+      "br",
+    ]);
+
+    const isSafeHref = (value: string) => {
+      const href = value.trim().toLowerCase();
+      return (
+        href.startsWith("http://") ||
+        href.startsWith("https://") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        href.startsWith("/")
+      );
+    };
+
+    const nodes = Array.from(root.querySelectorAll("*")).reverse();
     nodes.forEach((el) => {
-      const styleAttr = el.getAttribute("style");
-      if (styleAttr) {
-        const cleanedStyle = styleAttr
-          .split(";")
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .filter((part) => {
-            const prop = part.split(":")[0]?.trim().toLowerCase();
-            return prop !== "background" && prop !== "background-color";
-          })
-          .join("; ");
-        if (cleanedStyle) {
-          el.setAttribute("style", cleanedStyle);
-        } else {
-          el.removeAttribute("style");
+      const tag = el.tagName.toLowerCase();
+
+      if (!allowedTags.has(tag)) {
+        if (tag === "img") {
+          el.remove();
+          return;
         }
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
+        return;
       }
-      el.removeAttribute("bgcolor");
+
+      Array.from(el.attributes).forEach((attr) => {
+        const attrName = attr.name.toLowerCase();
+        if (tag === "a" && attrName === "href") return;
+        el.removeAttribute(attr.name);
+      });
+
+      if (tag === "a") {
+        const href = (el.getAttribute("href") || "").trim();
+        if (!href || !isSafeHref(href)) {
+          const parent = el.parentNode;
+          if (!parent) return;
+          while (el.firstChild) {
+            parent.insertBefore(el.firstChild, el);
+          }
+          parent.removeChild(el);
+          return;
+        }
+        el.setAttribute("href", href);
+        el.setAttribute("target", "_blank");
+        el.setAttribute("rel", "noopener noreferrer");
+      }
     });
 
     return root.innerHTML;
