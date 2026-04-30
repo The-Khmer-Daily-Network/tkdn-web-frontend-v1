@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getNewsPath } from "@/utils/newsSlug";
 
 /**
  * Google News Sitemap
@@ -157,7 +158,7 @@ export async function GET() {
     '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n';
 
   for (const article of recentNews) {
-    const articleUrl = `${baseUrl}/news/${article.id}`;
+    const articleUrl = `${baseUrl}${getNewsPath(article)}`;
     const publicationDate = article.date_time_post || article.created_at;
     const keywords = extractKeywords(article);
 

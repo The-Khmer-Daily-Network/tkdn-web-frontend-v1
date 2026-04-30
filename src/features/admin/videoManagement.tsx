@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -146,6 +146,7 @@ function NewsModal({
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleVideoUrlRef = useRef<string | null>(null);
+  const middleVideoRemovedFromParagraphRef = useRef(false);
   const originalEndImageUrlsRef = useRef<Array<string | null>>([null, null, null]);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleVideoFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -163,6 +164,32 @@ function NewsModal({
   const inlineImageInsertTypeRef = useRef<"middle" | "end">("end");
   const removedInlineImageUrlsRef = useRef<Set<string>>(new Set());
   const removedInlineVideoUrlsRef = useRef<Set<string>>(new Set());
+  const draftBaselineRef = useRef("");
+
+  const buildDraftSignature = (payload: {
+    categoryId: number | null;
+    author: string;
+    title: string;
+    cover: string | null;
+    coverName: string | null;
+    subtitle: string;
+    contentBlocks: ContentBlock[];
+    middleVideoUrl: string | null;
+    middleVideoName: string | null;
+    endImages: EndImage[];
+  }) =>
+    JSON.stringify({
+      categoryId: payload.categoryId,
+      author: payload.author,
+      title: payload.title,
+      cover: payload.cover,
+      coverName: payload.coverName,
+      subtitle: payload.subtitle,
+      contentBlocks: payload.contentBlocks,
+      middleVideoUrl: payload.middleVideoUrl,
+      middleVideoName: payload.middleVideoName,
+      endImages: payload.endImages,
+    });
 
   const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
     const selection = window.getSelection();
@@ -236,29 +263,42 @@ function NewsModal({
     setEndImagePendingFiles([null, null, null]);
 
     if (news) {
+      const initialContentBlocks =
+        news.content_blocks && news.content_blocks.length > 0
+          ? news.content_blocks
+          : [{ subtitle: null, paragraph: "" }];
+      const initialEndImages =
+        news.end_images && news.end_images.length > 0 ? news.end_images : [];
       setCategoryId(news.category_id);
       setAuthor(news.author);
       setTitle(news.title);
       setCover(news.cover);
       setCoverName(news.cover_name);
       setSubtitle(news.subtitle || "");
-      setContentBlocks(
-        news.content_blocks && news.content_blocks.length > 0
-          ? news.content_blocks
-          : [{ subtitle: null, paragraph: "" }],
-      );
+      setContentBlocks(initialContentBlocks);
       setMiddleVideoUrl(news.middle_video_url);
       setMiddleVideoName(news.middle_video_name);
-      setEndImages(
-        news.end_images && news.end_images.length > 0 ? news.end_images : [],
-      );
+      setEndImages(initialEndImages);
       originalCoverUrlRef.current = news.cover ?? null;
       originalMiddleVideoUrlRef.current = news.middle_video_url ?? null;
+      middleVideoRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [
         news.end_images?.[0]?.url ?? null,
         news.end_images?.[1]?.url ?? null,
         news.end_images?.[2]?.url ?? null,
       ];
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: news.category_id,
+        author: news.author,
+        title: news.title,
+        cover: news.cover,
+        coverName: news.cover_name,
+        subtitle: news.subtitle || "",
+        contentBlocks: initialContentBlocks,
+        middleVideoUrl: news.middle_video_url,
+        middleVideoName: news.middle_video_name,
+        endImages: initialEndImages,
+      });
     } else {
       setCategoryId(null);
       setAuthor(currentUsername);
@@ -275,7 +315,20 @@ function NewsModal({
       setEndImageUrlInputs([""]);
       originalCoverUrlRef.current = null;
       originalMiddleVideoUrlRef.current = null;
+      middleVideoRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [null, null, null];
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: null,
+        author: currentUsername,
+        title: "",
+        cover: null,
+        coverName: null,
+        subtitle: "",
+        contentBlocks: [{ subtitle: null, paragraph: "" }],
+        middleVideoUrl: null,
+        middleVideoName: null,
+        endImages: [],
+      });
     }
     setError(null);
     setShowCategorySelector(false);
@@ -284,6 +337,75 @@ function NewsModal({
     removedInlineImageUrlsRef.current = new Set();
     removedInlineVideoUrlsRef.current = new Set();
   }, [news, isOpen, currentUsername]);
+
+  const currentDraftSignature = useMemo(
+    () =>
+      buildDraftSignature({
+        categoryId,
+        author,
+        title,
+        cover,
+        coverName,
+        subtitle,
+        contentBlocks,
+        middleVideoUrl,
+        middleVideoName,
+        endImages,
+      }),
+    [
+      categoryId,
+      author,
+      title,
+      cover,
+      coverName,
+      subtitle,
+      contentBlocks,
+      middleVideoUrl,
+      middleVideoName,
+      endImages,
+    ],
+  );
+
+  useEffect(() => {
+    if (!asPage) return;
+
+    const hasUnsavedChanges = () =>
+      !!draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!loading && hasUnsavedChanges()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handlePopState = () => {
+      if (loading || !hasUnsavedChanges()) return;
+      const shouldLeave = window.confirm("Changes you made may not be saved.");
+      if (!shouldLeave) {
+        window.history.pushState(null, "", window.location.href);
+      }
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [asPage, loading, currentDraftSignature]);
+
+  const requestCloseEditor = () => {
+    if (loading) return;
+    if (draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current) {
+      const shouldLeave = window.confirm("Changes you made may not be saved.");
+      if (!shouldLeave) return;
+      onClose();
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     return () => {
@@ -389,6 +511,72 @@ function NewsModal({
     index: number,
     e: React.KeyboardEvent<HTMLDivElement>,
   ) => {
+    if (e.key === "Backspace" || e.key === "Delete") {
+      const editor = contentTextareaRefs.current[index];
+      if (!editor) return;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      const isProtectedWrapper = (node: Node | null) => {
+        if (!node) return false;
+        const el =
+          node.nodeType === Node.ELEMENT_NODE
+            ? (node as Element)
+            : node.parentElement;
+        if (!el) return false;
+        return !!el.closest(
+          "[data-inline-image-wrapper='true'][data-inline-image-kind='middle'],[data-inline-video-wrapper='true']",
+        );
+      };
+
+      if (!range.collapsed) {
+        const protectedWrappers = Array.from(
+          editor.querySelectorAll(
+            "[data-inline-image-wrapper='true'][data-inline-image-kind='middle'],[data-inline-video-wrapper='true']",
+          ),
+        );
+        for (const wrapper of protectedWrappers) {
+          if (range.intersectsNode(wrapper)) {
+            e.preventDefault();
+            return;
+          }
+        }
+      } else {
+        const { startContainer, startOffset } = range;
+        if (startContainer.nodeType === Node.TEXT_NODE) {
+          const textLength = startContainer.textContent?.length ?? 0;
+          const parent = startContainer.parentNode;
+          if (e.key === "Backspace" && startOffset === 0 && parent) {
+            if (isProtectedWrapper(startContainer.previousSibling || parent.previousSibling)) {
+              e.preventDefault();
+              return;
+            }
+          }
+          if (e.key === "Delete" && startOffset === textLength && parent) {
+            if (isProtectedWrapper(startContainer.nextSibling || parent.nextSibling)) {
+              e.preventDefault();
+              return;
+            }
+          }
+        } else if (startContainer.nodeType === Node.ELEMENT_NODE) {
+          const container = startContainer as Element;
+          const prevNode = startOffset > 0 ? container.childNodes[startOffset - 1] : null;
+          const nextNode =
+            startOffset < container.childNodes.length
+              ? container.childNodes[startOffset]
+              : null;
+          if (e.key === "Backspace" && isProtectedWrapper(prevNode)) {
+            e.preventDefault();
+            return;
+          }
+          if (e.key === "Delete" && isProtectedWrapper(nextNode)) {
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+    }
+
     if (e.key !== "Enter" || e.shiftKey) return;
     const editor = contentTextareaRefs.current[index];
     if (!editor) return;
@@ -541,12 +729,13 @@ function NewsModal({
     ) {
       removedInlineVideoUrlsRef.current.add(src);
     }
-    if (src && middleVideoUrl === src) {
-      setMiddleVideoUrl(null);
-      setMiddleVideoName(null);
-      setMiddleVideoPendingFile(null);
-      setMiddleVideoUrlInput("");
-    }
+    // Inline video remove represents removing the middle video for this article.
+    // Clear state unconditionally to avoid URL-variant mismatch issues.
+    middleVideoRemovedFromParagraphRef.current = true;
+    setMiddleVideoUrl(null);
+    setMiddleVideoName(null);
+    setMiddleVideoPendingFile(null);
+    setMiddleVideoUrlInput("");
     wrapper.remove();
     const editor = contentTextareaRefs.current[editorIndex];
     if (editor) {
@@ -728,6 +917,20 @@ function NewsModal({
     actionsBar.style.gap = "6px";
     actionsBar.style.zIndex = "2";
 
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("data-inline-video-name-id", videoId);
+    nameBtn.textContent = "Video Name";
+    nameBtn.style.border = "1px solid #e5e7eb";
+    nameBtn.style.borderRadius = "6px";
+    nameBtn.style.background = "#ffffff";
+    nameBtn.style.color = "#374151";
+    nameBtn.style.fontSize = "11px";
+    nameBtn.style.fontWeight = "600";
+    nameBtn.style.padding = "4px 8px";
+    nameBtn.style.cursor = "pointer";
+    actionsBar.appendChild(nameBtn);
+
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.setAttribute("data-inline-video-remove-id", videoId);
@@ -861,6 +1064,25 @@ function NewsModal({
       node.remove();
     });
     const actionsBar = createInlineVideoActionsBar(videoId);
+    const nameBtn = actionsBar.querySelector(
+      "button[data-inline-video-name-id]",
+    ) as HTMLButtonElement | null;
+    if (nameBtn) {
+      const runSetName = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const nextName = window.prompt("Video Name", middleVideoName || "");
+        if (nextName === null) return;
+        const normalized = nextName.trim();
+        setMiddleVideoName(normalized || null);
+        const editor = contentTextareaRefs.current[editorIndex];
+        if (editor) {
+          handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+        }
+      };
+      nameBtn.addEventListener("mousedown", runSetName);
+      nameBtn.addEventListener("click", runSetName);
+    }
     const removeBtn = actionsBar.querySelector(
       "button[data-inline-video-remove-id]",
     ) as HTMLButtonElement | null;
@@ -1188,6 +1410,7 @@ function NewsModal({
   };
 
   const handleSelectMiddleVideo = (video: ContentVideo) => {
+    middleVideoRemovedFromParagraphRef.current = false;
     setMiddleVideoUrl(video.video_url);
     setMiddleVideoName(null); // Don't auto-fill name, let user input it
     setMiddleVideoUrlInput(""); // Clear URL input when selecting from library
@@ -1218,6 +1441,7 @@ function NewsModal({
   const handleMiddleVideoUrlChange = (url: string) => {
     setMiddleVideoUrlInput(url);
     if (url.trim()) {
+      middleVideoRemovedFromParagraphRef.current = false;
       setMiddleVideoUrl(url.trim());
       setMiddleVideoPendingFile(null);
     }
@@ -1356,6 +1580,7 @@ function NewsModal({
     const previewUrl = queuePreviewUrl(file);
     const pendingId = `inline-video-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
     inlinePendingVideosRef.current[pendingId] = { file };
+    middleVideoRemovedFromParagraphRef.current = false;
     setMiddleVideoPendingFile(file);
     setMiddleVideoUrl(previewUrl);
     setMiddleVideoName(file.name || null);
@@ -1447,20 +1672,69 @@ function NewsModal({
     }
   };
 
-  const deleteImageByUrlIfPresent = async (url: string) => {
-    const res = await getContentImages();
-    const found = res.data.find((c) => c.image_url === url);
-    if (found) {
-      await deleteContentImage(found.id);
+  const normalizeMediaUrlKey = (rawUrl: string) => {
+    const value = (rawUrl || "").trim();
+    if (!value) return "";
+    try {
+      const parsed = new URL(value);
+      const path = decodeURIComponent(parsed.pathname || "");
+      const filename = path.split("/").filter(Boolean).pop() || path;
+      return filename.toLowerCase();
+    } catch {
+      const noQuery = decodeURIComponent(value.split("?")[0].split("#")[0] || "");
+      const filename = noQuery.split("/").filter(Boolean).pop() || noQuery;
+      return filename.toLowerCase();
     }
   };
 
-  const deleteVideoByUrlIfPresent = async (url: string) => {
+  const deleteImageByUrlIfPresent = async (url: string): Promise<boolean> => {
+    const res = await getContentImages();
+    const targetKey = normalizeMediaUrlKey(url);
+    const targetOriginalName = decodeURIComponent(
+      (url || "").split("?")[0].split("#")[0] || "",
+    )
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.toLowerCase();
+    const found = res.data.find((c) => {
+      if (c.image_url === url) return true;
+      if (normalizeMediaUrlKey(c.image_url) === targetKey) return true;
+      return (
+        !!targetOriginalName &&
+        (c.original_name || "").toLowerCase() === targetOriginalName
+      );
+    });
+    if (found) {
+      await deleteContentImage(found.id);
+      return true;
+    }
+    return false;
+  };
+
+  const deleteVideoByUrlIfPresent = async (url: string): Promise<boolean> => {
     const res = await getContentVideos();
-    const found = res.data.find((c) => c.video_url === url);
+    const targetKey = normalizeMediaUrlKey(url);
+    const targetOriginalName = decodeURIComponent(
+      (url || "").split("?")[0].split("#")[0] || "",
+    )
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.toLowerCase();
+    const found = res.data.find((c) => {
+      if (c.video_url === url) return true;
+      if (normalizeMediaUrlKey(c.video_url) === targetKey) return true;
+      return (
+        !!targetOriginalName &&
+        (c.original_name || "").toLowerCase() === targetOriginalName
+      );
+    });
     if (found) {
       await deleteContentVideo(found.id);
+      return true;
     }
+    return false;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1523,6 +1797,11 @@ function NewsModal({
         const imageUrl = getUploadedImageUrl(res.data);
         if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
+      }
+
+      if (middleVideoRemovedFromParagraphRef.current) {
+        finalMiddleVideoUrl = null;
+        finalMiddleVideoName = null;
       }
 
       // Do not clear middle/end image slots by checking paragraph HTML.
@@ -1758,10 +2037,8 @@ function NewsModal({
         subtitle: null,
         // date_time_post will be auto-set by backend
         content_blocks: contentBlocksWithoutEndImages,
-        end_images:
-          finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
-            ? finalEndImages.filter((img): img is EndImage => !!img?.url)
-            : undefined,
+        // Always send end_images explicitly so backend can clear removed slots.
+        end_images: finalEndImages.filter((img): img is EndImage => !!img?.url),
       };
 
       // For articles: only send middle_video_url, don't send middle_video_url at all
@@ -1803,11 +2080,14 @@ function NewsModal({
       for (const keptUrl of retainedMediaUrls) {
         removedInlineUrls.delete(keptUrl);
       }
+      const failedStorageDeletes: string[] = [];
       for (const removedUrl of removedInlineUrls) {
         try {
-          await deleteImageByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteImageByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed inline image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
       }
 
@@ -1845,23 +2125,37 @@ function NewsModal({
       }
       for (const removedUrl of removedInlineVideoUrls) {
         try {
-          await deleteVideoByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteVideoByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed inline video:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
       }
 
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
         try {
-          await deleteVideoByUrlIfPresent(removedUrl);
-        } catch {
+          const deletedVideo = await deleteVideoByUrlIfPresent(removedUrl);
+          if (deletedVideo) continue;
           try {
-            await deleteImageByUrlIfPresent(removedUrl);
-          } catch {
-            // best-effort delete only
+            const deletedImage = await deleteImageByUrlIfPresent(removedUrl);
+            if (!deletedImage) failedStorageDeletes.push(removedUrl);
+          } catch (imageDeleteErr) {
+            console.error("Failed to delete removed middle/end image:", removedUrl, imageDeleteErr);
+            failedStorageDeletes.push(removedUrl);
           }
+        } catch (videoDeleteErr) {
+          console.error("Failed to delete removed middle/end video:", removedUrl, videoDeleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
+      }
+
+      if (failedStorageDeletes.length > 0) {
+        const uniqueFailed = Array.from(new Set(failedStorageDeletes));
+        setError(
+          `Saved successfully, but failed to remove ${uniqueFailed.length} media file(s) from storage/library.`,
+        );
       }
 
       onSuccess();
@@ -1869,6 +2163,19 @@ function NewsModal({
       inlinePendingVideosRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       removedInlineVideoUrlsRef.current = new Set();
+      middleVideoRemovedFromParagraphRef.current = false;
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: categoryId || null,
+        author: author.trim(),
+        title: title.trim(),
+        cover: finalCover,
+        coverName: finalCoverName,
+        subtitle: "",
+        contentBlocks: contentBlocksWithoutEndImages,
+        middleVideoUrl: finalMiddleVideoUrl,
+        middleVideoName: finalMiddleVideoName,
+        endImages: finalEndImages.filter((img): img is EndImage => !!img?.url),
+      });
       onClose();
     } catch (err) {
       const errorMessage =
@@ -1901,7 +2208,7 @@ function NewsModal({
       {!asPage && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
-          onClick={onClose}
+          onClick={requestCloseEditor}
         />
       )}
       <div
@@ -2042,7 +2349,7 @@ function NewsModal({
                 </button>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={requestCloseEditor}
                   disabled={loading}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
@@ -2060,7 +2367,7 @@ function NewsModal({
             )}
             {!asPage && (
               <button
-                onClick={onClose}
+                onClick={requestCloseEditor}
                 disabled={loading}
                 className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
@@ -2540,7 +2847,7 @@ function NewsModal({
             <div className="order-4 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestCloseEditor}
                 disabled={loading}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
             >

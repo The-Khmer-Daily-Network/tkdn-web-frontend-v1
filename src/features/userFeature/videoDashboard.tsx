@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getNews } from "@/services/news";
 import type { News } from "@/types/news";
 import { Play } from "lucide-react";
+import { getNewsPath } from "@/utils/newsSlug";
 
 export default function VideoDashboard() {
   const [videos, setVideos] = useState<News[]>([]);
@@ -227,11 +228,11 @@ export default function VideoDashboard() {
         <div className="lg:col-span-2">
           {mainVideo && (
             <Link
-              href={`/news/${mainVideo.id}`}
+              href={getNewsPath(mainVideo)}
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
-                window.location.href = `/news/${mainVideo.id}`;
+                window.location.href = getNewsPath(mainVideo);
               }}
               className="block cursor-pointer hover:opacity-90 transition-opacity"
           >
@@ -329,11 +330,11 @@ export default function VideoDashboard() {
             {featuredVideos.map((video) => (
               <Link
                 key={video.id}
-                href={`/news/${video.id}`}
+                href={getNewsPath(video)}
                 onClick={(e) => {
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                   e.preventDefault();
-                  window.location.href = `/news/${video.id}`;
+                  window.location.href = getNewsPath(video);
                 }}
                 className="block cursor-pointer hover:opacity-90 transition-opacity"
             >
@@ -423,11 +424,11 @@ export default function VideoDashboard() {
             {remainingVideos.map((video) => (
               <Link
                 key={video.id}
-                href={`/news/${video.id}`}
+                href={getNewsPath(video)}
                 onClick={(e) => {
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                   e.preventDefault();
-                  window.location.href = `/news/${video.id}`;
+                  window.location.href = getNewsPath(video);
                 }}
                 className="block cursor-pointer hover:opacity-90 transition-opacity"
             >

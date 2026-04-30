@@ -21,7 +21,8 @@ export default function HeaderSponsor({
   // Show skeleton while loading
   if (loading) {
     return (
-      <div className="sticky top-0 z-50 w-full overflow-hidden h-[30px]">
+      // <div className="sticky top-0 z-50 w-full overflow-hidden h-[30px]">
+      <div className="sticky top-0 z-50 w-full overflow-hidden h-[0px]">
         <div
           className="flex animate-slide-right-responsive"
           style={{ width: "2880px" }}

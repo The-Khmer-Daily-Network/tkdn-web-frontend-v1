@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getNews, getNewsById } from "@/services/news";
 import { getCategories } from "@/services/category";
 import { categoryNameToSlug } from "@/utils/slug";
+import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
 import type { Category } from "@/types/category";
 import { Play } from "lucide-react";
@@ -377,7 +378,7 @@ export default function NewsPageContent({
 
   const handleNewsCardNavigate = (
     e: React.MouseEvent<HTMLAnchorElement>,
-    articleId: number,
+    article: News,
   ) => {
     // Keep default browser behavior for new-tab/window gestures.
     if (
@@ -390,7 +391,7 @@ export default function NewsPageContent({
       return;
     }
     e.preventDefault();
-    window.location.href = `/news/${articleId}`;
+    window.location.href = getNewsPath(article);
   };
 
   useEffect(() => {
@@ -428,11 +429,11 @@ export default function NewsPageContent({
         return;
       }
 
-      // Try to parse as number first (for /news/123 routes)
-      const numericId = parseInt(idParam, 10);
-      if (!isNaN(numericId)) {
+      // Try to resolve article by ID first (supports /news/123 and /news/title-123)
+      const resolvedNewsId = getNewsIdFromSlugParam(idParam);
+      if (resolvedNewsId) {
         // If we have initial news data, use it instead of fetching
-        if (initialNewsData && initialNewsData.id === numericId) {
+        if (initialNewsData && initialNewsData.id === resolvedNewsId) {
           setSingleNews(initialNewsData);
           setIsNewsDetail(true);
           setCategory(null);
@@ -443,7 +444,7 @@ export default function NewsPageContent({
 
         // First, try to fetch as news ID
         try {
-          const newsResponse = await getNewsById(numericId);
+          const newsResponse = await getNewsById(resolvedNewsId);
           if (newsResponse.success && newsResponse.data) {
             // It's a news ID - display news detail
             setSingleNews(newsResponse.data);
@@ -459,13 +460,29 @@ export default function NewsPageContent({
         }
       }
 
+      // Try to resolve as article slug (new /news/article-title route)
+      if (!resolvedNewsId) {
+        const allNewsResponse = await getNews();
+        const matchedArticle = allNewsResponse.data.find(
+          (article) => slugifyNewsTitle(article.title) === idParamLower,
+        );
+        if (matchedArticle) {
+          setSingleNews(matchedArticle);
+          setIsNewsDetail(true);
+          setCategory(null);
+          setNews([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       const response = await getCategories();
       let foundCategory: Category | null = null;
       let foundCategoryId: number | null = null;
 
-      if (!isNaN(numericId)) {
+      if (resolvedNewsId) {
         // It's a numeric ID - check categories
-        const found = response.categories.find((cat) => cat.id === numericId);
+        const found = response.categories.find((cat) => cat.id === resolvedNewsId);
         if (found) {
           // Found main category
           foundCategory = found;
@@ -474,7 +491,7 @@ export default function NewsPageContent({
           // Check subcategories
           for (const cat of response.categories) {
             const subcategory = cat.subcategories.find(
-              (sub) => sub.id === numericId,
+              (sub) => sub.id === resolvedNewsId,
             );
             if (subcategory) {
               // Found subcategory
@@ -830,8 +847,24 @@ export default function NewsPageContent({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-gray-600">Loading news...</p>
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-pulse">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-12 rounded-[10px] bg-gray-200"></div>
+          <div className="flex flex-col gap-2">
+            <div className="h-4 w-24 rounded bg-gray-200"></div>
+            <div className="h-3 w-40 rounded bg-gray-200"></div>
+          </div>
+        </div>
+        <div className="h-9 w-full rounded bg-gray-200"></div>
+        <div className="h-7 w-5/6 rounded bg-gray-200"></div>
+        <div className="h-[280px] w-full rounded-lg bg-gray-200"></div>
+        <div className="space-y-3">
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-11/12 rounded bg-gray-200"></div>
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-10/12 rounded bg-gray-200"></div>
+        </div>
       </div>
     );
   }
@@ -847,7 +880,9 @@ export default function NewsPageContent({
   // Generate SEO metadata based on page content
   const getSEOMetadata = () => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const currentUrl = `${baseUrl}/news/${idParam}`;
+    const currentUrl = isNewsDetail && singleNews
+      ? `${baseUrl}${getNewsPath(singleNews)}`
+      : `${baseUrl}/news/${idParam}`;
 
     if (isNewsDetail && singleNews) {
       return {
@@ -933,7 +968,7 @@ export default function NewsPageContent({
   // If it's a news detail page, show the news detail view
   if (isNewsDetail && singleNews) {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const articleUrl = `${baseUrl}/news/${singleNews.id}`;
+    const articleUrl = `${baseUrl}${getNewsPath(singleNews)}`;
     const endImageUrlKeys = new Set(
       (singleNews.end_images || [])
         .map((img) => normalizeImageUrlKey(img?.url || ""))
@@ -1162,7 +1197,8 @@ export default function NewsPageContent({
           {...(seoData.author && { author: seoData.author })}
         />
         <BannerSponsor />
-        <div className="w-full max-w-4xl mx-auto space-y-6 mt-6">
+        {/* <div className="w-full max-w-4xl mx-auto space-y-6 mt-6"> */}
+        <div className="w-full max-w-4xl mx-auto space-y-6">
           {/* Metadata Header with Red Bar */}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-1 h-12 rounded-[10px] bg-[#E34C33]"></div>
@@ -1202,7 +1238,7 @@ export default function NewsPageContent({
           {/* Subtitle */}
           {singleNews.subtitle && (
             <p
-              className="text-xl text-gray-700 mt-4"
+              className="text-[21px] text-gray-700 mt-4"
              
           >
               {singleNews.subtitle}
@@ -1272,7 +1308,7 @@ export default function NewsPageContent({
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[16px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[16px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[21px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[18px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[18px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[24px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: hasHydrated
                                 ? sanitizeRichText(
@@ -1583,10 +1619,10 @@ export default function NewsPageContent({
               {news.map((article) => (
                 <Link
                   key={article.id}
-                  href={`/news/${article.id}`}
-                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
+                  href={getNewsPath(article)}
+                  onClick={(e) => handleNewsCardNavigate(e, article)}
                   className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
-              >
+                >
                   {/* Article Image */}
                   <div className="relative w-[250px] h-[160px] shrink-0 rounded-lg overflow-hidden bg-gray-200 group">
                     {article.cover && (
@@ -1665,10 +1701,10 @@ export default function NewsPageContent({
               {news.map((article) => (
                 <Link
                   key={article.id}
-                  href={`/news/${article.id}`}
-                  onClick={(e) => handleNewsCardNavigate(e, article.id)}
+                  href={getNewsPath(article)}
+                  onClick={(e) => handleNewsCardNavigate(e, article)}
                   className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
-              >
+                >
                   {/* Article Image */}
                   {article.cover && (
                     <div className="relative w-full h-[200px] rounded-xl overflow-hidden bg-gray-200 group">
