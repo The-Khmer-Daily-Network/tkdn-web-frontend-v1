@@ -72,7 +72,7 @@ const toPlainPreviewText = (value: string) => {
 interface NewsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: () => void | Promise<void>;
   news?: News | null;
   categories: Category[];
   currentUsername: string;
@@ -1804,7 +1804,7 @@ function NewsModal({
         );
       }
 
-      onSuccess();
+      await Promise.resolve(onSuccess());
       inlinePendingImagesRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       middleImageRemovedFromParagraphRef.current = false;
@@ -1822,7 +1822,6 @@ function NewsModal({
         middleVideoName,
         endImages: finalEndImages.filter((img): img is EndImage => !!img?.url),
       });
-      onClose();
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to save article";
@@ -1975,7 +1974,7 @@ function NewsModal({
                 <button
                   type="submit"
                   form="article-editor-form"
-                  disabled={loading || !author.trim()}
+                  disabled={loading || !author.trim() || !categoryId}
                   className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Save
@@ -2472,7 +2471,7 @@ function NewsModal({
               </button>
               <button
                 type="submit"
-                disabled={loading || !author.trim()}
+                disabled={loading || !author.trim() || !categoryId}
                 className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
             >
                 {loading
@@ -2663,7 +2662,7 @@ export default function ArticleManagement() {
   };
 
   const closeEditorPage = () => {
-    router.push(pathname);
+    router.push("/articleManagement");
   };
 
   const handleDelete = async (id: number) => {
@@ -2737,10 +2736,8 @@ export default function ArticleManagement() {
           asPage
           onClose={closeEditorPage}
           onSuccess={async () => {
-            if (!isCreatePage) {
-              await fetchArticles();
-            }
-            closeEditorPage();
+            await fetchArticles();
+            router.replace("/articleManagement");
           }}
           news={isEditPage ? selectedArticle : null}
           categories={categories}
