@@ -392,6 +392,72 @@ function NewsModal({
     index: number,
     e: React.KeyboardEvent<HTMLDivElement>,
   ) => {
+    if (e.key === "Backspace" || e.key === "Delete") {
+      const editor = contentTextareaRefs.current[index];
+      if (!editor) return;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      const isProtectedWrapper = (node: Node | null) => {
+        if (!node) return false;
+        const el =
+          node.nodeType === Node.ELEMENT_NODE
+            ? (node as Element)
+            : node.parentElement;
+        if (!el) return false;
+        return !!el.closest(
+          "[data-inline-image-wrapper='true'][data-inline-image-kind='middle'],[data-inline-video-wrapper='true']",
+        );
+      };
+
+      if (!range.collapsed) {
+        const protectedWrappers = Array.from(
+          editor.querySelectorAll(
+            "[data-inline-image-wrapper='true'][data-inline-image-kind='middle'],[data-inline-video-wrapper='true']",
+          ),
+        );
+        for (const wrapper of protectedWrappers) {
+          if (range.intersectsNode(wrapper)) {
+            e.preventDefault();
+            return;
+          }
+        }
+      } else {
+        const { startContainer, startOffset } = range;
+        if (startContainer.nodeType === Node.TEXT_NODE) {
+          const textLength = startContainer.textContent?.length ?? 0;
+          const parent = startContainer.parentNode;
+          if (e.key === "Backspace" && startOffset === 0 && parent) {
+            if (isProtectedWrapper(startContainer.previousSibling || parent.previousSibling)) {
+              e.preventDefault();
+              return;
+            }
+          }
+          if (e.key === "Delete" && startOffset === textLength && parent) {
+            if (isProtectedWrapper(startContainer.nextSibling || parent.nextSibling)) {
+              e.preventDefault();
+              return;
+            }
+          }
+        } else if (startContainer.nodeType === Node.ELEMENT_NODE) {
+          const container = startContainer as Element;
+          const prevNode = startOffset > 0 ? container.childNodes[startOffset - 1] : null;
+          const nextNode =
+            startOffset < container.childNodes.length
+              ? container.childNodes[startOffset]
+              : null;
+          if (e.key === "Backspace" && isProtectedWrapper(prevNode)) {
+            e.preventDefault();
+            return;
+          }
+          if (e.key === "Delete" && isProtectedWrapper(nextNode)) {
+            e.preventDefault();
+            return;
+          }
+        }
+      }
+    }
+
     if (e.key !== "Enter" || e.shiftKey) return;
     const editor = contentTextareaRefs.current[index];
     if (!editor) return;
@@ -1852,10 +1918,8 @@ function NewsModal({
         subtitle: null,
         // date_time_post will be auto-set by backend
         content_blocks: contentBlocksWithoutEndImages,
-        end_images:
-          finalEndImages.filter((img): img is EndImage => !!img?.url).length > 0
-            ? finalEndImages.filter((img): img is EndImage => !!img?.url)
-            : undefined,
+        // Always send end_images explicitly so backend can clear removed slots.
+        end_images: finalEndImages.filter((img): img is EndImage => !!img?.url),
       };
 
       // For articles: only send middle_video_url, don't send middle_video_url at all
