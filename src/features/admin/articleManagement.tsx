@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -158,6 +158,36 @@ function NewsModal({
   const inlinePendingImageCounterRef = useRef(0);
   const inlineImageInsertTypeRef = useRef<"middle" | "end">("end");
   const removedInlineImageUrlsRef = useRef<Set<string>>(new Set());
+  const draftBaselineRef = useRef("");
+
+  const buildDraftSignature = (payload: {
+    categoryId: number | null;
+    author: string;
+    title: string;
+    cover: string | null;
+    coverName: string | null;
+    subtitle: string;
+    contentBlocks: ContentBlock[];
+    middleImageUrl: string | null;
+    middleImageName: string | null;
+    middleVideoUrl: string | null;
+    middleVideoName: string | null;
+    endImages: EndImage[];
+  }) =>
+    JSON.stringify({
+      categoryId: payload.categoryId,
+      author: payload.author,
+      title: payload.title,
+      cover: payload.cover,
+      coverName: payload.coverName,
+      subtitle: payload.subtitle,
+      contentBlocks: payload.contentBlocks,
+      middleImageUrl: payload.middleImageUrl,
+      middleImageName: payload.middleImageName,
+      middleVideoUrl: payload.middleVideoUrl,
+      middleVideoName: payload.middleVideoName,
+      endImages: payload.endImages,
+    });
 
   const syncActiveTextFormat = (editor?: HTMLDivElement | null) => {
     const selection = window.getSelection();
@@ -232,24 +262,24 @@ function NewsModal({
     setEndImagePendingFiles([null, null, null]);
 
     if (news) {
+      const initialContentBlocks =
+        news.content_blocks && news.content_blocks.length > 0
+          ? news.content_blocks
+          : [{ subtitle: null, paragraph: "" }];
+      const initialEndImages =
+        news.end_images && news.end_images.length > 0 ? news.end_images : [];
       setCategoryId(news.category_id);
       setAuthor(news.author);
       setTitle(news.title);
       setCover(news.cover);
       setCoverName(news.cover_name);
       setSubtitle(news.subtitle || "");
-      setContentBlocks(
-        news.content_blocks && news.content_blocks.length > 0
-          ? news.content_blocks
-          : [{ subtitle: null, paragraph: "" }],
-      );
+      setContentBlocks(initialContentBlocks);
       setMiddleImageUrl(news.middle_image_url);
       setMiddleImageName(news.middle_image_name);
       setMiddleVideoUrl(news.middle_video_url);
       setMiddleVideoName(news.middle_video_name);
-      setEndImages(
-        news.end_images && news.end_images.length > 0 ? news.end_images : [],
-      );
+      setEndImages(initialEndImages);
       originalCoverUrlRef.current = news.cover ?? null;
       originalMiddleImageUrlRef.current = news.middle_image_url ?? null;
       middleImageRemovedFromParagraphRef.current = false;
@@ -258,6 +288,20 @@ function NewsModal({
         news.end_images?.[1]?.url ?? null,
         news.end_images?.[2]?.url ?? null,
       ];
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: news.category_id,
+        author: news.author,
+        title: news.title,
+        cover: news.cover,
+        coverName: news.cover_name,
+        subtitle: news.subtitle || "",
+        contentBlocks: initialContentBlocks,
+        middleImageUrl: news.middle_image_url,
+        middleImageName: news.middle_image_name,
+        middleVideoUrl: news.middle_video_url,
+        middleVideoName: news.middle_video_name,
+        endImages: initialEndImages,
+      });
     } else {
       setCategoryId(null);
       setAuthor(currentUsername);
@@ -278,12 +322,99 @@ function NewsModal({
       originalMiddleImageUrlRef.current = null;
       middleImageRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [null, null, null];
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: null,
+        author: currentUsername,
+        title: "",
+        cover: null,
+        coverName: null,
+        subtitle: "",
+        contentBlocks: [{ subtitle: null, paragraph: "" }],
+        middleImageUrl: null,
+        middleImageName: null,
+        middleVideoUrl: null,
+        middleVideoName: null,
+        endImages: [],
+      });
     }
     setError(null);
     setShowCategorySelector(false);
     inlinePendingImagesRef.current = {};
     removedInlineImageUrlsRef.current = new Set();
   }, [news, isOpen, currentUsername]);
+
+  const currentDraftSignature = useMemo(
+    () =>
+      buildDraftSignature({
+        categoryId,
+        author,
+        title,
+        cover,
+        coverName,
+        subtitle,
+        contentBlocks,
+        middleImageUrl,
+        middleImageName,
+        middleVideoUrl,
+        middleVideoName,
+        endImages,
+      }),
+    [
+      categoryId,
+      author,
+      title,
+      cover,
+      coverName,
+      subtitle,
+      contentBlocks,
+      middleImageUrl,
+      middleImageName,
+      middleVideoUrl,
+      middleVideoName,
+      endImages,
+    ],
+  );
+
+  useEffect(() => {
+    if (!asPage) return;
+
+    const hasUnsavedChanges = () =>
+      !!draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!loading && hasUnsavedChanges()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+
+    const handlePopState = () => {
+      if (loading || !hasUnsavedChanges()) return;
+      const shouldLeave = window.confirm("Changes you made may not be saved.");
+      if (!shouldLeave) {
+        window.history.pushState(null, "", window.location.href);
+      }
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [asPage, loading, currentDraftSignature]);
+
+  const requestCloseEditor = () => {
+    if (loading) return;
+    if (draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current) {
+      const shouldLeave = window.confirm("Changes you made may not be saved.");
+      if (!shouldLeave) return;
+      onClose();
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     return () => {
@@ -1677,6 +1808,20 @@ function NewsModal({
       inlinePendingImagesRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       middleImageRemovedFromParagraphRef.current = false;
+      draftBaselineRef.current = buildDraftSignature({
+        categoryId: categoryId || null,
+        author: author.trim(),
+        title: title.trim(),
+        cover: finalCover,
+        coverName: finalCoverName,
+        subtitle: "",
+        contentBlocks: contentBlocksWithoutEndImages,
+        middleImageUrl: finalMiddleImageUrl,
+        middleImageName: finalMiddleImageName,
+        middleVideoUrl,
+        middleVideoName,
+        endImages: finalEndImages.filter((img): img is EndImage => !!img?.url),
+      });
       onClose();
     } catch (err) {
       const errorMessage =
@@ -1709,7 +1854,7 @@ function NewsModal({
       {!asPage && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
-          onClick={onClose}
+          onClick={requestCloseEditor}
         />
       )}
       <div
@@ -1821,7 +1966,7 @@ function NewsModal({
                 </button>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={requestCloseEditor}
                   disabled={loading}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
@@ -1839,7 +1984,7 @@ function NewsModal({
             )}
             {!asPage && (
               <button
-                onClick={onClose}
+                onClick={requestCloseEditor}
                 disabled={loading}
                 className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
@@ -2319,7 +2464,7 @@ function NewsModal({
             <div className="order-4 lg:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestCloseEditor}
                 disabled={loading}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
             >
