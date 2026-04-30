@@ -6,7 +6,7 @@ import Link from "next/link";
 import { getNews, getNewsById } from "@/services/news";
 import { getCategories } from "@/services/category";
 import { categoryNameToSlug } from "@/utils/slug";
-import { getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
+import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
 import type { Category } from "@/types/category";
 import { Play } from "lucide-react";
@@ -429,11 +429,11 @@ export default function NewsPageContent({
         return;
       }
 
-      // Try to parse as number first (legacy /news/123 routes)
-      const numericId = parseInt(idParam, 10);
-      if (!isNaN(numericId)) {
+      // Try to resolve article by ID first (supports /news/123 and /news/title-123)
+      const resolvedNewsId = getNewsIdFromSlugParam(idParam);
+      if (resolvedNewsId) {
         // If we have initial news data, use it instead of fetching
-        if (initialNewsData && initialNewsData.id === numericId) {
+        if (initialNewsData && initialNewsData.id === resolvedNewsId) {
           setSingleNews(initialNewsData);
           setIsNewsDetail(true);
           setCategory(null);
@@ -444,7 +444,7 @@ export default function NewsPageContent({
 
         // First, try to fetch as news ID
         try {
-          const newsResponse = await getNewsById(numericId);
+          const newsResponse = await getNewsById(resolvedNewsId);
           if (newsResponse.success && newsResponse.data) {
             // It's a news ID - display news detail
             setSingleNews(newsResponse.data);
@@ -461,7 +461,7 @@ export default function NewsPageContent({
       }
 
       // Try to resolve as article slug (new /news/article-title route)
-      if (isNaN(numericId)) {
+      if (!resolvedNewsId) {
         const allNewsResponse = await getNews();
         const matchedArticle = allNewsResponse.data.find(
           (article) => slugifyNewsTitle(article.title) === idParamLower,
@@ -480,9 +480,9 @@ export default function NewsPageContent({
       let foundCategory: Category | null = null;
       let foundCategoryId: number | null = null;
 
-      if (!isNaN(numericId)) {
+      if (resolvedNewsId) {
         // It's a numeric ID - check categories
-        const found = response.categories.find((cat) => cat.id === numericId);
+        const found = response.categories.find((cat) => cat.id === resolvedNewsId);
         if (found) {
           // Found main category
           foundCategory = found;
@@ -491,7 +491,7 @@ export default function NewsPageContent({
           // Check subcategories
           for (const cat of response.categories) {
             const subcategory = cat.subcategories.find(
-              (sub) => sub.id === numericId,
+              (sub) => sub.id === resolvedNewsId,
             );
             if (subcategory) {
               // Found subcategory

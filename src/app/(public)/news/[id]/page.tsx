@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import NewsPageContent from "./NewsPageContent";
-import { getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
+import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -109,10 +109,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id: idParam } = await params;
 
-  // Check if it's a numeric ID (legacy support)
-  const numericId = parseInt(idParam, 10);
-  const news = !isNaN(numericId)
-    ? await getNewsById(numericId)
+  const resolvedId = getNewsIdFromSlugParam(idParam);
+  const news = resolvedId
+    ? await getNewsById(resolvedId)
     : await getNewsBySlug(idParam);
 
   if (news) {
@@ -356,10 +355,10 @@ export default async function NewsPage({
 
   // Pre-fetch news data by numeric ID (legacy) or slug.
   let initialNewsData = null;
-  const numericId = parseInt(idParam, 10);
+  const resolvedId = getNewsIdFromSlugParam(idParam);
   try {
-    const news = !isNaN(numericId)
-      ? await getNewsById(numericId)
+    const news = resolvedId
+      ? await getNewsById(resolvedId)
       : await getNewsBySlug(idParam);
     if (news) {
       initialNewsData = news;

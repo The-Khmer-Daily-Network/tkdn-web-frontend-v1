@@ -10,11 +10,29 @@ export function slugifyNewsTitle(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export function getNewsSlug(news: Pick<News, "title">): string {
-  const slug = slugifyNewsTitle(news.title || "");
-  return slug || "article";
+type NewsSlugInput = Pick<News, "title"> & Partial<Pick<News, "id">>;
+
+export function getNewsSlug(news: NewsSlugInput): string {
+  const slug = slugifyNewsTitle(news.title || "") || "article";
+  if (typeof news.id === "number" && Number.isFinite(news.id)) {
+    return `${slug}-${news.id}`;
+  }
+  return slug;
 }
 
-export function getNewsPath(news: Pick<News, "title">): string {
+export function getNewsPath(news: NewsSlugInput): string {
   return `/news/${getNewsSlug(news)}`;
+}
+
+export function getNewsIdFromSlugParam(param: string): number | null {
+  const value = (param || "").trim();
+  if (!value) return null;
+  const exactNumeric = Number(value);
+  if (Number.isInteger(exactNumeric) && exactNumeric > 0) {
+    return exactNumeric;
+  }
+  const match = value.match(/-(\d+)$/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
