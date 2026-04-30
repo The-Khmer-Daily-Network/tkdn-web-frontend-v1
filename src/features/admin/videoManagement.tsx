@@ -146,6 +146,7 @@ function NewsModal({
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleVideoUrlRef = useRef<string | null>(null);
+  const middleVideoRemovedFromParagraphRef = useRef(false);
   const originalEndImageUrlsRef = useRef<Array<string | null>>([null, null, null]);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleVideoFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,6 +255,7 @@ function NewsModal({
       );
       originalCoverUrlRef.current = news.cover ?? null;
       originalMiddleVideoUrlRef.current = news.middle_video_url ?? null;
+      middleVideoRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [
         news.end_images?.[0]?.url ?? null,
         news.end_images?.[1]?.url ?? null,
@@ -275,6 +277,7 @@ function NewsModal({
       setEndImageUrlInputs([""]);
       originalCoverUrlRef.current = null;
       originalMiddleVideoUrlRef.current = null;
+      middleVideoRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
@@ -541,12 +544,13 @@ function NewsModal({
     ) {
       removedInlineVideoUrlsRef.current.add(src);
     }
-    if (src && middleVideoUrl === src) {
-      setMiddleVideoUrl(null);
-      setMiddleVideoName(null);
-      setMiddleVideoPendingFile(null);
-      setMiddleVideoUrlInput("");
-    }
+    // Inline video remove represents removing the middle video for this article.
+    // Clear state unconditionally to avoid URL-variant mismatch issues.
+    middleVideoRemovedFromParagraphRef.current = true;
+    setMiddleVideoUrl(null);
+    setMiddleVideoName(null);
+    setMiddleVideoPendingFile(null);
+    setMiddleVideoUrlInput("");
     wrapper.remove();
     const editor = contentTextareaRefs.current[editorIndex];
     if (editor) {
@@ -728,6 +732,20 @@ function NewsModal({
     actionsBar.style.gap = "6px";
     actionsBar.style.zIndex = "2";
 
+    const nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.setAttribute("data-inline-video-name-id", videoId);
+    nameBtn.textContent = "Video Name";
+    nameBtn.style.border = "1px solid #e5e7eb";
+    nameBtn.style.borderRadius = "6px";
+    nameBtn.style.background = "#ffffff";
+    nameBtn.style.color = "#374151";
+    nameBtn.style.fontSize = "11px";
+    nameBtn.style.fontWeight = "600";
+    nameBtn.style.padding = "4px 8px";
+    nameBtn.style.cursor = "pointer";
+    actionsBar.appendChild(nameBtn);
+
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.setAttribute("data-inline-video-remove-id", videoId);
@@ -861,6 +879,25 @@ function NewsModal({
       node.remove();
     });
     const actionsBar = createInlineVideoActionsBar(videoId);
+    const nameBtn = actionsBar.querySelector(
+      "button[data-inline-video-name-id]",
+    ) as HTMLButtonElement | null;
+    if (nameBtn) {
+      const runSetName = (event: Event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const nextName = window.prompt("Video Name", middleVideoName || "");
+        if (nextName === null) return;
+        const normalized = nextName.trim();
+        setMiddleVideoName(normalized || null);
+        const editor = contentTextareaRefs.current[editorIndex];
+        if (editor) {
+          handleUpdateContentBlock(editorIndex, "paragraph", editor.innerHTML);
+        }
+      };
+      nameBtn.addEventListener("mousedown", runSetName);
+      nameBtn.addEventListener("click", runSetName);
+    }
     const removeBtn = actionsBar.querySelector(
       "button[data-inline-video-remove-id]",
     ) as HTMLButtonElement | null;
@@ -1188,6 +1225,7 @@ function NewsModal({
   };
 
   const handleSelectMiddleVideo = (video: ContentVideo) => {
+    middleVideoRemovedFromParagraphRef.current = false;
     setMiddleVideoUrl(video.video_url);
     setMiddleVideoName(null); // Don't auto-fill name, let user input it
     setMiddleVideoUrlInput(""); // Clear URL input when selecting from library
@@ -1218,6 +1256,7 @@ function NewsModal({
   const handleMiddleVideoUrlChange = (url: string) => {
     setMiddleVideoUrlInput(url);
     if (url.trim()) {
+      middleVideoRemovedFromParagraphRef.current = false;
       setMiddleVideoUrl(url.trim());
       setMiddleVideoPendingFile(null);
     }
@@ -1356,6 +1395,7 @@ function NewsModal({
     const previewUrl = queuePreviewUrl(file);
     const pendingId = `inline-video-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
     inlinePendingVideosRef.current[pendingId] = { file };
+    middleVideoRemovedFromParagraphRef.current = false;
     setMiddleVideoPendingFile(file);
     setMiddleVideoUrl(previewUrl);
     setMiddleVideoName(file.name || null);
@@ -1447,20 +1487,69 @@ function NewsModal({
     }
   };
 
-  const deleteImageByUrlIfPresent = async (url: string) => {
-    const res = await getContentImages();
-    const found = res.data.find((c) => c.image_url === url);
-    if (found) {
-      await deleteContentImage(found.id);
+  const normalizeMediaUrlKey = (rawUrl: string) => {
+    const value = (rawUrl || "").trim();
+    if (!value) return "";
+    try {
+      const parsed = new URL(value);
+      const path = decodeURIComponent(parsed.pathname || "");
+      const filename = path.split("/").filter(Boolean).pop() || path;
+      return filename.toLowerCase();
+    } catch {
+      const noQuery = decodeURIComponent(value.split("?")[0].split("#")[0] || "");
+      const filename = noQuery.split("/").filter(Boolean).pop() || noQuery;
+      return filename.toLowerCase();
     }
   };
 
-  const deleteVideoByUrlIfPresent = async (url: string) => {
+  const deleteImageByUrlIfPresent = async (url: string): Promise<boolean> => {
+    const res = await getContentImages();
+    const targetKey = normalizeMediaUrlKey(url);
+    const targetOriginalName = decodeURIComponent(
+      (url || "").split("?")[0].split("#")[0] || "",
+    )
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.toLowerCase();
+    const found = res.data.find((c) => {
+      if (c.image_url === url) return true;
+      if (normalizeMediaUrlKey(c.image_url) === targetKey) return true;
+      return (
+        !!targetOriginalName &&
+        (c.original_name || "").toLowerCase() === targetOriginalName
+      );
+    });
+    if (found) {
+      await deleteContentImage(found.id);
+      return true;
+    }
+    return false;
+  };
+
+  const deleteVideoByUrlIfPresent = async (url: string): Promise<boolean> => {
     const res = await getContentVideos();
-    const found = res.data.find((c) => c.video_url === url);
+    const targetKey = normalizeMediaUrlKey(url);
+    const targetOriginalName = decodeURIComponent(
+      (url || "").split("?")[0].split("#")[0] || "",
+    )
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.toLowerCase();
+    const found = res.data.find((c) => {
+      if (c.video_url === url) return true;
+      if (normalizeMediaUrlKey(c.video_url) === targetKey) return true;
+      return (
+        !!targetOriginalName &&
+        (c.original_name || "").toLowerCase() === targetOriginalName
+      );
+    });
     if (found) {
       await deleteContentVideo(found.id);
+      return true;
     }
+    return false;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1523,6 +1612,11 @@ function NewsModal({
         const imageUrl = getUploadedImageUrl(res.data);
         if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
+      }
+
+      if (middleVideoRemovedFromParagraphRef.current) {
+        finalMiddleVideoUrl = null;
+        finalMiddleVideoName = null;
       }
 
       // Do not clear middle/end image slots by checking paragraph HTML.
@@ -1803,11 +1897,14 @@ function NewsModal({
       for (const keptUrl of retainedMediaUrls) {
         removedInlineUrls.delete(keptUrl);
       }
+      const failedStorageDeletes: string[] = [];
       for (const removedUrl of removedInlineUrls) {
         try {
-          await deleteImageByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteImageByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed inline image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
       }
 
@@ -1845,23 +1942,37 @@ function NewsModal({
       }
       for (const removedUrl of removedInlineVideoUrls) {
         try {
-          await deleteVideoByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteVideoByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed inline video:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
       }
 
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
         try {
-          await deleteVideoByUrlIfPresent(removedUrl);
-        } catch {
+          const deletedVideo = await deleteVideoByUrlIfPresent(removedUrl);
+          if (deletedVideo) continue;
           try {
-            await deleteImageByUrlIfPresent(removedUrl);
-          } catch {
-            // best-effort delete only
+            const deletedImage = await deleteImageByUrlIfPresent(removedUrl);
+            if (!deletedImage) failedStorageDeletes.push(removedUrl);
+          } catch (imageDeleteErr) {
+            console.error("Failed to delete removed middle/end image:", removedUrl, imageDeleteErr);
+            failedStorageDeletes.push(removedUrl);
           }
+        } catch (videoDeleteErr) {
+          console.error("Failed to delete removed middle/end video:", removedUrl, videoDeleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
+      }
+
+      if (failedStorageDeletes.length > 0) {
+        const uniqueFailed = Array.from(new Set(failedStorageDeletes));
+        setError(
+          `Saved successfully, but failed to remove ${uniqueFailed.length} media file(s) from storage/library.`,
+        );
       }
 
       onSuccess();
@@ -1869,6 +1980,7 @@ function NewsModal({
       inlinePendingVideosRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       removedInlineVideoUrlsRef.current = new Set();
+      middleVideoRemovedFromParagraphRef.current = false;
       onClose();
     } catch (err) {
       const errorMessage =

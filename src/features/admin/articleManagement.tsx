@@ -142,6 +142,7 @@ function NewsModal({
   const previewObjectUrlsRef = useRef<string[]>([]);
   const originalCoverUrlRef = useRef<string | null>(null);
   const originalMiddleImageUrlRef = useRef<string | null>(null);
+  const middleImageRemovedFromParagraphRef = useRef(false);
   const originalEndImageUrlsRef = useRef<Array<string | null>>([null, null, null]);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const middleImageFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -251,6 +252,7 @@ function NewsModal({
       );
       originalCoverUrlRef.current = news.cover ?? null;
       originalMiddleImageUrlRef.current = news.middle_image_url ?? null;
+      middleImageRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [
         news.end_images?.[0]?.url ?? null,
         news.end_images?.[1]?.url ?? null,
@@ -274,6 +276,7 @@ function NewsModal({
       setEndImageUrlInputs([""]);
       originalCoverUrlRef.current = null;
       originalMiddleImageUrlRef.current = null;
+      middleImageRemovedFromParagraphRef.current = false;
       originalEndImageUrlsRef.current = [null, null, null];
     }
     setError(null);
@@ -470,15 +473,18 @@ function NewsModal({
     wrapper: Element,
     pendingId: string | null,
   ) => {
+    const img = wrapper.querySelector("img");
+    const src = (img?.getAttribute("src") || "").trim();
     const imageKind =
       wrapper.getAttribute("data-inline-image-kind") ||
-      wrapper.querySelector("img")?.getAttribute("data-inline-image-kind") ||
+      img?.getAttribute("data-inline-image-kind") ||
       "middle";
     if (pendingId && inlinePendingImagesRef.current[pendingId]) {
       delete inlinePendingImagesRef.current[pendingId];
+      if (imageKind === "middle") {
+        setMiddleImagePendingFile(null);
+      }
     } else {
-      const img = wrapper.querySelector("img");
-      const src = img?.getAttribute("src") || "";
       if (
         src &&
         !src.startsWith("blob:") &&
@@ -496,6 +502,13 @@ function NewsModal({
           return next;
         });
       }
+    }
+    if (imageKind === "middle") {
+      middleImageRemovedFromParagraphRef.current = true;
+      setMiddleImageUrl(null);
+      setMiddleImageName(null);
+      setMiddleImagePendingFile(null);
+      setMiddleImageUrlInput("");
     }
     wrapper.remove();
     const editor = contentTextareaRefs.current[editorIndex];
@@ -651,7 +664,7 @@ function NewsModal({
     nameBtn.style.cursor = "pointer";
     actionsBar.appendChild(nameBtn);
 
-    if (imageKind === "end") {
+    if (imageKind === "middle") {
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.setAttribute("data-inline-remove-id", imageId);
@@ -1043,6 +1056,7 @@ function NewsModal({
   };
 
   const handleSelectMiddleImage = (image: ContentImage) => {
+    middleImageRemovedFromParagraphRef.current = false;
     setMiddleImageUrl(image.image_url);
     setMiddleImageName(null); // Don't auto-fill name, let user input it
     setMiddleImageUrlInput(""); // Clear URL input when selecting from library
@@ -1084,6 +1098,7 @@ function NewsModal({
   const handleMiddleImageUrlChange = (url: string) => {
     setMiddleImageUrlInput(url);
     if (url.trim()) {
+      middleImageRemovedFromParagraphRef.current = false;
       setMiddleImageUrl(url.trim());
       setMiddleImagePendingFile(null);
       setMiddleVideoUrl(null);
@@ -1202,6 +1217,7 @@ function NewsModal({
       setError("Middle image must be less than or equal to 20MB.");
       return;
     }
+    middleImageRemovedFromParagraphRef.current = false;
     setMiddleImagePendingFile(file);
     setMiddleImageUrl(queuePreviewUrl(file));
     setMiddleImageUrlInput("");
@@ -1235,12 +1251,44 @@ function NewsModal({
     }
   };
 
-  const deleteImageByUrlIfPresent = async (url: string) => {
+  const normalizeMediaUrlKey = (rawUrl: string) => {
+    const value = (rawUrl || "").trim();
+    if (!value) return "";
+    try {
+      const parsed = new URL(value);
+      const path = decodeURIComponent(parsed.pathname || "");
+      const filename = path.split("/").filter(Boolean).pop() || path;
+      return filename.toLowerCase();
+    } catch {
+      const noQuery = decodeURIComponent(value.split("?")[0].split("#")[0] || "");
+      const filename = noQuery.split("/").filter(Boolean).pop() || noQuery;
+      return filename.toLowerCase();
+    }
+  };
+
+  const deleteImageByUrlIfPresent = async (url: string): Promise<boolean> => {
     const res = await getContentImages();
-    const found = res.data.find((c) => c.image_url === url);
+    const targetKey = normalizeMediaUrlKey(url);
+    const targetOriginalName = decodeURIComponent(
+      (url || "").split("?")[0].split("#")[0] || "",
+    )
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.toLowerCase();
+    const found = res.data.find((c) => {
+      if (c.image_url === url) return true;
+      if (normalizeMediaUrlKey(c.image_url) === targetKey) return true;
+      return (
+        !!targetOriginalName &&
+        (c.original_name || "").toLowerCase() === targetOriginalName
+      );
+    });
     if (found) {
       await deleteContentImage(found.id);
+      return true;
     }
+    return false;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1300,6 +1348,11 @@ function NewsModal({
         const imageUrl = getUploadedImageUrl(res.data);
         if (!imageUrl) throw new Error("End image upload succeeded but URL missing");
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
+      }
+
+      if (middleImageRemovedFromParagraphRef.current) {
+        finalMiddleImageUrl = null;
+        finalMiddleImageName = null;
       }
 
       // Do not clear middle/end image slots by checking paragraph HTML.
@@ -1525,26 +1578,39 @@ function NewsModal({
       for (const keptUrl of retainedMediaUrls) {
         removedInlineUrls.delete(keptUrl);
       }
+      const failedStorageDeletes: string[] = [];
       for (const removedUrl of removedInlineUrls) {
         try {
-          await deleteImageByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteImageByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed inline image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
       }
 
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
         try {
-          await deleteImageByUrlIfPresent(removedUrl);
-        } catch {
-          // best-effort delete only
+          const deleted = await deleteImageByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete removed middle/end image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
         }
+      }
+
+      if (failedStorageDeletes.length > 0) {
+        const uniqueFailed = Array.from(new Set(failedStorageDeletes));
+        setError(
+          `Saved successfully, but failed to remove ${uniqueFailed.length} media file(s) from storage/library.`,
+        );
       }
 
       onSuccess();
       inlinePendingImagesRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
+      middleImageRemovedFromParagraphRef.current = false;
       onClose();
     } catch (err) {
       const errorMessage =
