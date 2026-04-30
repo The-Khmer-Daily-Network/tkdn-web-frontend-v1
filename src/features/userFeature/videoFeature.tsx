@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { News } from "@/types/news";
 import { getVideosNews } from "@/services/news";
 import { Play } from "lucide-react";
+import { getNewsPath } from "@/utils/newsSlug";
 
 const DISPLAY_LIMIT = 15;
 
@@ -134,11 +135,11 @@ export default function VideoFeature({
         {videos.map((video) => (
           <Link
             key={video.id}
-            href={`/news/${video.id}`}
+            href={getNewsPath(video)}
             onClick={(e) => {
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
               e.preventDefault();
-              window.location.href = `/news/${video.id}`;
+              window.location.href = getNewsPath(video);
             }}
             className="bg-white rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow block"
         >

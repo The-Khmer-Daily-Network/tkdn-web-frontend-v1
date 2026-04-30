@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { categoryNameToSlug } from "@/utils/slug";
+import { getNewsPath } from "@/utils/newsSlug";
 
 /**
  * Main Sitemap with Image Extensions
@@ -204,7 +205,7 @@ export async function GET() {
 
   // Add news articles with images
   for (const article of allNews) {
-    const articleUrl = `${baseUrl}/news/${article.id}`;
+    const articleUrl = `${baseUrl}${getNewsPath(article)}`;
     const lastModified = new Date(
       article.updated_at || article.date_time_post || article.created_at,
     );

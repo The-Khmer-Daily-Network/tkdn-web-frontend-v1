@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { News } from "@/types/news";
+import { getNewsPath } from "@/utils/newsSlug";
 
 interface NewsDashboardProps {
   allNews?: News[];
@@ -237,11 +238,11 @@ export default function NewsDashboard({
       {/* Main Article */}
       {mainArticle && (
         <Link
-          href={`/news/${mainArticle.id}`}
+          href={getNewsPath(mainArticle)}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
             e.preventDefault();
-            window.location.href = `/news/${mainArticle.id}`;
+            window.location.href = getNewsPath(mainArticle);
           }}
           className="w-full block"
         >
@@ -350,11 +351,11 @@ export default function NewsDashboard({
           {displayedArticles.map((article) => (
             <Link
               key={article.id}
-              href={`/news/${article.id}`}
+              href={getNewsPath(article)}
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
-                window.location.href = `/news/${article.id}`;
+                window.location.href = getNewsPath(article);
               }}
               className="cursor-pointer hover:opacity-90 transition-opacity"
           >

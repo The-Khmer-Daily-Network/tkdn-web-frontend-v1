@@ -7,6 +7,7 @@ import { getNews } from "@/services/news";
 import type { News } from "@/types/news";
 import { Play } from "lucide-react";
 import SEO from "@/components/SEO";
+import { getNewsPath } from "@/utils/newsSlug";
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -154,11 +155,11 @@ function SearchContent() {
             {news.map((article) => (
               <Link
                 key={article.id}
-                href={`/news/${article.id}`}
+                href={getNewsPath(article)}
                 onClick={(e) => {
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                   e.preventDefault();
-                  window.location.href = `/news/${article.id}`;
+                  window.location.href = getNewsPath(article);
                 }}
                 className="flex flex-col space-y-3 cursor-pointer hover:opacity-90 transition-opacity"
             >

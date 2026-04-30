@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import NewsPageContent from "./NewsPageContent";
+import { getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -29,6 +30,39 @@ async function getNewsById(id: number) {
     return data.success ? data.data : null;
   } catch (error) {
     console.error("Error fetching news for metadata:", error);
+    return null;
+  }
+}
+
+async function getNewsBySlug(slug: string) {
+  if (!API_BASE_URL || !slug) {
+    return null;
+  }
+
+  try {
+    const baseUrl = API_BASE_URL.replace(/\/$/, "");
+    const response = await fetch(`${baseUrl}/news`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const articles = Array.isArray(data?.data) ? data.data : [];
+    return (
+      articles.find(
+        (article: any) => slugifyNewsTitle(article?.title || "") === slug,
+      ) || null
+    );
+  } catch (error) {
+    console.error("Error fetching news by slug:", error);
     return null;
   }
 }
@@ -75,12 +109,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id: idParam } = await params;
 
-  // Check if it's a numeric ID (news article)
+  // Check if it's a numeric ID (legacy support)
   const numericId = parseInt(idParam, 10);
-  if (!isNaN(numericId)) {
-    const news = await getNewsById(numericId);
+  const news = !isNaN(numericId)
+    ? await getNewsById(numericId)
+    : await getNewsBySlug(idParam);
 
-    if (news) {
+  if (news) {
       // Get base URL - use environment variable or default
       const baseUrl =
         process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com";
@@ -103,7 +138,7 @@ export async function generateMetadata({
 
       // Dynamic SEO - Use the news title for Google to index
       const title = news.title;
-      const url = `${baseUrl}/news/${numericId}`;
+      const url = `${baseUrl}${getNewsPath(news)}`;
 
       // Create optimized description for search engines
       const description = news.subtitle
@@ -231,7 +266,6 @@ export async function generateMetadata({
             process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
         },
       };
-    }
   }
 
   // Default metadata for category/list pages
@@ -320,19 +354,19 @@ export default async function NewsPage({
 }) {
   const { id: idParam } = await params;
 
-  // Pre-fetch news data if it's a numeric ID to avoid duplicate client-side fetch
+  // Pre-fetch news data by numeric ID (legacy) or slug.
   let initialNewsData = null;
   const numericId = parseInt(idParam, 10);
-  if (!isNaN(numericId)) {
-    try {
-      const news = await getNewsById(numericId);
-      if (news) {
-        initialNewsData = news;
-      }
-    } catch (error) {
-      // If fetch fails, let client-side handle it
-      console.error("Error pre-fetching news:", error);
+  try {
+    const news = !isNaN(numericId)
+      ? await getNewsById(numericId)
+      : await getNewsBySlug(idParam);
+    if (news) {
+      initialNewsData = news;
     }
+  } catch (error) {
+    // If fetch fails, let client-side handle it
+    console.error("Error pre-fetching news:", error);
   }
 
   return <NewsPageContent key={idParam} initialNewsData={initialNewsData} />;

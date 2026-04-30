@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { News } from "@/types/news";
 import { getInternationalNews } from "@/services/news";
+import { getNewsPath } from "@/utils/newsSlug";
 
 const DISPLAY_LIMIT = 15;
 
@@ -128,11 +129,11 @@ export default function InternationalFeature({
         {news.map((article) => (
           <Link
             key={article.id}
-            href={`/news/${article.id}`}
+            href={getNewsPath(article)}
             onClick={(e) => {
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
               e.preventDefault();
-              window.location.href = `/news/${article.id}`;
+              window.location.href = getNewsPath(article);
             }}
             className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
         >
