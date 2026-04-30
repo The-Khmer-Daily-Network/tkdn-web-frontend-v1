@@ -164,7 +164,8 @@ export default function HeaderSidebar({
 
   return (
     <header
-      className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[30px]"}`}
+      // className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[30px]"}`}
+      className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[0px]"}`}
   >
       <div className="w-full h-[65px] bg-white border-b border-gray-200 rounded-b-[30px] shadow-sm transition-shadow duration-200 hover:shadow-md">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">

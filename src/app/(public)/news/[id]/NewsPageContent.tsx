@@ -830,8 +830,24 @@ export default function NewsPageContent({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-gray-600">Loading news...</p>
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-pulse">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-12 rounded-[10px] bg-gray-200"></div>
+          <div className="flex flex-col gap-2">
+            <div className="h-4 w-24 rounded bg-gray-200"></div>
+            <div className="h-3 w-40 rounded bg-gray-200"></div>
+          </div>
+        </div>
+        <div className="h-9 w-full rounded bg-gray-200"></div>
+        <div className="h-7 w-5/6 rounded bg-gray-200"></div>
+        <div className="h-[280px] w-full rounded-lg bg-gray-200"></div>
+        <div className="space-y-3">
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-11/12 rounded bg-gray-200"></div>
+          <div className="h-4 w-full rounded bg-gray-200"></div>
+          <div className="h-4 w-10/12 rounded bg-gray-200"></div>
+        </div>
       </div>
     );
   }
@@ -1162,7 +1178,8 @@ export default function NewsPageContent({
           {...(seoData.author && { author: seoData.author })}
         />
         <BannerSponsor />
-        <div className="w-full max-w-4xl mx-auto space-y-6 mt-6">
+        {/* <div className="w-full max-w-4xl mx-auto space-y-6 mt-6"> */}
+        <div className="w-full max-w-4xl mx-auto space-y-6">
           {/* Metadata Header with Red Bar */}
           <div className="flex items-center gap-3 mb-4">
             <div className="w-1 h-12 rounded-[10px] bg-[#E34C33]"></div>
