@@ -1524,6 +1524,28 @@ export default function NewsPageContent({
                                 )}
                               </div>
                             )}
+
+                          {(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl) && (
+                            <div className="w-full my-6">
+                              <audio controls className="w-full">
+                                <source
+                                  src={
+                                    singleNews.tts_audio_url ||
+                                    (singleNews as any).ttsAudioUrl ||
+                                    ""
+                                  }
+                                />
+                                Your browser does not support the audio element.
+                              </audio>
+                              {(singleNews.tts_audio_name ||
+                                (singleNews as any).ttsAudioName) && (
+                                <p className="text-sm text-gray-600 mt-2 italic">
+                                  {singleNews.tts_audio_name ||
+                                    (singleNews as any).ttsAudioName}
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>

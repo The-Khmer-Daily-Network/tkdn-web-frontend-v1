@@ -30,6 +30,10 @@ export interface News {
   middle_image_name: string | null;
   middle_video_url: string | null;
   middle_video_name: string | null;
+  tts_audio_url: string | null;
+  tts_audio_name: string | null;
+  /** Plain text last used to generate the TTS audio (for admin re-edit). */
+  tts_source_text?: string | null;
   end_images: EndImage[];
   created_at: string;
   updated_at: string;
@@ -67,6 +71,9 @@ export interface NewsCreateParams {
   middle_image_name?: string | null;
   middle_video_url?: string | null;
   middle_video_name?: string | null;
+  tts_audio_url?: string | null;
+  tts_audio_name?: string | null;
+  tts_source_text?: string | null;
   end_images?: EndImage[];
 }
 
@@ -83,6 +90,9 @@ export interface NewsUpdateParams {
   middle_image_name?: string | null;
   middle_video_url?: string | null;
   middle_video_name?: string | null;
+  tts_audio_url?: string | null;
+  tts_audio_name?: string | null;
+  tts_source_text?: string | null;
   end_images?: EndImage[];
 }
 
