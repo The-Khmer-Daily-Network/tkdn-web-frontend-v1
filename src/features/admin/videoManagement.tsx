@@ -36,6 +36,11 @@ import {
   getContentVideos,
   uploadContentVideo,
 } from "@/services/contentVideo";
+import {
+  convertArticleToSpeech,
+  deleteArticleTtsAudio,
+} from "@/services/textToSpeech";
+import NewsAudioPlayer from "@/components/NewsAudioPlayer";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
@@ -74,6 +79,10 @@ const toPlainPreviewText = (value: string) => {
   return decoded.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 };
 
+/** Preview conversions live under .../audio-text-to-speech/pending/ until Save promotes them. */
+const isPendingTtsUrl = (url: string | null | undefined): boolean =>
+  !!url && url.includes("/audio-text-to-speech/pending/");
+
 interface NewsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -109,6 +118,11 @@ function NewsModal({
   const [middleVideoUrl, setMiddleVideoUrl] = useState<string | null>(null);
   const [middleVideoName, setMiddleVideoName] = useState<string | null>(null);
   const [middleVideoUrlInput, setMiddleVideoUrlInput] = useState("");
+  const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
+  const [ttsAudioName, setTtsAudioName] = useState<string | null>(null);
+  const [ttsPlainInput, setTtsPlainInput] = useState("");
+  const [ttsConverting, setTtsConverting] = useState(false);
+  const [ttsRemoving, setTtsRemoving] = useState(false);
   const [endImages, setEndImages] = useState<EndImage[]>([]);
   const [endImageUrlInputs, setEndImageUrlInputs] = useState<string[]>([""]);
   const [loading, setLoading] = useState(false);
@@ -176,6 +190,9 @@ function NewsModal({
     contentBlocks: ContentBlock[];
     middleVideoUrl: string | null;
     middleVideoName: string | null;
+    ttsAudioUrl: string | null;
+    ttsAudioName: string | null;
+    ttsSourceText: string;
     endImages: EndImage[];
   }) =>
     JSON.stringify({
@@ -188,6 +205,9 @@ function NewsModal({
       contentBlocks: payload.contentBlocks,
       middleVideoUrl: payload.middleVideoUrl,
       middleVideoName: payload.middleVideoName,
+      ttsAudioUrl: payload.ttsAudioUrl,
+      ttsAudioName: payload.ttsAudioName,
+      ttsSourceText: payload.ttsSourceText,
       endImages: payload.endImages,
     });
 
@@ -278,6 +298,9 @@ function NewsModal({
       setContentBlocks(initialContentBlocks);
       setMiddleVideoUrl(news.middle_video_url);
       setMiddleVideoName(news.middle_video_name);
+      setTtsAudioUrl(news.tts_audio_url);
+      setTtsAudioName(news.tts_audio_name);
+      setTtsPlainInput(news.tts_source_text ?? "");
       setEndImages(initialEndImages);
       originalCoverUrlRef.current = news.cover ?? null;
       originalMiddleVideoUrlRef.current = news.middle_video_url ?? null;
@@ -297,6 +320,9 @@ function NewsModal({
         contentBlocks: initialContentBlocks,
         middleVideoUrl: news.middle_video_url,
         middleVideoName: news.middle_video_name,
+        ttsAudioUrl: news.tts_audio_url,
+        ttsAudioName: news.tts_audio_name,
+        ttsSourceText: news.tts_source_text ?? "",
         endImages: initialEndImages,
       });
     } else {
@@ -311,6 +337,9 @@ function NewsModal({
       setMiddleVideoUrl(null);
       setMiddleVideoName(null);
       setMiddleVideoUrlInput("");
+      setTtsAudioUrl(null);
+      setTtsAudioName(null);
+      setTtsPlainInput("");
       setEndImages([]);
       setEndImageUrlInputs([""]);
       originalCoverUrlRef.current = null;
@@ -327,6 +356,9 @@ function NewsModal({
         contentBlocks: [{ subtitle: null, paragraph: "" }],
         middleVideoUrl: null,
         middleVideoName: null,
+        ttsAudioUrl: null,
+        ttsAudioName: null,
+        ttsSourceText: "",
         endImages: [],
       });
     }
@@ -350,6 +382,9 @@ function NewsModal({
         contentBlocks,
         middleVideoUrl,
         middleVideoName,
+        ttsAudioUrl,
+        ttsAudioName,
+        ttsSourceText: ttsPlainInput,
         endImages,
       }),
     [
@@ -362,6 +397,9 @@ function NewsModal({
       contentBlocks,
       middleVideoUrl,
       middleVideoName,
+      ttsAudioUrl,
+      ttsAudioName,
+      ttsPlainInput,
       endImages,
     ],
   );
@@ -397,14 +435,21 @@ function NewsModal({
   }, [asPage, loading, currentDraftSignature]);
 
   const requestCloseEditor = () => {
-    if (loading) return;
-    if (draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current) {
-      const shouldLeave = window.confirm("Changes you made may not be saved.");
-      if (!shouldLeave) return;
+    void (async () => {
+      if (loading || ttsRemoving) return;
+      if (draftBaselineRef.current && currentDraftSignature !== draftBaselineRef.current) {
+        const shouldLeave = window.confirm("Changes you made may not be saved.");
+        if (!shouldLeave) return;
+      }
+      if (ttsAudioUrl && isPendingTtsUrl(ttsAudioUrl)) {
+        try {
+          await deleteArticleTtsAudio(ttsAudioUrl);
+        } catch (e) {
+          console.error("Failed to delete preview TTS from storage on close:", e);
+        }
+      }
       onClose();
-      return;
-    }
-    onClose();
+    })();
   };
 
   useEffect(() => {
@@ -1737,6 +1782,75 @@ function NewsModal({
     return false;
   };
 
+  const handleRemoveTtsAudio = async () => {
+    if (!ttsAudioUrl) return;
+    try {
+      setTtsRemoving(true);
+      setError(null);
+      await deleteArticleTtsAudio(ttsAudioUrl);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to remove audio from storage";
+      setError(message);
+      return;
+    } finally {
+      setTtsRemoving(false);
+    }
+    setTtsAudioUrl(null);
+    setTtsAudioName(null);
+  };
+
+  const handleConvertTextToSpeech = async () => {
+    const text = ttsPlainInput.trim();
+    if (text.length < 10) {
+      setError("Enter at least 10 characters of plain text to convert (API limit).");
+      return;
+    }
+    if (text.length > 5000) {
+      setError("Text must be 5000 characters or fewer.");
+      return;
+    }
+    try {
+      setTtsConverting(true);
+      setError(null);
+      if (ttsAudioUrl && isPendingTtsUrl(ttsAudioUrl)) {
+        try {
+          await deleteArticleTtsAudio(ttsAudioUrl);
+        } catch (e) {
+          console.error("Failed to remove previous preview TTS:", e);
+        }
+      }
+      const response = await convertArticleToSpeech({
+        text,
+        articleId: news?.id,
+        title: title.trim() || undefined,
+      });
+      const audioUrl =
+        response.data?.tts_audio_url ||
+        response.data?.audio_url ||
+        response.tts_audio_url ||
+        response.audio_url ||
+        null;
+      const audioName =
+        response.data?.tts_audio_name ||
+        response.data?.audio_name ||
+        response.tts_audio_name ||
+        response.audio_name ||
+        null;
+      if (!audioUrl) {
+        throw new Error("TTS conversion succeeded but no audio URL was returned");
+      }
+      setTtsAudioUrl(audioUrl);
+      setTtsAudioName(audioName);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to convert article to speech";
+      setError(message);
+    } finally {
+      setTtsConverting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -2051,6 +2165,16 @@ function NewsModal({
         params.middle_video_url = null;
         params.middle_video_name = null;
       }
+      params.tts_audio_url = ttsAudioUrl;
+      params.tts_audio_name = ttsAudioName;
+      {
+        const trimmedTtsText = ttsPlainInput.trim();
+        params.tts_source_text = ttsAudioUrl
+          ? trimmedTtsText.length > 0
+            ? trimmedTtsText
+            : null
+          : null;
+      }
       // Do NOT include middle_video_url or middle_video_name in the request
 
       if (news) {
@@ -2174,6 +2298,9 @@ function NewsModal({
         contentBlocks: contentBlocksWithoutEndImages,
         middleVideoUrl: finalMiddleVideoUrl,
         middleVideoName: finalMiddleVideoName,
+        ttsAudioUrl,
+        ttsAudioName,
+        ttsSourceText: ttsPlainInput,
         endImages: finalEndImages.filter((img): img is EndImage => !!img?.url),
       });
     } catch (err) {
@@ -2349,7 +2476,7 @@ function NewsModal({
                 <button
                   type="button"
                   onClick={requestCloseEditor}
-                  disabled={loading}
+                  disabled={loading || ttsConverting || ttsRemoving}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancel
@@ -2357,7 +2484,13 @@ function NewsModal({
                 <button
                   type="submit"
                   form="article-editor-form"
-                  disabled={loading || !author.trim() || !categoryId}
+                  disabled={
+                    loading ||
+                    ttsConverting ||
+                    ttsRemoving ||
+                    !author.trim() ||
+                    !categoryId
+                  }
                   className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Save
@@ -2367,7 +2500,7 @@ function NewsModal({
             {!asPage && (
               <button
                 onClick={requestCloseEditor}
-                disabled={loading}
+                disabled={loading || ttsConverting || ttsRemoving}
                 className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
                 <X size={20} />
@@ -2835,6 +2968,74 @@ function NewsModal({
               </div>
             </div>
 
+              {/* Text To Speech Section */}
+              <div className="space-y-3 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Text To Speech</h3>
+                  </div>
+                )}
+                <div className="w-full max-w-[860px] rounded-md border border-gray-200 bg-white p-3 space-y-3">
+                  <div>
+                    <label
+                      htmlFor="tts-plain-input"
+                      className="block text-xs font-medium text-gray-600 mb-1.5"
+                    >
+                      Plain text for audio (no formatting)
+                    </label>
+                    <textarea
+                      id="tts-plain-input"
+                      value={ttsPlainInput}
+                      onChange={(e) => setTtsPlainInput(e.target.value)}
+                      maxLength={5000}
+                      rows={5}
+                      placeholder="Type or paste plain text here (10–5000 characters), then click Convert to hear a preview."
+                      disabled={loading || ttsConverting || ttsRemoving}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 placeholder:text-gray-400 bg-white resize-y min-h-[100px] disabled:opacity-50"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      {ttsPlainInput.length} / 5000 — Convert needs at least 10 characters.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConvertTextToSpeech}
+                      disabled={
+                        loading ||
+                        ttsConverting ||
+                        ttsRemoving ||
+                        ttsPlainInput.trim().length < 10 ||
+                        ttsPlainInput.trim().length > 5000
+                      }
+                      className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {ttsConverting ? "Converting..." : "Convert"}
+                    </button>
+                    {ttsAudioUrl && (
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveTtsAudio()}
+                        disabled={loading || ttsConverting || ttsRemoving}
+                        className="cursor-pointer rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {ttsRemoving ? "Removing..." : "Remove Audio"}
+                      </button>
+                    )}
+                  </div>
+                  {ttsAudioUrl ? (
+                    <div>
+                      <NewsAudioPlayer src={ttsAudioUrl} />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Preview files stay in a temporary folder until you save; cancel or remove deletes them
+                      from storage. Save moves the audio to the permanent location for this article.
+                    </p>
+                  )}
+                </div>
+              </div>
+
             {error && (
               <div className="order-3 lg:col-span-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-600">{error}</p>
@@ -2847,14 +3048,20 @@ function NewsModal({
               <button
                 type="button"
                 onClick={requestCloseEditor}
-                disabled={loading}
+                disabled={loading || ttsConverting || ttsRemoving}
                 className="cursor-pointer px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium"
             >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading || !author.trim() || !categoryId}
+                disabled={
+                  loading ||
+                  ttsConverting ||
+                  ttsRemoving ||
+                  !author.trim() ||
+                  !categoryId
+                }
                 className="cursor-pointer px-6 py-2.5 bg-blue-600 text-[#f7f7f7] rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
             >
                 {loading
