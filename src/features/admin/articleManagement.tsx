@@ -35,6 +35,7 @@ import {
   convertArticleToSpeech,
   deleteArticleTtsAudio,
 } from "@/services/textToSpeech";
+import NewsAudioPlayer from "@/components/NewsAudioPlayer";
 import type { News, ContentBlock, EndImage } from "@/types/news";
 import type { Category } from "@/types/category";
 import CoverSelectorModal from "@/components/admin/CoverSelectorModal";
@@ -46,6 +47,16 @@ import type { ContentVideo } from "@/types/contentVideo";
 import { useAuth } from "@/contexts/AuthContext";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
+
+/** List URL without query (?mode / ?id). */
+const ARTICLE_MANAGEMENT_LIST_PATH = "/articleManagement";
+
+/** Full browser navigation — reliably clears `?mode=` / `?id=` (App Router `router.push` often no-ops when only search params change). */
+function goToArticleManagementList() {
+  if (typeof window !== "undefined") {
+    window.location.assign(ARTICLE_MANAGEMENT_LIST_PATH);
+  }
+}
 
 const decodeHtmlEntities = (input: string) => {
   if (typeof window === "undefined") {
@@ -2507,79 +2518,7 @@ function NewsModal({
                 </div>
               </div>
 
-              {/* Text To Speech Section */}
-              <div className="space-y-3 min-w-0">
-                {asPage && (
-                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
-                    <h3 className="text-sm font-semibold text-gray-700">Text To Speech</h3>
-                  </div>
-                )}
-                <div className="w-full max-w-[860px] rounded-md border border-gray-200 bg-white p-3 space-y-3">
-                  <div>
-                    <label
-                      htmlFor="tts-plain-input"
-                      className="block text-xs font-medium text-gray-600 mb-1.5"
-                    >
-                      Plain text for audio (no formatting)
-                    </label>
-                    <textarea
-                      id="tts-plain-input"
-                      value={ttsPlainInput}
-                      onChange={(e) => setTtsPlainInput(e.target.value)}
-                      maxLength={5000}
-                      rows={5}
-                      placeholder="Type or paste plain text here (10–5000 characters), then click Convert to hear a preview."
-                      disabled={loading || ttsConverting || ttsRemoving}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 placeholder:text-gray-400 bg-white resize-y min-h-[100px] disabled:opacity-50"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      {ttsPlainInput.length} / 5000 — Convert needs at least 10 characters.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleConvertTextToSpeech}
-                      disabled={
-                        loading ||
-                        ttsConverting ||
-                        ttsRemoving ||
-                        ttsPlainInput.trim().length < 10 ||
-                        ttsPlainInput.trim().length > 5000
-                      }
-                      className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {ttsConverting ? "Converting..." : "Convert"}
-                    </button>
-                    {ttsAudioUrl && (
-                      <button
-                        type="button"
-                        onClick={() => void handleRemoveTtsAudio()}
-                        disabled={loading || ttsConverting || ttsRemoving}
-                        className="cursor-pointer rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {ttsRemoving ? "Removing..." : "Remove Audio"}
-                      </button>
-                    )}
-                  </div>
-                  {ttsAudioUrl ? (
-                    <div>
-                      <audio controls className="w-full">
-                        <source src={ttsAudioUrl} />
-                        Your browser does not support the audio element.
-                      </audio>
-                      {ttsAudioName && (
-                        <p className="mt-2 text-xs italic text-gray-600">{ttsAudioName}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      Preview files stay in a temporary folder until you save; cancel or remove deletes them
-                      from storage. Save moves the audio to the permanent location for this article.
-                    </p>
-                  )}
-                </div>
-              </div>
+            
 
               {/* End Images Section */}
               <div className="space-y-4 min-w-0">
@@ -2668,6 +2607,74 @@ function NewsModal({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Text To Speech Section */}
+              <div className="space-y-3 min-w-0">
+                {asPage && (
+                  <div className="w-full max-w-[860px] border-b border-gray-200 pb-2">
+                    <h3 className="text-sm font-semibold text-gray-700">Text To Speech</h3>
+                  </div>
+                )}
+                <div className="w-full max-w-[860px] rounded-md border border-gray-200 bg-white p-3 space-y-3">
+                  <div>
+                    <label
+                      htmlFor="tts-plain-input"
+                      className="block text-xs font-medium text-gray-600 mb-1.5"
+                    >
+                      Plain text for audio (no formatting)
+                    </label>
+                    <textarea
+                      id="tts-plain-input"
+                      value={ttsPlainInput}
+                      onChange={(e) => setTtsPlainInput(e.target.value)}
+                      maxLength={5000}
+                      rows={5}
+                      placeholder="Type or paste plain text here (10–5000 characters), then click Convert to hear a preview."
+                      disabled={loading || ttsConverting || ttsRemoving}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 placeholder:text-gray-400 bg-white resize-y min-h-[100px] disabled:opacity-50"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      {ttsPlainInput.length} / 5000 — Convert needs at least 10 characters.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConvertTextToSpeech}
+                      disabled={
+                        loading ||
+                        ttsConverting ||
+                        ttsRemoving ||
+                        ttsPlainInput.trim().length < 10 ||
+                        ttsPlainInput.trim().length > 5000
+                      }
+                      className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {ttsConverting ? "Converting..." : "Convert"}
+                    </button>
+                    {ttsAudioUrl && (
+                      <button
+                        type="button"
+                        onClick={() => void handleRemoveTtsAudio()}
+                        disabled={loading || ttsConverting || ttsRemoving}
+                        className="cursor-pointer rounded-md border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {ttsRemoving ? "Removing..." : "Remove Audio"}
+                      </button>
+                    )}
+                  </div>
+                  {ttsAudioUrl ? (
+                    <div>
+                      <NewsAudioPlayer src={ttsAudioUrl} />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Preview files stay in a temporary folder until you save; cancel or remove deletes them
+                      from storage. Save moves the audio to the permanent location for this article.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -2888,7 +2895,7 @@ export default function ArticleManagement() {
   };
 
   const closeEditorPage = () => {
-    router.push("/articleManagement");
+    goToArticleManagementList();
   };
 
   const handleDelete = async (id: number) => {
@@ -2961,9 +2968,9 @@ export default function ArticleManagement() {
           isOpen
           asPage
           onClose={closeEditorPage}
-          onSuccess={async () => {
-            await fetchArticles();
-            router.replace("/articleManagement");
+          onSuccess={() => {
+            // Hard navigation: SPA router often keeps ?mode=edit&id= on same pathname. Full assign always resets the URL and reloads the list.
+            goToArticleManagementList();
           }}
           news={isEditPage ? selectedArticle : null}
           categories={categories}
