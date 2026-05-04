@@ -11,6 +11,7 @@ import type { News } from "@/types/news";
 import type { Category } from "@/types/category";
 import { Play } from "lucide-react";
 import SEO from "@/components/SEO";
+import NewsAudioPlayer from "@/components/NewsAudioPlayer";
 import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 
@@ -1280,6 +1281,18 @@ export default function NewsPageContent({
             </div>
           )}
 
+          {/* Listen (TTS) — under cover + caption, above article body */}
+          {(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl) && (
+            <div className="w-full mt-6">
+              <NewsAudioPlayer
+                src={
+                  (singleNews.tts_audio_url ||
+                    (singleNews as any).ttsAudioUrl) as string
+                }
+              />
+            </div>
+          )}
+
           {/* Content Blocks with Middle Media */}
           {singleNews.content_blocks &&
             singleNews.content_blocks.length > 0 && (
@@ -1524,6 +1537,7 @@ export default function NewsPageContent({
                                 )}
                               </div>
                             )}
+
                         </>
                       )}
                     </div>
