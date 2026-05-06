@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import HomePageContent from "./(public)/home/HomePageContent";
 
 export const metadata: Metadata = {
   title: "The Khmer Daily Network - Latest News, Articles & Videos",
@@ -128,5 +128,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootPage() {
-  redirect("/home");
+  return <HomePageContent />;
 }
