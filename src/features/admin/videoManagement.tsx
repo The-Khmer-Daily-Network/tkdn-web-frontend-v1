@@ -2475,6 +2475,20 @@ function NewsModal({
                 </button>
                 <button
                   type="button"
+                  onClick={handleConvertTextToSpeech}
+                  disabled={
+                    loading ||
+                    ttsConverting ||
+                    ttsRemoving ||
+                    ttsPlainInput.trim().length < 10 ||
+                    ttsPlainInput.trim().length > 5000
+                  }
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {ttsConverting ? "Converting..." : "Convert"}
+                </button>
+                <button
+                  type="button"
                   onClick={requestCloseEditor}
                   disabled={loading || ttsConverting || ttsRemoving}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
@@ -3258,7 +3272,7 @@ export default function VideoManagement() {
 
     try {
       setDeletingId(id);
-      await deleteAdminVideo(id);
+      await deleteAdminVideo(id, user?.id);
       const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
       if (nextPage !== currentPage) {
         setCurrentPage(nextPage);

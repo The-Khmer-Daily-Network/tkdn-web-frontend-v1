@@ -2905,7 +2905,7 @@ export default function ArticleManagement() {
 
     try {
       setDeletingId(id);
-      await deleteAdminArticle(id);
+      await deleteAdminArticle(id, user?.id);
       const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
       if (nextPage !== currentPage) {
         setCurrentPage(nextPage);

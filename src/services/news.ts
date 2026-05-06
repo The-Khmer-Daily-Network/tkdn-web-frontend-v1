@@ -662,6 +662,7 @@ export async function deleteNews(id: number): Promise<NewsDeleteResponse> {
  */
 export async function deleteAdminArticle(
   id: number,
+  actorUserId?: number,
 ): Promise<NewsDeleteResponse> {
   try {
     const url = getApiUrl(`/admin/articles/${id}`);
@@ -672,6 +673,8 @@ export async function deleteAdminArticle(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
+      body:
+        actorUserId != null ? JSON.stringify({ user_id: actorUserId }) : undefined,
       credentials: "omit",
       mode: "cors",
     });
@@ -699,6 +702,7 @@ export async function deleteAdminArticle(
  */
 export async function deleteAdminVideo(
   id: number,
+  actorUserId?: number,
 ): Promise<NewsDeleteResponse> {
   try {
     const url = getApiUrl(`/admin/videos/${id}`);
@@ -709,6 +713,8 @@ export async function deleteAdminVideo(
         "Content-Type": "application/json",
         Accept: "application/json",
       },
+      body:
+        actorUserId != null ? JSON.stringify({ user_id: actorUserId }) : undefined,
       credentials: "omit",
       mode: "cors",
     });
