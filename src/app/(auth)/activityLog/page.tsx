@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  ClipboardList,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
   Loader2,
-  Plus,
-  RefreshCw,
   Search,
   X,
 } from "lucide-react";
@@ -43,6 +44,8 @@ export default function ActivityLogPage() {
   const [manualDetails, setManualDetails] = useState("");
   const [manualAttributionUserId, setManualAttributionUserId] = useState<number | "">("");
   const [manualSaving, setManualSaving] = useState(false);
+  const startRow = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const endRow = total === 0 ? 0 : Math.min(page * perPage, total);
 
   const load = useCallback(async () => {
     if (!user?.id || !isUserSME) {
@@ -276,7 +279,7 @@ export default function ActivityLogPage() {
                     e.target.value === "" ? "" : Number(e.target.value),
                   )
                 }
-                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                className="cursor-pointer mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
                 disabled={usersLoading}
               >
                 <option value="">All users</option>
@@ -387,28 +390,17 @@ export default function ActivityLogPage() {
               </table>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-4 py-3 text-sm text-gray-600">
-              <span>
-                Showing{" "}
-                <strong className="font-medium text-gray-900">{total}</strong>{" "}
-                entr{total === 1 ? "y" : "ies"}
-                {" · "}
-                Page{" "}
-                <strong className="font-medium text-gray-900">{page}</strong> of{" "}
-                <strong className="font-medium text-gray-900">
-                  {Math.max(1, totalPages)}
-                </strong>
-              </span>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs text-gray-600">
-                  Per page
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-white px-4 py-3 text-sm text-gray-600">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                Rows per page:
+                <div className="relative">
                   <select
                     value={perPage}
                     onChange={(e) => {
                       setPerPage(Number(e.target.value) as ActivityLogPerPage);
                       setPage(1);
                     }}
-                    className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                    className="cursor-pointer appearance-none rounded-md border border-gray-200 bg-white px-2 py-1.5 flex pr-6 text-sm text-gray-900"
                   >
                     {PER_PAGE_OPTIONS.map((n) => (
                       <option key={n} value={n}>
@@ -416,25 +408,48 @@ export default function ActivityLogPage() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1 || loading}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    disabled={page >= totalPages || loading}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next
-                  </button>
                 </div>
+              </label>
+              <span className="text-sm text-gray-600">
+                {startRow}-{endRow} of {total}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="First page"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage(1)}
+                  className="cursor-pointer inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="cursor-pointer inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Last page"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage(Math.max(1, totalPages))}
+                  className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
