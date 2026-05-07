@@ -320,15 +320,6 @@ export default function SidebareAdmin() {
                   <span>Video Management</span>
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/guidelines"
-                  className={getLinkClasses("/guidelines")}
-              >
-                  {renderMenuIcon("notification")}
-                  <span>Notification</span>
-                </Link>
-              </li>
             </>
           ) : (
             <>
@@ -412,14 +403,6 @@ export default function SidebareAdmin() {
           >
               {renderMenuIcon("video")}
               <span>Video Management</span>
-            </Link>
-          </li>
-
-          {/* Guidelines (UI only for now) */}
-          <li>
-            <Link href="/guidelines" className={getLinkClasses("/guidelines")}>
-              {renderMenuIcon("notification")}
-              <span>Notification</span>
             </Link>
           </li>
 
@@ -522,42 +505,6 @@ export default function SidebareAdmin() {
               >
                   {renderMenuIcon("category")}
                   <span>Categories Management</span>
-                </div>
-                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                    />
-                  </svg>
-                  <span className="text-sm">Your role not allow</span>
-                </div>
-              </>
-            )}
-          </li>
-
-          {/* Advertisement - No Dropdown - SME Only */}
-          <li className="relative group">
-            {isUserSME ? (
-              <Link
-                href="/advertisement"
-                className={getLinkClasses("/advertisement")}
-            >
-                {renderMenuIcon("ad")}
-                <span>Advertisement</span>
-              </Link>
-            ) : (
-              <>
-                <div className={getLinkClasses("/advertisement", false, true)}>
-                  {renderMenuIcon("ad")}
-                  <span>Advertisement</span>
                 </div>
                 <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                   <svg
