@@ -8,6 +8,7 @@ import type { News } from "@/types/news";
 import { Play } from "lucide-react";
 import SEO from "@/components/SEO";
 import { getNewsPath } from "@/utils/newsSlug";
+import { stripHtmlToText } from "@/utils/text";
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -209,7 +210,7 @@ function SearchContent() {
                   {article.content_blocks &&
                     article.content_blocks.length > 0 && (
                       <p className="text-sm text-gray-700 line-clamp-3">
-                        {article.content_blocks[0].paragraph}
+                        {stripHtmlToText(article.content_blocks[0].paragraph)}
                       </p>
                     )}
                 </div>

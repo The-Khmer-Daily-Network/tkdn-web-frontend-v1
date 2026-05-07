@@ -14,6 +14,7 @@ import SEO from "@/components/SEO";
 import NewsAudioPlayer from "@/components/NewsAudioPlayer";
 import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
+import { stripHtmlToText } from "@/utils/text";
 
 interface NewsPageContentProps {
   initialNewsData?: News | null;
@@ -1777,7 +1778,7 @@ export default function NewsPageContent({
                           className="text-sm text-gray-700 line-clamp-3"
                          
                       >
-                          {article.content_blocks[0].paragraph}
+                          {stripHtmlToText(article.content_blocks[0].paragraph)}
                         </p>
                       )}
                   </div>
