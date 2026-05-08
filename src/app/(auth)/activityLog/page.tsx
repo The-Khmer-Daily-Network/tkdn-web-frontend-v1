@@ -21,6 +21,23 @@ import {
 } from "@/services/activityLog";
 
 const PER_PAGE_OPTIONS: ActivityLogPerPage[] = [30, 50, 100];
+const PHNOM_PENH_TIMEZONE = "Asia/Phnom_Penh";
+
+const formatPhnomPenhTime = (value: string, fallback: string): string => {
+  if (!value) return fallback;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return fallback;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: PHNOM_PENH_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(parsed);
+};
 
 export default function ActivityLogPage() {
   const { user, isUserSME } = useAuth();
@@ -363,7 +380,7 @@ export default function ActivityLogPage() {
                         className="transition-colors hover:bg-gray-50/90"
                       >
                         <td className="whitespace-nowrap px-4 py-3 text-gray-800 tabular-nums">
-                          {row.created_at_display}
+                          {formatPhnomPenhTime(row.created_at, row.created_at_display)}
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-900">
                           {row.username ?? "—"}
