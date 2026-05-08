@@ -121,9 +121,9 @@ export async function uploadContentImage({
     const url = getApiUrl("/images-content");
 
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowedTypes.includes(image.type)) {
-      throw new Error("Only JPG, PNG, and JPEG files are allowed");
+      throw new Error("Only JPG, PNG, JPEG, and WEBP files are allowed");
     }
 
     // Validate file size (20MB max)
@@ -307,13 +307,13 @@ export async function uploadMultipleContentImages({
     const url = getApiUrl("/images-content");
 
     // Validate all files
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     const maxSize = 20 * 1024 * 1024; // 20MB in bytes
 
     for (const image of images) {
       if (!allowedTypes.includes(image.type)) {
         throw new Error(
-          `${image.name}: Only JPG, PNG, and JPEG files are allowed`,
+          `${image.name}: Only JPG, PNG, JPEG, and WEBP files are allowed`,
         );
       }
       if (image.size > maxSize) {

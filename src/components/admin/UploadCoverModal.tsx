@@ -173,7 +173,7 @@ export default function UploadCoverModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/jpg,image/png"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={handleFileSelect}
                   className="hidden"
                   disabled={uploading}
