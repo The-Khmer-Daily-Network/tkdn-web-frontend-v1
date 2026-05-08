@@ -2030,7 +2030,7 @@ function NewsModal({
                 >
                   {inlineImageUploading ? "Adding..." : "Mid Image"}
                 </button>
-                <button
+                {/* <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleInlineImageButtonClick("end")}
@@ -2038,7 +2038,7 @@ function NewsModal({
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {inlineImageUploading ? "Adding..." : "End Image"}
-                </button>
+                </button> */}
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
@@ -2905,7 +2905,7 @@ export default function ArticleManagement() {
 
     try {
       setDeletingId(id);
-      await deleteAdminArticle(id);
+      await deleteAdminArticle(id, user?.id);
       const nextPage = articles.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
       if (nextPage !== currentPage) {
         setCurrentPage(nextPage);

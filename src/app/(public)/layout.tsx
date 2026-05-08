@@ -5,10 +5,7 @@ import HeaderSidebar from "@/features/userFeature/headerSidebar";
 import RightsideSponsor from "@/features/sponsor/rightsideSponsor";
 import FooterFeature from "@/features/userFeature/footerFeature";
 import { AdvertisementProvider } from "@/contexts/AdvertisementContext";
-import { getAdvertisementImages } from "@/services/advertisement";
 import { getSocialMedia } from "@/services/socialMedia";
-import { getStatistics, type Statistics } from "@/services/statistics";
-import type { AdvertisementImage } from "@/types/advertisement";
 import type { SocialMedia } from "@/types/socialMedia";
 import OrganizationStructuredData from "@/components/OrganizationStructuredData";
 
@@ -20,10 +17,7 @@ export default function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [adImages, setAdImages] = useState<AdvertisementImage[]>([]);
   const [socialMedia, setSocialMedia] = useState<SocialMedia[]>([]);
-  const [statistics, setStatistics] = useState<Statistics | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (publicLayoutHasFetched) return;
@@ -33,16 +27,7 @@ export default function PublicLayout({
 
   const fetchData = async () => {
     try {
-      // Fetch advertisement images, social media, and statistics in parallel
-      const [imagesResponse, socialMediaResponse, statisticsResponse] =
-        await Promise.all([
-          getAdvertisementImages(),
-          getSocialMedia(),
-          getStatistics().catch(() => ({ data: null })), // Don't fail if statistics fails
-        ]);
-
-      setAdImages(imagesResponse.data);
-      setStatistics(statisticsResponse.data);
+      const socialMediaResponse = await getSocialMedia();
 
       // Process social media data (same logic as in SocialMediaWidget)
       const defaultPlatforms = [
@@ -153,17 +138,15 @@ export default function PublicLayout({
         },
         { id: 6, name: "Instagram", link: "https://www.instagram.com" },
       ]);
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <AdvertisementProvider images={adImages} loading={loading}>
+    <AdvertisementProvider images={[]} loading={false}>
       {/* Organization structured data for Google News and Search */}
       <OrganizationStructuredData />
       <div>
-        <HeaderSponsor images={adImages} loading={loading} />
+        <HeaderSponsor images={[]} loading={false} />
         <HeaderSidebar />
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col lg:flex-row gap-6">
@@ -172,10 +155,10 @@ export default function PublicLayout({
             {/* Right Side Sponsor - 30% on desktop/tablet, full width on mobile */}
             {/* <div className="w-full lg:w-[30%] lg:sticky lg:top-[124px] lg:self-start">
               <RightsideSponsor
-                images={adImages}
+                images={[]}
                 socialMedia={socialMedia}
-                statistics={statistics}
-                loading={loading}
+                statistics={null}
+                loading={false}
               />
             </div> */}
           </div>

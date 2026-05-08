@@ -12,6 +12,7 @@ import type { Category } from "@/types/category";
 import { Play, FileText } from "lucide-react";
 import SEO from "@/components/SEO";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
+import { stripHtmlToText } from "@/utils/text";
 
 export default function CategoryPage() {
   const params = useParams();
@@ -551,7 +552,7 @@ export default function CategoryPage() {
                           className="text-sm text-gray-700 line-clamp-3"
                          
                       >
-                          {article.content_blocks[0].paragraph}
+                          {stripHtmlToText(article.content_blocks[0].paragraph)}
                         </p>
                       )}
                   </div>

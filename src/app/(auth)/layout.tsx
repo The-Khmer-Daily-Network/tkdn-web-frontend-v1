@@ -22,6 +22,7 @@ export default function AuthLayout({
     "/guidelines",
     "/videoManagement",
     "/articleManagement",
+    "/activityLog",
   ];
   const isAllowedAdminRoute =
     !!pathname && adminAllowedRoutes.some((route) => pathname.startsWith(route));

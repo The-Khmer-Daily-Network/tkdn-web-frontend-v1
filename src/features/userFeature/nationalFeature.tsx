@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { News } from "@/types/news";
 import { getNationalNews } from "@/services/news";
 import { getNewsPath } from "@/utils/newsSlug";
+import { stripHtmlToText } from "@/utils/text";
 
 const DISPLAY_LIMIT = 15;
 
@@ -185,7 +186,7 @@ export default function NationalFeature({
                     overflow: "hidden",
                   }}
               >
-                  {article.content_blocks[0].paragraph}
+                  {stripHtmlToText(article.content_blocks[0].paragraph)}
                 </p>
               )}
             </div>
