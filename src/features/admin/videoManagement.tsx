@@ -274,6 +274,9 @@ function NewsModal({
   const [isMiddleVideoModalOpen, setIsMiddleVideoModalOpen] = useState(false);
   const [isEndImageModalOpen, setIsEndImageModalOpen] = useState(false);
 
+  const hasInlineVideoHtml = (blocks: ContentBlock[]): boolean =>
+    blocks.some((block) => /<video[\s>]|<iframe[\s>]/i.test(block.paragraph || ""));
+
   useEffect(() => {
     // Clear any pending local previews/files when switching item or opening.
     previewObjectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
@@ -283,10 +286,32 @@ function NewsModal({
     setEndImagePendingFiles([null, null, null]);
 
     if (news) {
-      const initialContentBlocks =
+      const initialContentBlocksRaw =
         news.content_blocks && news.content_blocks.length > 0
           ? news.content_blocks
           : [{ subtitle: null, paragraph: "" }];
+      const initialContentBlocks = (() => {
+        const middleUrl = (news.middle_video_url || "").trim();
+        if (!middleUrl) return initialContentBlocksRaw;
+        if (hasInlineVideoHtml(initialContentBlocksRaw)) return initialContentBlocksRaw;
+
+        const firstBlock = initialContentBlocksRaw[0] ?? { subtitle: null, paragraph: "" };
+        const existingParagraph = firstBlock.paragraph || "";
+        const spacer = existingParagraph.trim().length > 0 ? "<br/><br/>" : "";
+        const embedUrl = toYouTubeEmbedUrl(middleUrl);
+        const safeMiddleUrl = middleUrl.replace(/"/g, "&quot;");
+        const inlineVideoHtml = embedUrl
+          ? `<iframe src="${embedUrl}" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`
+          : `<video src="${safeMiddleUrl}" controls playsinline preload="metadata"></video>`;
+
+        return [
+          {
+            ...firstBlock,
+            paragraph: `${existingParagraph}${spacer}${inlineVideoHtml}`,
+          },
+          ...initialContentBlocksRaw.slice(1),
+        ];
+      })();
       const initialEndImages =
         news.end_images && news.end_images.length > 0 ? news.end_images : [];
       setCategoryId(news.category_id);
@@ -297,6 +322,7 @@ function NewsModal({
       setSubtitle(news.subtitle || "");
       setContentBlocks(initialContentBlocks);
       setMiddleVideoUrl(news.middle_video_url);
+      setMiddleVideoUrlInput(news.middle_video_url || "");
       setMiddleVideoName(news.middle_video_name);
       setTtsAudioUrl(news.tts_audio_url);
       setTtsAudioName(news.tts_audio_name);
@@ -1620,12 +1646,14 @@ function NewsModal({
   };
 
   const insertMiddleVideoToEditor = (videoUrl: string, videoId: string, pendingId?: string) => {
-    const blockIndex =
+    const preferredIndex =
       savedInlineImageBlockIndexRef.current ??
       activeSelection?.blockIndex ??
       activeEditorBlockIndex;
+    const blockIndex =
+      preferredIndex ?? (contentBlocks.length > 0 ? 0 : null);
     if (blockIndex === null) {
-      setError("Select a content position before adding Mid Video.");
+      setError("Add at least one content block before adding Mid Video.");
       return;
     }
 
@@ -1649,22 +1677,44 @@ function NewsModal({
     wrapper.style.margin = "16px 0";
     wrapper.style.position = "relative";
 
-    const video = document.createElement("video");
-    video.setAttribute("src", videoUrl);
-    video.setAttribute("controls", "true");
-    video.setAttribute("playsinline", "true");
-    video.setAttribute("preload", "metadata");
-    if (pendingId) {
-      video.setAttribute("data-inline-pending-video-id", pendingId);
+    const youtubeEmbedUrl = toYouTubeEmbedUrl(videoUrl);
+    if (youtubeEmbedUrl) {
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("src", youtubeEmbedUrl);
+      iframe.setAttribute("title", "YouTube video player");
+      iframe.setAttribute(
+        "allow",
+        "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+      );
+      iframe.setAttribute("allowfullscreen", "true");
+      iframe.style.width = "100%";
+      iframe.style.maxWidth = "100%";
+      iframe.style.aspectRatio = "16 / 9";
+      iframe.style.height = "auto";
+      iframe.style.minHeight = "320px";
+      iframe.style.border = "0";
+      iframe.style.borderRadius = "8px";
+      iframe.style.display = "block";
+      wrapper.appendChild(iframe);
+    } else {
+      const video = document.createElement("video");
+      video.setAttribute("src", videoUrl);
+      video.setAttribute("controls", "true");
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("preload", "metadata");
+      if (pendingId) {
+        video.setAttribute("data-inline-pending-video-id", pendingId);
+      }
+      video.style.width = "100%";
+      video.style.maxWidth = "100%";
+      video.style.aspectRatio = "16 / 9";
+      video.style.height = "auto";
+      video.style.minHeight = "320px";
+      video.style.objectFit = "cover";
+      video.style.borderRadius = "8px";
+      video.style.display = "block";
+      wrapper.appendChild(video);
     }
-    video.style.width = "100%";
-    video.style.maxWidth = "100%";
-    video.style.aspectRatio = "100 / 53";
-    video.style.height = "auto";
-    video.style.objectFit = "cover";
-    video.style.borderRadius = "8px";
-    video.style.display = "block";
-    wrapper.appendChild(video);
     attachInlineVideoActions(wrapper, blockIndex, videoId);
 
     if (selection && canInsertAtSavedRange && range) {
@@ -1689,6 +1739,35 @@ function NewsModal({
   };
 
   const isYouTubeVideoUrl = (url: string) => /youtube\.com|youtu\.be/i.test(url);
+
+  const toYouTubeEmbedUrl = (url: string): string | null => {
+    const normalized = (url || "").trim();
+    if (!normalized || !isYouTubeVideoUrl(normalized)) return null;
+    try {
+      const safeUrl = /^https?:\/\//i.test(normalized)
+        ? normalized
+        : `https://${normalized}`;
+      const parsed = new URL(safeUrl);
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+      const path = parsed.pathname;
+      let videoId: string | null = null;
+
+      if (host === "youtu.be") {
+        videoId = path.replace(/^\/+/, "").split("/")[0] || null;
+      } else if (host.includes("youtube")) {
+        if (path === "/watch") videoId = parsed.searchParams.get("v");
+        else if (path.startsWith("/embed/"))
+          videoId = path.replace("/embed/", "").split("/")[0] || null;
+        else if (path.startsWith("/shorts/"))
+          videoId = path.replace("/shorts/", "").split("/")[0] || null;
+        else videoId = parsed.searchParams.get("v");
+      }
+
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleSelectMiddleVideoFile = (file?: File) => {
     if (!file) return;
@@ -1722,9 +1801,6 @@ function NewsModal({
     setMiddleVideoUrl(normalizedUrl);
     setMiddleVideoName(null);
     setMiddleVideoUrlInput(normalizedUrl);
-    if (isYouTubeVideoUrl(normalizedUrl)) {
-      return;
-    }
     const videoId = `inline-video-url-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
     insertMiddleVideoToEditor(normalizedUrl, videoId);
   };
@@ -1767,6 +1843,39 @@ function NewsModal({
       const noQuery = decodeURIComponent(value.split("?")[0].split("#")[0] || "");
       const filename = noQuery.split("/").filter(Boolean).pop() || noQuery;
       return filename.toLowerCase();
+    }
+  };
+
+  const isLibraryManagedMediaUrl = (rawUrl: string): boolean => {
+    const value = (rawUrl || "").trim();
+    if (!value) return false;
+    if (
+      value.startsWith("blob:") ||
+      value.startsWith("data:") ||
+      value.startsWith("about:")
+    ) {
+      return false;
+    }
+    try {
+      const parsed = new URL(value);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host.includes("youtube.com") ||
+        host.includes("youtu.be") ||
+        host.includes("youtube-nocookie.com")
+      ) {
+        return false;
+      }
+      return (
+        host.includes("digitaloceanspaces.com") ||
+        host.includes("cdn.digitaloceanspaces.com") ||
+        host === "api.thekhmerdailynetwork.com" ||
+        host === "localhost" ||
+        host === "127.0.0.1"
+      );
+    } catch {
+      // Relative URLs are considered app-managed.
+      return value.startsWith("/");
     }
   };
 
@@ -2244,9 +2353,9 @@ function NewsModal({
       }
       const failedStorageDeletes: string[] = [];
       for (const removedUrl of removedInlineUrls) {
+        if (!isLibraryManagedMediaUrl(removedUrl)) continue;
         try {
-          const deleted = await deleteImageByUrlIfPresent(removedUrl);
-          if (!deleted) failedStorageDeletes.push(removedUrl);
+          await deleteImageByUrlIfPresent(removedUrl);
         } catch (deleteErr) {
           console.error("Failed to delete removed inline image:", removedUrl, deleteErr);
           failedStorageDeletes.push(removedUrl);
@@ -2286,9 +2395,9 @@ function NewsModal({
         removedInlineVideoUrls.delete(keptUrl);
       }
       for (const removedUrl of removedInlineVideoUrls) {
+        if (!isLibraryManagedMediaUrl(removedUrl)) continue;
         try {
-          const deleted = await deleteVideoByUrlIfPresent(removedUrl);
-          if (!deleted) failedStorageDeletes.push(removedUrl);
+          await deleteVideoByUrlIfPresent(removedUrl);
         } catch (deleteErr) {
           console.error("Failed to delete removed inline video:", removedUrl, deleteErr);
           failedStorageDeletes.push(removedUrl);
@@ -2297,12 +2406,12 @@ function NewsModal({
 
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
+        if (!isLibraryManagedMediaUrl(removedUrl)) continue;
         try {
           const deletedVideo = await deleteVideoByUrlIfPresent(removedUrl);
           if (deletedVideo) continue;
           try {
-            const deletedImage = await deleteImageByUrlIfPresent(removedUrl);
-            if (!deletedImage) failedStorageDeletes.push(removedUrl);
+            await deleteImageByUrlIfPresent(removedUrl);
           } catch (imageDeleteErr) {
             console.error("Failed to delete removed middle/end image:", removedUrl, imageDeleteErr);
             failedStorageDeletes.push(removedUrl);
@@ -2409,8 +2518,7 @@ function NewsModal({
                   onClick={() => {
                     if (
                       loading ||
-                      middleVideoUploading ||
-                      activeEditorBlockIndex === null
+                      middleVideoUploading
                     )
                       return;
                     cacheActiveInlineSelection();
@@ -2420,9 +2528,7 @@ function NewsModal({
                     input.value = "";
                     input.click();
                   }}
-                  disabled={
-                    loading || middleVideoUploading || activeEditorBlockIndex === null
-                  }
+                  disabled={loading || middleVideoUploading}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {middleVideoUploading ? "Adding..." : "Mid Video"}
@@ -2433,8 +2539,7 @@ function NewsModal({
                   onClick={() => {
                     if (
                       loading ||
-                      middleVideoUploading ||
-                      activeEditorBlockIndex === null
+                      middleVideoUploading
                     )
                       return;
                     cacheActiveInlineSelection();
@@ -2446,9 +2551,7 @@ function NewsModal({
                     if (nextUrl === null) return;
                     handleSelectMiddleVideoByUrl(nextUrl);
                   }}
-                  disabled={
-                    loading || middleVideoUploading || activeEditorBlockIndex === null
-                  }
+                  disabled={loading || middleVideoUploading}
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Video URL
@@ -2917,7 +3020,7 @@ function NewsModal({
                                   quote: false,
                                 });
                               }}
-                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                              className="min-h-[56px] w-full overflow-hidden whitespace-pre-wrap bg-transparent px-0 pb-0 pt-[8px] text-[16px] leading-[1.25] text-black outline-none border-0 [&_a]:text-current [&_a]:underline [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-video [&_video]:min-h-[320px] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_iframe]:my-4 [&_iframe]:w-full [&_iframe]:aspect-video [&_iframe]:min-h-[320px] [&_iframe]:rounded-lg [&_h2]:text-[20px] [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:my-2 [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:pl-8 [&_blockquote]:pr-2 [&_blockquote]:text-[20px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:before:absolute [&_blockquote]:before:left-1 [&_blockquote]:before:top-[14px] [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[45px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:relative [&_blockquote]:after:top-[14px] [&_blockquote]:after:ml-1 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[45px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             />
                           </div>
                         ) : (
