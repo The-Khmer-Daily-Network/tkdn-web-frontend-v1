@@ -1607,12 +1607,19 @@ function NewsModal({
     setCoverUrlInput("");
   };
 
-  const handleSelectMiddleVideoFile = (file?: File) => {
-    if (!file) return;
-    if (file.size > MAX_MIDDLE_VIDEO_FILE_SIZE_BYTES) {
-      setError("Middle video must be less than or equal to 100MB.");
-      return;
+  const cacheActiveInlineSelection = () => {
+    savedInlineImageBlockIndexRef.current =
+      activeSelection?.blockIndex ?? activeEditorBlockIndex;
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      savedInlineImageRangeRef.current = range.cloneRange();
+    } else {
+      savedInlineImageRangeRef.current = null;
     }
+  };
+
+  const insertMiddleVideoToEditor = (videoUrl: string, videoId: string, pendingId?: string) => {
     const blockIndex =
       savedInlineImageBlockIndexRef.current ??
       activeSelection?.blockIndex ??
@@ -1621,15 +1628,6 @@ function NewsModal({
       setError("Select a content position before adding Mid Video.");
       return;
     }
-
-    const previewUrl = queuePreviewUrl(file);
-    const pendingId = `inline-video-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
-    inlinePendingVideosRef.current[pendingId] = { file };
-    middleVideoRemovedFromParagraphRef.current = false;
-    setMiddleVideoPendingFile(file);
-    setMiddleVideoUrl(previewUrl);
-    setMiddleVideoName(file.name || null);
-    setMiddleVideoUrlInput("");
 
     const editor = contentTextareaRefs.current[blockIndex];
     if (!editor) return;
@@ -1644,7 +1642,7 @@ function NewsModal({
 
     const wrapper = document.createElement("div");
     wrapper.setAttribute("data-inline-video-wrapper", "true");
-    wrapper.setAttribute("data-inline-video-id", pendingId);
+    wrapper.setAttribute("data-inline-video-id", videoId);
     wrapper.style.display = "block";
     wrapper.style.width = "100%";
     wrapper.style.maxWidth = "100%";
@@ -1652,11 +1650,13 @@ function NewsModal({
     wrapper.style.position = "relative";
 
     const video = document.createElement("video");
-    video.setAttribute("src", previewUrl);
+    video.setAttribute("src", videoUrl);
     video.setAttribute("controls", "true");
     video.setAttribute("playsinline", "true");
     video.setAttribute("preload", "metadata");
-    video.setAttribute("data-inline-pending-video-id", pendingId);
+    if (pendingId) {
+      video.setAttribute("data-inline-pending-video-id", pendingId);
+    }
     video.style.width = "100%";
     video.style.maxWidth = "100%";
     video.style.aspectRatio = "100 / 53";
@@ -1665,7 +1665,7 @@ function NewsModal({
     video.style.borderRadius = "8px";
     video.style.display = "block";
     wrapper.appendChild(video);
-    attachInlineVideoActions(wrapper, blockIndex, pendingId);
+    attachInlineVideoActions(wrapper, blockIndex, videoId);
 
     if (selection && canInsertAtSavedRange && range) {
       const workingRange = range.cloneRange();
@@ -1686,9 +1686,47 @@ function NewsModal({
     handleUpdateContentBlock(blockIndex, "paragraph", editor.innerHTML);
     savedInlineImageRangeRef.current = null;
     savedInlineImageBlockIndexRef.current = null;
+  };
+
+  const isYouTubeVideoUrl = (url: string) => /youtube\.com|youtu\.be/i.test(url);
+
+  const handleSelectMiddleVideoFile = (file?: File) => {
+    if (!file) return;
+    if (file.size > MAX_MIDDLE_VIDEO_FILE_SIZE_BYTES) {
+      setError("Middle video must be less than or equal to 100MB.");
+      return;
+    }
+
+    const previewUrl = queuePreviewUrl(file);
+    const pendingId = `inline-video-pending-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+    inlinePendingVideosRef.current[pendingId] = { file };
+    middleVideoRemovedFromParagraphRef.current = false;
+    setMiddleVideoPendingFile(file);
+    setMiddleVideoUrl(previewUrl);
+    setMiddleVideoName(file.name || null);
+    setMiddleVideoUrlInput("");
+    insertMiddleVideoToEditor(previewUrl, pendingId, pendingId);
     if (middleVideoFileInputRef.current) {
       middleVideoFileInputRef.current.value = "";
     }
+  };
+
+  const handleSelectMiddleVideoByUrl = (url: string) => {
+    const normalizedUrl = url.trim();
+    if (!normalizedUrl) {
+      setError("Video URL is required.");
+      return;
+    }
+    middleVideoRemovedFromParagraphRef.current = false;
+    setMiddleVideoPendingFile(null);
+    setMiddleVideoUrl(normalizedUrl);
+    setMiddleVideoName(null);
+    setMiddleVideoUrlInput(normalizedUrl);
+    if (isYouTubeVideoUrl(normalizedUrl)) {
+      return;
+    }
+    const videoId = `inline-video-url-${Date.now()}-${inlinePendingImageCounterRef.current++}`;
+    insertMiddleVideoToEditor(normalizedUrl, videoId);
   };
 
   const handleSelectEndImageFile = (slot: number, file?: File) => {
@@ -2375,15 +2413,8 @@ function NewsModal({
                       activeEditorBlockIndex === null
                     )
                       return;
-                    savedInlineImageBlockIndexRef.current =
-                      activeSelection?.blockIndex ?? activeEditorBlockIndex;
-                    const selection = window.getSelection();
-                    if (selection && selection.rangeCount > 0) {
-                      const range = selection.getRangeAt(0);
-                      savedInlineImageRangeRef.current = range.cloneRange();
-                    } else {
-                      savedInlineImageRangeRef.current = null;
-                    }
+                    cacheActiveInlineSelection();
+                    setError(null);
                     const input = middleVideoFileInputRef.current;
                     if (!input) return;
                     input.value = "";
@@ -2396,14 +2427,40 @@ function NewsModal({
                 >
                   {middleVideoUploading ? "Adding..." : "Mid Video"}
                 </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (
+                      loading ||
+                      middleVideoUploading ||
+                      activeEditorBlockIndex === null
+                    )
+                      return;
+                    cacheActiveInlineSelection();
+                    setError(null);
+                    const nextUrl = window.prompt(
+                      "Enter video URL",
+                      middleVideoUrlInput || middleVideoUrl || "",
+                    );
+                    if (nextUrl === null) return;
+                    handleSelectMiddleVideoByUrl(nextUrl);
+                  }}
+                  disabled={
+                    loading || middleVideoUploading || activeEditorBlockIndex === null
+                  }
+                  className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Video URL
+                </button>
                 <input
                   ref={middleVideoFileInputRef}
                   type="file"
-                  accept="video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm"
+                  accept="video/*"
                   className="hidden"
                   onChange={(e) => handleSelectMiddleVideoFile(e.target.files?.[0])}
                 />
-                <button
+                {/* <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleInlineImageButtonClick("end")}
@@ -2411,7 +2468,7 @@ function NewsModal({
                   className="cursor-pointer rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {inlineImageUploading ? "Adding..." : "End Image"}
-                </button>
+                </button> */}
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}

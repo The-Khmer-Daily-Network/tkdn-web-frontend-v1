@@ -38,6 +38,7 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
   "img",
   "video",
   "source",
+  "iframe",
 ]);
 
 const isPresentationAttr = (attrName: string) =>
@@ -64,6 +65,66 @@ const isSafeImageSrc = (src: string) => {
 };
 
 const resolveVideoUrl = (url: string | null | undefined) => (url || "").trim();
+
+const isYouTubeLink = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  return /youtube\.com|youtu\.be/i.test(url);
+};
+
+// Convert various YouTube URL formats (watch, shorts, youtu.be) to embed URL.
+// Returns null when not a YouTube URL.
+const toYouTubeEmbedUrl = (url: string): string | null => {
+  const normalized = (url || "").trim();
+  if (!normalized) return null;
+  if (!isYouTubeLink(normalized)) return null;
+
+  try {
+    // Already embed form.
+    const embedMatch = normalized.match(/youtube\.com\/embed\/([^&\n?#/]+)/i);
+    if (embedMatch?.[1]) {
+      return `https://www.youtube.com/embed/${embedMatch[1]}`;
+    }
+
+    const youtuBeMatch = normalized.match(/youtu\.be\/([^&\n?#/]+)/i);
+    if (youtuBeMatch?.[1]) {
+      return `https://www.youtube.com/embed/${youtuBeMatch[1]}`;
+    }
+
+    const watchMatch = normalized.match(/youtube\.com\/watch\?v=([^&\n?#/]+)/i);
+    if (watchMatch?.[1]) {
+      return `https://www.youtube.com/embed/${watchMatch[1]}`;
+    }
+
+    const shortsMatch = normalized.match(/youtube\.com\/shorts\/([^&\n?#/]+)/i);
+    if (shortsMatch?.[1]) {
+      return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+    }
+
+    // Fallback: try parsing v= from query.
+    const parsed = new URL(normalized);
+    const v = parsed.searchParams.get("v");
+    if (v) return `https://www.youtube.com/embed/${v}`;
+  } catch {
+    // ignore
+  }
+
+  return null;
+};
+
+const isSafeIframeSrc = (src: string) => {
+  const normalizedSrc = (src || "").trim().toLowerCase();
+  if (!normalizedSrc) return false;
+  try {
+    const parsed = new URL(normalizedSrc);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname !== "www.youtube.com" && hostname !== "www.youtube-nocookie.com") {
+      return false;
+    }
+    return parsed.pathname.startsWith("/embed/");
+  } catch {
+    return false;
+  }
+};
 
 const getImageCaptionFallback = (src: string) => {
   if (!src) return "";
@@ -230,6 +291,19 @@ const sanitizeRichText = (html: string): string => {
         }
         continue;
       }
+      if (tagName === "iframe") {
+        if (
+          attrName !== "src" &&
+          attrName !== "title" &&
+          attrName !== "allow" &&
+          attrName !== "allowfullscreen" &&
+          attrName !== "frameborder" &&
+          !isPresentationAttr(attrName)
+        ) {
+          element.removeAttribute(attr.name);
+        }
+        continue;
+      }
 
       if (
         tagName === "p" ||
@@ -295,16 +369,62 @@ const sanitizeRichText = (html: string): string => {
     }
     if (tagName === "video") {
       const src = element.getAttribute("src") || "";
-      if (src && !isSafeImageSrc(src)) {
+      const trimmedSrc = resolveVideoUrl(src);
+
+      // YouTube URLs cannot be played via <video>; convert to iframe embed.
+      const embedSrc = trimmedSrc ? toYouTubeEmbedUrl(trimmedSrc) : null;
+      if (embedSrc) {
+        const iframe = doc.createElement("iframe");
+        iframe.setAttribute("src", embedSrc);
+        iframe.setAttribute("title", "YouTube video player");
+        iframe.setAttribute(
+          "allow",
+          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+        );
+        iframe.setAttribute("allowfullscreen", "true");
+        iframe.style.width = "100%";
+        iframe.style.aspectRatio = "16 / 9";
+        iframe.style.border = "0";
+        iframe.style.borderRadius = "8px";
+
+        element.replaceWith(iframe);
+        return;
+      }
+
+      if (trimmedSrc && !isSafeImageSrc(trimmedSrc)) {
         element.remove();
         return;
       }
-      if (src) {
-        element.setAttribute("src", resolveVideoUrl(src));
+      if (trimmedSrc) {
+        element.setAttribute("src", trimmedSrc);
       }
       element.setAttribute("controls", "true");
       element.setAttribute("playsinline", "true");
       element.setAttribute("preload", "metadata");
+    }
+
+    if (tagName === "iframe") {
+      const rawSrc = (element.getAttribute("src") || "").trim();
+      const embedSrc = toYouTubeEmbedUrl(rawSrc);
+      if (embedSrc) {
+        element.setAttribute("src", embedSrc);
+      }
+      const finalSrc = (element.getAttribute("src") || "").trim();
+      if (!isSafeIframeSrc(finalSrc)) {
+        element.remove();
+        return;
+      }
+      if (!element.getAttribute("allow")) {
+        element.setAttribute(
+          "allow",
+          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+        );
+      }
+      element.setAttribute("allowfullscreen", "true");
+      element.style.width = "100%";
+      element.style.aspectRatio = "16 / 9";
+      element.style.border = "0";
+      element.style.borderRadius = "8px";
     }
 
     if (tagName === "blockquote") {
@@ -340,7 +460,6 @@ export default function NewsPageContent({
   const [category, setCategory] = useState<Category | null>(null);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [isNewsDetail, setIsNewsDetail] = useState(!!initialNewsData);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [loading, setLoading] = useState(!initialNewsData);
   const [error, setError] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -355,7 +474,6 @@ export default function NewsPageContent({
   // Keep local state in sync when route param or prefetched data changes.
   // Without this, client-side navigation can render stale detail state until refresh.
   useEffect(() => {
-    setIsVideoPlaying(false);
     hasFetchedRef.current = null;
 
     if (initialNewsData) {
@@ -846,6 +964,14 @@ export default function NewsPageContent({
     // For direct video URLs, return null (we'll use video poster or default)
     return null;
   };
+
+const logVideoDebug = (
+  stage: string,
+  payload: Record<string, unknown>,
+): void => {
+  if (process.env.NODE_ENV === "production") return;
+  console.debug("[NewsVideoDebug]", stage, payload);
+};
 
   if (loading) {
     return (
@@ -1354,11 +1480,9 @@ export default function NewsPageContent({
                               const embedUrl = isYouTube
                                 ? convertToYouTubeEmbed(videoUrl)
                                 : null;
-                              const thumbnailUrl = getVideoThumbnail(videoUrl);
-
                               return (
                                 <div className="w-full my-8">
-                                  {isVideoPlaying && isYouTube && embedUrl ? (
+                                  {isYouTube && embedUrl ? (
                                     <div className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden">
                                       <iframe
                                         src={embedUrl}
@@ -1367,21 +1491,13 @@ export default function NewsPageContent({
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                         allowFullScreen
                                       />
-                                      <button
-                                        onClick={() => setIsVideoPlaying(false)}
-                                        className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded hover:bg-opacity-70 transition-all z-30"
-                                      >
-                                        × Close
-                                      </button>
                                     </div>
-                                  ) : isVideoPlaying && !isYouTube ? (
-                                    /* Video Player - Show when clicked (only for direct videos) */
+                                  ) : (
                                     <div className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden">
-                                      {/* Direct Video from Storage - Use HTML5 video element */}
                                       <video
                                         src={videoUrl}
                                         controls
-                                        autoPlay
+                                        preload="metadata"
                                         className="w-full h-full object-contain"
                                         style={{
                                           position: "absolute",
@@ -1391,106 +1507,46 @@ export default function NewsPageContent({
                                           height: "100%",
                                         }}
                                         onError={(e) => {
-                                          console.error(
-                                            "Video failed to load:",
-                                            videoUrl,
-                                          );
                                           const video =
                                             e.target as HTMLVideoElement;
+                                          const errorCode = video.error?.code;
+                                          logVideoDebug("playback_error", {
+                                            url: videoUrl,
+                                            currentSrc: video.currentSrc,
+                                            networkState: video.networkState,
+                                            readyState: video.readyState,
+                                            errorCode,
+                                            errorMessage:
+                                              errorCode === 4
+                                                ? "MEDIA_ERR_SRC_NOT_SUPPORTED (often CSP/CORS or invalid URL)"
+                                                : video.error?.message || null,
+                                          });
                                           video.style.display = "none";
+                                        }}
+                                        onLoadedMetadata={(e) => {
+                                          const video =
+                                            e.target as HTMLVideoElement;
+                                          logVideoDebug("loaded_metadata", {
+                                            url: videoUrl,
+                                            currentSrc: video.currentSrc,
+                                            duration: video.duration,
+                                            videoWidth: video.videoWidth,
+                                            videoHeight: video.videoHeight,
+                                          });
+                                        }}
+                                        onCanPlay={(e) => {
+                                          const video =
+                                            e.target as HTMLVideoElement;
+                                          logVideoDebug("can_play", {
+                                            url: videoUrl,
+                                            currentSrc: video.currentSrc,
+                                            readyState: video.readyState,
+                                          });
                                         }}
                                     >
                                         Your browser does not support the video
                                         tag.
                                       </video>
-
-                                      {/* Close/Back button to return to thumbnail */}
-                                      <button
-                                        onClick={() => setIsVideoPlaying(false)}
-                                        className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-3 py-1 rounded hover:bg-opacity-70 transition-all z-30"
-                                    >
-                                        × Close
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    /* Thumbnail with Play Button - Show before click */
-                                    <div
-                                      onClick={() => {
-                                        setIsVideoPlaying(true);
-                                      }}
-                                      className="relative w-full aspect-video bg-gray-200 rounded-lg overflow-hidden cursor-pointer group"
-                                  >
-                                      {/* Thumbnail Image */}
-                                      {thumbnailUrl ? (
-                                        <img
-                                          src={thumbnailUrl}
-                                          alt={singleNews.title}
-                                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                          style={{ zIndex: 0 }}
-                                          onError={(e) => {
-                                            const img =
-                                              e.target as HTMLImageElement;
-                                            const currentSrc = img.src;
-                                            if (
-                                              currentSrc.includes(
-                                                "maxresdefault",
-                                              )
-                                            ) {
-                                              const videoId =
-                                                currentSrc.match(
-                                                  /vi\/([^\/]+)\//,
-                                                )?.[1];
-                                              if (videoId) {
-                                                img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-                                              } else {
-                                                img.style.display = "none";
-                                              }
-                                            } else if (
-                                              currentSrc.includes("hqdefault")
-                                            ) {
-                                              img.style.display = "none";
-                                            }
-                                          }}
-                                        />
-                                      ) : (
-                                        /* For direct video URLs, show default placeholder or use cover image if available */
-                                        <>
-                                          {singleNews.cover && !isYouTube ? (
-                                            <img
-                                              src={singleNews.cover}
-                                              alt={singleNews.title}
-                                              className="absolute inset-0 w-full h-full object-cover"
-                                              style={{ zIndex: 0 }}
-                                            />
-                                          ) : (
-                                            <div
-                                              className="absolute inset-0 w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center"
-                                              style={{ zIndex: 0 }}
-                                          >
-                                              <Play className="w-16 h-16 text-gray-500" />
-                                            </div>
-                                          )}
-                                        </>
-                                      )}
-
-                                      {/* Play Button Overlay */}
-                                      <div className="absolute inset-0 flex items-center justify-center bg-opacity-30 group-hover:bg-opacity-40 transition-all z-10">
-                                        <div className="w-20 h-20 rounded-full bg-[#ffffff]/50 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                                          <Play
-                                            className="w-10 h-10 text-white ml-1"
-                                            fill="currentColor"
-                                          />
-                                        </div>
-                                      </div>
-
-                                      {/* Hover text */}
-                                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        <span className="text-white font-medium text-sm bg-black bg-opacity-50 px-4 py-2 rounded-lg">
-                                          {isYouTube
-                                            ? "Click to watch on YouTube"
-                                            : "Click to play video"}
-                                        </span>
-                                      </div>
                                     </div>
                                   )}
 
