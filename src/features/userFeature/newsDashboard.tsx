@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { News } from "@/types/news";
 import { getNewsPath } from "@/utils/newsSlug";
 
 interface NewsDashboardProps {
   allNews?: News[];
   loading?: boolean;
+  disableFetch?: boolean;
 }
 
 type UserArticleDashboardResponse = {
@@ -45,6 +47,7 @@ function getPlainPreviewText(html: string): string {
 export default function NewsDashboard({
   allNews = [],
   loading = false,
+  disableFetch = false,
 }: NewsDashboardProps) {
   const [news, setNews] = useState<News[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
@@ -55,7 +58,7 @@ export default function NewsDashboard({
       setWindowWidth(window.innerWidth);
     };
 
-    handleResize(); // Set initial width
+    handleResize();
     window.addEventListener("resize", handleResize);
 
     return () => window.removeEventListener("resize", handleResize);
@@ -83,6 +86,7 @@ export default function NewsDashboard({
 
   useEffect(() => {
     if (allNews.length > 0) return;
+    if (disableFetch) return;
     if (!API_BASE_URL) return;
 
     const controller = new AbortController();
@@ -127,7 +131,7 @@ export default function NewsDashboard({
 
     load();
     return () => controller.abort();
-  }, [allNews.length]);
+  }, [allNews.length, disableFetch]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -145,17 +149,13 @@ export default function NewsDashboard({
   if (loading || internalLoading) {
     return (
       <div className="w-full space-y-6">
-        {/* Main Article Skeleton */}
         <div className="w-full">
-          {/* Mobile: Full width image with text below */}
           <div className="flex flex-col space-y-2 sm:hidden animate-pulse">
-            {/* Main Article Image Skeleton */}
             <div
               className="relative w-full rounded-[10px] bg-gray-200"
               style={{ height: "200px" }}
-          ></div>
+            ></div>
 
-            {/* Main Article Info Skeleton */}
             <div className="flex flex-col space-y-1">
               <div className="h-4 bg-gray-200 rounded-[10px] w-20"></div>
               <div className="h-4 bg-gray-200 rounded-[10px] w-32"></div>
@@ -164,15 +164,12 @@ export default function NewsDashboard({
             </div>
           </div>
 
-          {/* Desktop/Tablet: Original style skeleton */}
           <div className="hidden sm:flex flex-col sm:flex-row gap-4 sm:gap-6 bg-[#273C8F]/10 rounded-[10px] animate-pulse">
-            {/* Main Article Image Skeleton */}
             <div
               className="relative rounded-[10px] bg-gray-200"
               style={{ width: "500px", height: "275px" }}
-          ></div>
+            ></div>
 
-            {/* Main Article Content Skeleton */}
             <div className="w-full sm:w-1/2 flex flex-col justify-start mt-4 space-y-6">
               <div>
                 <div className="h-5 bg-gray-200 rounded-[10px] w-32 mb-2"></div>
@@ -191,16 +188,12 @@ export default function NewsDashboard({
           </div>
         </div>
 
-        {/* Other Articles Grid Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, index) => (
-            <div key={index} className="animate-pulse">
-              {/* Mobile: Horizontal layout skeleton */}
+          {Array.from({ length: 5 }, (_, index) => index + 1).map((item) => (
+            <div key={item} className="animate-pulse">
               <div className="flex flex-row gap-3 sm:flex-col sm:space-y-0">
-                {/* Article Image Skeleton */}
                 <div className="relative max-[400px]:w-[150px] max-[400px]:h-[90px] w-[200px] h-[120px] sm:w-full sm:h-[100px] shrink-0 rounded-[10px] bg-gray-200"></div>
 
-                {/* Article Info Skeleton */}
                 <div className="flex-1 sm:flex-none flex flex-col justify-center sm:justify-start sm:space-y-1 space-y-1">
                   <div className="h-3 bg-gray-200 rounded-[10px] w-16"></div>
                   <div className="h-3 bg-gray-200 rounded-[10px] w-24 mb-2"></div>
@@ -218,7 +211,7 @@ export default function NewsDashboard({
   if (news.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <p className="text-gray-600">News is Loading...</p>
+        <p className="text-gray-600">No latest news available</p>
       </div>
     );
   }
@@ -226,8 +219,6 @@ export default function NewsDashboard({
   const mainArticle = news[0];
   const otherArticles = news.slice(1, 6);
 
-  // Show only 3 articles when screen width is up to 1279px (total 4 including main)
-  // Above 1280px, show all 5 articles (total 6 including main)
   const displayedArticles =
     windowWidth !== null && windowWidth <= 1279
       ? otherArticles.slice(0, 3)
@@ -235,7 +226,6 @@ export default function NewsDashboard({
 
   return (
     <div className="w-full space-y-6">
-      {/* Main Article */}
       {mainArticle && (
         <Link
           href={getNewsPath(mainArticle)}
@@ -247,18 +237,19 @@ export default function NewsDashboard({
           className="w-full block"
         >
           <article className="w-full">
-            {/* Mobile: Full width image with text below */}
             <div className="flex flex-col space-y-2 cursor-pointer hover:opacity-90 transition-opacity sm:hidden">
-              {/* Main Article Image */}
               <div
                 className="relative w-full rounded-xl overflow-hidden bg-gray-200 group"
                 style={{ height: "200px" }}
-            >
+              >
                 {mainArticle.cover && (
-                  <img
+                  <Image
                     src={mainArticle.cover}
                     alt={mainArticle.title}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 500px"
                     className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                    unoptimized
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
@@ -266,40 +257,34 @@ export default function NewsDashboard({
                 )}
               </div>
 
-              {/* Main Article Info */}
               <div className="flex flex-col space-y-1">
                 {mainArticle.category && (
-                  <span
-                    className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                   
-                >
+                  <span className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
                     {mainArticle.category.name}
                   </span>
                 )}
                 <p className="text-xs text-[#1D2229] font-medium">
                   {formatDate(mainArticle.date_time_post)}
                 </p>
-                <h1
-                  className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                 
-              >
+                <h1 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
                   {mainArticle.title}
                 </h1>
               </div>
             </div>
 
-            {/* Desktop/Tablet: Original style */}
             <div className="hidden sm:flex flex-col sm:flex-row gap-4 sm:gap-6 bg-[#273C8F]/10 rounded-[10px] cursor-pointer hover:opacity-90 transition-opacity">
-              {/* Main Article Image */}
               <div
                 className="relative rounded-xl overflow-hidden bg-gray-200 group"
                 style={{ width: "500px", height: "275px" }}
-            >
+              >
                 {mainArticle.cover && (
-                  <img
+                  <Image
                     src={mainArticle.cover}
                     alt={mainArticle.title}
+                    fill
+                    sizes="500px"
                     className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                    unoptimized
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
@@ -307,14 +292,10 @@ export default function NewsDashboard({
                 )}
               </div>
 
-              {/* Main Article Content */}
               <div className="w-full sm:w-1/2 flex flex-col justify-start mt-4 space-y-6">
                 <div>
                   {mainArticle.category && (
-                    <span
-                      className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-3 underline-offset-5 uppercase"
-                     
-                  >
+                    <span className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-3 underline-offset-5 uppercase">
                       {mainArticle.category.name}
                     </span>
                   )}
@@ -323,19 +304,13 @@ export default function NewsDashboard({
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <h1
-                    className="line-clamp-2 text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight"
-                    
-                >
+                  <h1 className="line-clamp-2 text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight">
                     {mainArticle.title}
                   </h1>
                 </div>
                 {mainArticle.content_blocks &&
                   mainArticle.content_blocks.length > 0 && (
-                    <p
-                      className="text-xs text-gray-700 line-clamp-3"
-                     
-                  >
+                    <p className="text-xs text-gray-700 line-clamp-3">
                       {getPlainPreviewText(mainArticle.content_blocks[0].paragraph)}
                     </p>
                   )}
@@ -345,7 +320,6 @@ export default function NewsDashboard({
         </Link>
       )}
 
-      {/* Other Articles Grid */}
       {displayedArticles.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-4">
           {displayedArticles.map((article) => (
@@ -358,16 +332,17 @@ export default function NewsDashboard({
                 window.location.href = getNewsPath(article);
               }}
               className="cursor-pointer hover:opacity-90 transition-opacity"
-          >
-              {/* Mobile: Horizontal layout - image left, content right */}
+            >
               <div className="flex flex-row gap-3 sm:flex-col sm:space-y-0">
-                {/* Article Image */}
                 <div className="relative max-[400px]:w-[150px] max-[400px]:h-[90px] w-[200px] h-[120px] sm:w-full sm:h-[100px] shrink-0 rounded-xl overflow-hidden bg-gray-200 group">
                   {article.cover && (
-                    <img
+                    <Image
                       src={article.cover}
                       alt={article.title}
+                      fill
+                      sizes="(max-width: 400px) 150px, (max-width: 640px) 200px, 200px"
                       className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                      unoptimized
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
@@ -375,31 +350,18 @@ export default function NewsDashboard({
                   )}
                 </div>
 
-                {/* Article Info */}
                 <div className="flex-1 sm:flex-none flex flex-col justify-center sm:justify-start sm:space-y-1 space-y-1">
                   {article.category && (
-                    <span
-                      className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase"
-                     
-                  >
+                    <span className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
                       {article.category.name}
                     </span>
                   )}
                   <p className="text-xs text-[#1D2229] font-regular mb-2">
                     {formatDate(article.date_time_post)}
                   </p>
-                  <h2
-                    className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
-                   
-                >
+                  <h2 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
                     {article.title}
                   </h2>
-                  {/* {article.content_blocks &&
-                    article.content_blocks.length > 0 && (
-                      <p className="text-xs text-gray-600 line-clamp-2 mt-1">
-                        {article.content_blocks[0].paragraph}
-                      </p>
-                    )} */}
                 </div>
               </div>
             </Link>

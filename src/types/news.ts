@@ -53,6 +53,22 @@ export interface NewsResponse {
   };
 }
 
+export interface HomeNewsSections {
+  latest: News[];
+  international: News[];
+  national: News[];
+  video: News[];
+  technology: News[];
+  bussiness: News[];
+  sports: News[];
+  lifestyle: News[];
+}
+
+export interface HomeNewsResponse {
+  success: boolean;
+  data: HomeNewsSections;
+}
+
 export interface NewsSingleResponse {
   success: boolean;
   data: News;
