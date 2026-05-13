@@ -7,6 +7,7 @@ import type { News } from "@/types/news";
 import { getVideosNews } from "@/services/news";
 import { Play } from "lucide-react";
 import { getNewsPath } from "@/utils/newsSlug";
+import { stripHtmlToText } from "@/utils/text";
 
 const DISPLAY_LIMIT = 15;
 
@@ -198,7 +199,7 @@ export default function VideoFeature({
                   className="text-sm text-gray-600 line-clamp-2"
                  
               >
-                  {video.content_blocks[0].paragraph}
+                  {stripHtmlToText(video.content_blocks[0].paragraph)}
                 </p>
               )}
             </div>
