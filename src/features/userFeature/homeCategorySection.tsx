@@ -12,17 +12,24 @@ interface HomeCategorySectionProps {
   loading?: boolean;
 }
 
-function formatDate(dateString: string) {
+function getRelativeTimeShort(dateString: string) {
   const date = new Date(dateString);
-  const day = date.getDate();
-  const month = date.toLocaleDateString("en-US", { month: "long" });
-  const year = date.getFullYear();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? "PM" : "AM";
-  const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  const displayMinutes = minutes.toString().padStart(2, "0");
-  return `${day} ${month} ${year} ${displayHour}:${displayMinutes}${period}`;
+  const diffInSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "just now";
+
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? "min" : "mins"} ago`;
+  }
+
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} ${diffInHours === 1 ? "hr" : "hrs"} ago`;
+  }
+
+  const diffInDays = Math.floor(diffInHours / 24);
+  return `${diffInDays} ${diffInDays === 1 ? "day" : "days"} ago`;
 }
 
 export default function HomeCategorySection({
@@ -90,14 +97,15 @@ export default function HomeCategorySection({
               )}
             </div>
             <div className="flex-1 flex flex-col justify-center space-y-2">
-              <div className="flex flex-row space-x-5 max-[481px]:flex-col max-[481px]:space-x-0 max-[481px]:space-y-1">
-                {article.category && (
-                  <span className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
-                    {article.category.name}
-                  </span>
-                )}
-                <p className="text-xs max-[481px]:text-[10px] font-medium" style={{ color: "rgba(29, 34, 41, 0.6784)" }}>
-                  {formatDate(article.date_time_post)}
+              <div className="flex items-center gap-2 max-[481px]:flex-col max-[481px]:items-start max-[481px]:gap-1">
+                <span className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
+                  {article.category?.name ?? "News"}
+                </span>
+                <p
+                  className="text-xs max-[481px]:text-[10px] font-medium"
+                  style={{ color: "rgba(29, 34, 41, 0.6784)" }}
+                >
+                  - {getRelativeTimeShort(article.date_time_post)}
                 </p>
               </div>
               <h3 className="text-base font-semibold text-gray-900 line-clamp-2 leading-tight">

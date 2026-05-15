@@ -121,17 +121,24 @@ export default function NewsDashboard({
     return () => controller.abort();
   }, [allNews.length, disableFetch]);
 
-  const formatDate = (dateString: string) => {
+  const getRelativeTimeShort = (dateString: string) => {
     const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.toLocaleDateString("en-US", { month: "long" });
-    const year = date.getFullYear();
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const period = hours >= 12 ? "PM" : "AM";
-    const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-    const displayMinutes = minutes.toString().padStart(2, "0");
-    return `${day} ${month} ${year} ${displayHour}:${displayMinutes}${period}`;
+    const diffInSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "just now";
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} ${diffInMinutes === 1 ? "min" : "mins"} ago`;
+    }
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours} ${diffInHours === 1 ? "hr" : "hrs"} ago`;
+    }
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays} ${diffInDays === 1 ? "day" : "days"} ago`;
   };
 
   if (loading || internalLoading) {
@@ -243,11 +250,14 @@ export default function NewsDashboard({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
 
                   <div className="absolute left-6 bottom-6 right-6 text-white">
-                    {mainArticle.category && (
-                      <span className="inline-block text-sm font-semibold uppercase tracking-wider text-[#F3F4F6] mb-2 border-b-2 border-[#E34C33] pb-1">
-                        {mainArticle.category.name}
+                    <div className="mb-2 flex items-center gap-2 flex-wrap">
+                      <span className="inline-block text-sm font-semibold uppercase tracking-wider text-[#F3F4F6] border-b-2 border-[#E34C33] pb-1">
+                        {mainArticle.category?.name ?? "News"}
                       </span>
-                    )}
+                      <span className="text-xs text-white/80">
+                        - {getRelativeTimeShort(mainArticle.date_time_post)}
+                      </span>
+                    </div>
                     <h2 className="mt-3 text-2xl md:text-3xl lg:text-4xl font-extrabold leading-tight">
                       {mainArticle.title}
                     </h2>
@@ -292,11 +302,14 @@ export default function NewsDashboard({
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                   <div className="absolute left-4 bottom-4 right-4 text-white">
-                    {article.category && (
-                      <span className="text-xs font-semibold uppercase tracking-wider inline-block mb-1 border-b-2 border-[#E34C33] pb-1">
-                        {article.category.name}
+                    <div className="mb-1 flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold uppercase tracking-wider inline-block border-b-2 border-[#E34C33] pb-1">
+                        {article.category?.name ?? "News"}
                       </span>
-                    )}
+                      <span className="text-[11px] text-white/80">
+                        - {getRelativeTimeShort(article.date_time_post)}
+                      </span>
+                    </div>
                     <h3 className="text-sm font-bold leading-tight line-clamp-2">
                       {article.title}
                     </h3>
@@ -344,14 +357,14 @@ export default function NewsDashboard({
 
                 <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 text-white">
                   <div className="relative z-10 space-y-2">
-                    {article.category && (
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-white/90 border-b-2 border-[#E34C33] pb-1">
-                        {article.category.name}
+                        {article.category?.name ?? "News"}
                       </span>
-                    )}
-                    <p className="text-xs text-white/75 font-regular">
-                      {formatDate(article.date_time_post)}
-                    </p>
+                      <span className="text-[11px] text-white/80">
+                        - {getRelativeTimeShort(article.date_time_post)}
+                      </span>
+                    </div>
                     <h2 className="text-sm sm:text-base font-bold leading-tight line-clamp-2">
                       {article.title}
                     </h2>
