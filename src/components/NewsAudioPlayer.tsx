@@ -1,29 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Copy, Headphones, Pause, Share2, Volume2, VolumeX } from "lucide-react";
 
 /** Dark navy — matches reference pill player accent */
 const NAVY = "#1e3a5f";
-const INACTIVE_BAR = "#e5e7eb";
 
 const SPEEDS = [0.75, 1, 1.5, 2] as const;
-
-function hashString(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (h << 5) - h + s.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
-}
-
-function formatTime(s: number) {
-  if (!Number.isFinite(s) || s < 0) return "00:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
 
 function formatSpeedLabel(r: number) {
   if (Number.isInteger(r)) return `x${r}`;
@@ -37,33 +20,20 @@ export interface NewsAudioPlayerProps {
 
 export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speedIndex, setSpeedIndex] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-
-  const barHeights = useMemo(() => {
-    const n = 56;
-    const out: number[] = [];
-    let seed = hashString(src || "audio");
-    for (let i = 0; i < n; i++) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      const t = (i / n) * Math.PI * 6;
-      const wave = (Math.sin(t) * 0.5 + 0.5) * 0.65;
-      const noise = (seed % 80) / 80;
-      out.push(Math.min(1, Math.max(0.12, 0.22 + wave * 0.55 + noise * 0.2)));
-    }
-    return out;
-  }, [src]);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   useEffect(() => {
-    setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
     setSpeedIndex(1);
     const a = audioRef.current;
     if (a) {
+      a.src = src;
       a.load();
     }
   }, [src]);
@@ -78,7 +48,18 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
     const a = audioRef.current;
     if (!a) return;
     a.volume = isMuted ? 0 : 1;
-  }, [isMuted, src]);
+  }, [isMuted]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!shareMenuRef.current) return;
+      if (shareMenuRef.current.contains(event.target as Node)) return;
+      setIsShareOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   const togglePlay = useCallback(() => {
     const a = audioRef.current;
@@ -92,11 +73,6 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
     }
   }, [isPlaying]);
 
-  const onTimeUpdate = useCallback(() => {
-    const a = audioRef.current;
-    if (a) setCurrentTime(a.currentTime);
-  }, []);
-
   const onLoadedMetadata = useCallback(() => {
     const a = audioRef.current;
     if (a && Number.isFinite(a.duration)) {
@@ -108,23 +84,7 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
   const onPause = useCallback(() => setIsPlaying(false), []);
   const onEnded = useCallback(() => {
     setIsPlaying(false);
-    setCurrentTime(0);
   }, []);
-
-  const seek = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const a = audioRef.current;
-      if (!a) return;
-      const d = a.duration;
-      if (!Number.isFinite(d) || d <= 0) return;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const pct = Math.max(0, Math.min(1, x / rect.width));
-      a.currentTime = pct * d;
-      setCurrentTime(a.currentTime);
-    },
-    [],
-  );
 
   const cycleSpeed = useCallback(() => {
     setSpeedIndex((i) => (i + 1) % SPEEDS.length);
@@ -134,8 +94,78 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
     setIsMuted((m) => !m);
   }, []);
 
-  const progress =
-    duration > 0 && Number.isFinite(duration) ? currentTime / duration : 0;
+  const getShareUrl = useCallback(() => {
+    if (typeof window === "undefined") return "";
+    return window.location.href;
+  }, []);
+
+  const getShortShareUrl = useCallback(() => {
+    if (typeof window === "undefined") return "";
+
+    const { origin, pathname, search } = window.location;
+    const match = pathname.match(/\/news\/(?:.*-)?(\d+)$/);
+    if (!match?.[1]) {
+      return `${origin}${pathname}${search}`;
+    }
+
+    return `${origin}/news/${match[1]}`;
+  }, []);
+
+  const shareTitle = typeof document !== "undefined" ? document.title : "";
+
+  const openShareLink = useCallback((shareUrl: string) => {
+    if (typeof window === "undefined") return;
+    window.open(shareUrl, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const handleShareOption = useCallback(
+    async (service: "facebook" | "instagram" | "linkedin" | "telegram" | "x" | "copy") => {
+      const url = getShareUrl();
+      const shortUrl = getShortShareUrl();
+      if (!url) return;
+
+      const encodedUrl = encodeURIComponent(url);
+      const encodedTitle = encodeURIComponent(shareTitle || url);
+
+      if (service === "copy") {
+        await navigator.clipboard.writeText(shortUrl || url);
+        setIsShareOpen(false);
+        return;
+      }
+
+      if (service === "instagram") {
+        if (navigator.share) {
+          await navigator.share({
+            title: shareTitle,
+            text: shareTitle,
+            url,
+          });
+        } else {
+          await navigator.clipboard.writeText(url);
+        }
+        setIsShareOpen(false);
+        return;
+      }
+
+      if (service === "facebook") {
+        openShareLink(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`);
+      } else if (service === "linkedin") {
+        openShareLink(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`);
+      } else if (service === "telegram") {
+        openShareLink(`https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`);
+      } else if (service === "x") {
+        openShareLink(`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`);
+      }
+
+      setIsShareOpen(false);
+    },
+    [getShareUrl, getShortShareUrl, openShareLink, shareTitle],
+  );
+
+  const displayMinutes = Math.max(1, Math.round(duration / 60));
+  const listenLabel = isPlaying
+    ? `Listening (${displayMinutes} mins)`
+    : `Listen (${displayMinutes} mins)`;
 
   return (
     <div className={`w-full ${className}`}>
@@ -144,110 +174,135 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
         src={src}
         preload="metadata"
         className="hidden"
-        onTimeUpdate={onTimeUpdate}
         onLoadedMetadata={onLoadedMetadata}
         onDurationChange={onLoadedMetadata}
         onPlay={onPlay}
         onPause={onPause}
         onEnded={onEnded}
-      />
-
-      <div
-        className="flex w-full min-w-0 items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1.5 shadow-sm sm:gap-2 sm:px-3 sm:py-2"
-        style={{ color: NAVY }}
       >
-        <button
-          type="button"
-          onClick={togglePlay}
-          aria-label={isPlaying ? "Pause" : "Play"}
-          className="cursor-pointer flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90 sm:h-8 sm:w-8"
-          style={{ backgroundColor: NAVY }}
-        >
-          {isPlaying ? (
-            <Pause className="h-3 w-3 shrink-0 text-white" strokeWidth={2.25} aria-hidden />
-          ) : (
-            <Play className="ml-px h-3 w-3 shrink-0 fill-white text-white" aria-hidden />
-          )}
-        </button>
+        <track
+          kind="captions"
+          label="English"
+          srcLang="en"
+          default
+          src="data:text/vtt;charset=utf-8,WEBVTT%0A%0A00:00:00.000 --> 00:00:01.000%0A%0A"
+        />
+      </audio>
 
-        <button
-          type="button"
-          onClick={cycleSpeed}
-          className="cursor-pointer shrink-0 px-0.5 text-[11px] font-medium tabular-nums sm:text-xs"
-          style={{ color: NAVY }}
-          aria-label={`Playback speed ${formatSpeedLabel(SPEEDS[speedIndex])}`}
-        >
-          {formatSpeedLabel(SPEEDS[speedIndex])}
-        </button>
+      <div className="space-y-3" style={{ color: NAVY }}>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={isPlaying ? "Listening" : "Listen"}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-sm transition-opacity hover:opacity-90"
+            style={{ color: NAVY }}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: NAVY }}>
+              {isPlaying ? (
+                <Pause className="h-3 w-3 text-white" strokeWidth={2.25} aria-hidden />
+              ) : (
+                <Headphones className="h-3 w-3 text-white" aria-hidden />
+              )}
+            </span>
+            <span className="whitespace-nowrap text-sm font-medium sm:text-[15px]">
+              {listenLabel}
+            </span>
+          </button>
 
-        <div
-          role="slider"
-          aria-label="Seek"
-          aria-valuenow={Math.round(progress * 100)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          tabIndex={0}
-          className="relative flex h-6 min-w-0 flex-1 cursor-pointer items-end justify-between gap-px px-0.5 sm:gap-[2px]"
-          onClick={seek}
-          onKeyDown={(e) => {
-            const a = audioRef.current;
-            if (!a || !duration) return;
-            if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-              e.preventDefault();
-              const step = 5;
-              const delta = e.key === "ArrowLeft" ? -step : step;
-              a.currentTime = Math.max(0, Math.min(duration, a.currentTime + delta));
-              setCurrentTime(a.currentTime);
-            }
-          }}
-        >
-          {barHeights.map((h, i) => {
-            const barCenter = (i + 0.5) / barHeights.length;
-            const played = barCenter <= progress;
-            return (
-              <div
-                key={i}
-                className="pointer-events-none w-[2px] shrink-0 rounded-full sm:w-[3px]"
-                style={{
-                  height: `${Math.round(4 + h * 14)}px`,
-                  backgroundColor: played ? NAVY : INACTIVE_BAR,
-                }}
-              />
-            );
-          })}
-          {/* Playhead line (reference UI) */}
-          {duration > 0 && (
-            <div
-              className="pointer-events-none absolute bottom-0 top-0 z-10 w-0.5 -translate-x-1/2 rounded-full"
-              style={{
-                left: `${progress * 100}%`,
-                backgroundColor: NAVY,
-              }}
-              aria-hidden
-            />
-          )}
+          <div className="relative" ref={shareMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsShareOpen((open) => !open)}
+              aria-label="Share"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-sm transition-opacity hover:opacity-90"
+              style={{ color: NAVY }}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: NAVY }}>
+                <Share2 className="h-3 w-3 text-white" aria-hidden />
+              </span>
+              <span className="whitespace-nowrap text-sm font-medium sm:text-[15px]">Share</span>
+            </button>
+
+            {isShareOpen && (
+              <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("facebook")}
+                >
+                  <span>Facebook</span>
+                  <span className="text-xs text-gray-500">Share</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("instagram")}
+                >
+                  <span>Instagram</span>
+                  <span className="text-xs text-gray-500">Open</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("linkedin")}
+                >
+                  <span>LinkedIn</span>
+                  <span className="text-xs text-gray-500">Share</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("telegram")}
+                >
+                  <span>Telegram</span>
+                  <span className="text-xs text-gray-500">Share</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("x")}
+                >
+                  <span>X</span>
+                  <span className="text-xs text-gray-500">Share</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                  onClick={() => void handleShareOption("copy")}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Copy className="h-3 w-3" aria-hidden />
+                    Copy link
+                  </span>
+                  <span className="text-xs text-gray-500">Copy</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={cycleSpeed}
+            className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium tabular-nums shadow-sm transition-opacity hover:opacity-90"
+            style={{ color: NAVY }}
+            aria-label={`Playback speed ${formatSpeedLabel(SPEEDS[speedIndex])}`}
+          >
+            {formatSpeedLabel(SPEEDS[speedIndex])}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={isMuted ? "Unmute" : "Mute"}
+            className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium shadow-sm transition-opacity hover:opacity-90"
+            style={{ color: NAVY }}
+          >
+            {isMuted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
+          </button>
         </div>
 
-        <div
-          className="shrink-0 whitespace-nowrap text-[10px] tabular-nums sm:text-[11px]"
-          style={{ color: NAVY }}
-        >
-          {formatTime(currentTime)}/{formatTime(duration)}
-        </div>
-
-        <button
-          type="button"
-          onClick={toggleMute}
-          aria-label={isMuted ? "Unmute" : "Mute"}
-          className="cursor-pointer shrink-0 rounded-md p-0.5 transition-opacity hover:opacity-70"
-          style={{ color: NAVY }}
-        >
-          {isMuted ? (
-            <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
-          ) : (
-            <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
-          )}
-        </button>
+        
       </div>
     </div>
   );
