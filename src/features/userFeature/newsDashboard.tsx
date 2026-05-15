@@ -310,7 +310,7 @@ export default function NewsDashboard({
                         - {getRelativeTimeShort(article.date_time_post)}
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold leading-tight line-clamp-2">
+                    <h3 className="text-lg font-bold leading-tight line-clamp-2">
                       {article.title}
                     </h3>
                   </div>
@@ -365,7 +365,7 @@ export default function NewsDashboard({
                         - {getRelativeTimeShort(article.date_time_post)}
                       </span>
                     </div>
-                    <h2 className="text-sm sm:text-base font-bold leading-tight line-clamp-2">
+                    <h2 className="text-lg sm:text-base font-bold leading-tight line-clamp-2">
                       {article.title}
                     </h2>
                   </div>
