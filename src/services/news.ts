@@ -1,6 +1,7 @@
 import type {
   NewsResponse,
   NewsSingleResponse,
+  HomeNewsResponse,
   NewsCreateParams,
   NewsUpdateParams,
   NewsCreateResponse,
@@ -105,6 +106,47 @@ export async function getVideosNews(): Promise<NewsResponse> {
   } catch (error) {
     console.warn("Videos news fetch failed, using empty fallback:", error);
     return { success: false, data: [] };
+  }
+}
+
+/**
+ * Fetch home page sections in one request
+ */
+export async function getHomeNews(): Promise<HomeNewsResponse> {
+  try {
+    const url = getApiUrl("/home");
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch home news: ${response.status} ${response.statusText}. ${errorText}`,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    console.warn("Home news fetch failed, using empty fallback:", error);
+    return {
+      success: false,
+      data: {
+        latest: [],
+        international: [],
+        national: [],
+        video: [],
+        technology: [],
+        bussiness: [],
+        sports: [],
+        lifestyle: [],
+      },
+    };
   }
 }
 

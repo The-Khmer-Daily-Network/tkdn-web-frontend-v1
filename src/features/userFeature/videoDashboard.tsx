@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { getNews } from "@/services/news";
 import type { News } from "@/types/news";
 import { Play } from "lucide-react";
 import { getNewsPath } from "@/utils/newsSlug";
+import { stripHtmlToText } from "@/utils/text";
 
 export default function VideoDashboard() {
   const [videos, setVideos] = useState<News[]>([]);
@@ -152,7 +154,7 @@ export default function VideoDashboard() {
           <div className="lg:col-span-1">
             <div className="grid grid-cols-2 gap-4">
               {[...Array(6)].map((_, index) => (
-                <div key={index} className="space-y-2 animate-pulse">
+                <div key={`featured-video-skeleton-${index + 1}`} className="space-y-2 animate-pulse">
                   {/* Video Thumbnail Skeleton */}
                   <div className="relative w-full aspect-video rounded-[20px] bg-gray-200"></div>
 
@@ -177,7 +179,7 @@ export default function VideoDashboard() {
           <div className="h-7 bg-gray-200 rounded-[10px] w-40 animate-pulse"></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, index) => (
-              <div key={index} className="space-y-3 animate-pulse">
+              <div key={`more-video-skeleton-${index + 1}`} className="space-y-3 animate-pulse">
                 {/* Video Thumbnail Skeleton */}
                 <div className="relative w-full aspect-video rounded-[20px] bg-gray-200"></div>
 
@@ -211,6 +213,7 @@ export default function VideoDashboard() {
   const mainVideo = videos[0];
   const featuredVideos = videos.slice(1, 7); // Next 6 videos for right side (3 rows x 2 columns)
   const remainingVideos = videos.slice(7); // Remaining videos for grid below
+  const mainVideoThumbnail = getVideoThumbnail(mainVideo);
 
   return (
     <div className="w-full space-y-8">
@@ -239,18 +242,19 @@ export default function VideoDashboard() {
               <div className="w-full space-y-4">
                 {/* Video Thumbnail */}
                 <div className="relative w-full aspect-video rounded-[20px] overflow-hidden bg-gray-200 group">
-                  {getVideoThumbnail(mainVideo) ? (
-                    <img
-                      src={getVideoThumbnail(mainVideo)!}
+                  {mainVideoThumbnail ? (
+                    <Image
+                      src={mainVideoThumbnail}
                       alt={mainVideo.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 66vw"
                       className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                      unoptimized
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
                         const currentSrc = img.src;
-                        // If YouTube thumbnail fails, try hqdefault
                         if (currentSrc.includes("maxresdefault")) {
-                          const videoId =
-                            currentSrc.match(/vi\/([^\/]+)\//)?.[1];
+                          const videoId = currentSrc.match(/vi\/([^\/]+)\//)?.[1];
                           if (videoId) {
                             img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                           } else {
@@ -315,7 +319,7 @@ export default function VideoDashboard() {
                         className="text-sm text-gray-600 line-clamp-2"
                        
                     >
-                        {mainVideo.content_blocks[0].paragraph}
+                        {stripHtmlToText(mainVideo.content_blocks[0].paragraph)}
                       </p>
                     )}
                 </div>
@@ -328,6 +332,9 @@ export default function VideoDashboard() {
         <div className="lg:col-span-1">
           <div className="grid grid-cols-2 gap-4">
             {featuredVideos.map((video) => (
+              (() => {
+                const thumbnail = getVideoThumbnail(video);
+                return (
               <Link
                 key={video.id}
                 href={getNewsPath(video)}
@@ -341,18 +348,19 @@ export default function VideoDashboard() {
                 <div className="space-y-2">
                   {/* Video Thumbnail */}
                   <div className="relative w-full aspect-video rounded-[20px] overflow-hidden bg-gray-200 group">
-                    {getVideoThumbnail(video) ? (
-                      <img
-                        src={getVideoThumbnail(video)!}
+                    {thumbnail ? (
+                      <Image
+                        src={thumbnail}
                         alt={video.title}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 33vw"
                         className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                        unoptimized
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
                           const currentSrc = img.src;
-                          // If YouTube thumbnail fails, try hqdefault
                           if (currentSrc.includes("maxresdefault")) {
-                            const videoId =
-                              currentSrc.match(/vi\/([^\/]+)\//)?.[1];
+                            const videoId = currentSrc.match(/vi\/([^\/]+)\//)?.[1];
                             if (videoId) {
                               img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                             } else {
@@ -406,6 +414,8 @@ export default function VideoDashboard() {
                   </div>
                 </div>
               </Link>
+                );
+              })()
             ))}
           </div>
         </div>
@@ -422,6 +432,9 @@ export default function VideoDashboard() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {remainingVideos.map((video) => (
+              (() => {
+                const thumbnail = getVideoThumbnail(video);
+                return (
               <Link
                 key={video.id}
                 href={getNewsPath(video)}
@@ -435,18 +448,19 @@ export default function VideoDashboard() {
                 <div className="space-y-3">
                   {/* Video Thumbnail */}
                   <div className="relative w-full aspect-video rounded-[20px] overflow-hidden bg-gray-200 group">
-                    {getVideoThumbnail(video) ? (
-                      <img
-                        src={getVideoThumbnail(video)!}
+                    {thumbnail ? (
+                      <Image
+                        src={thumbnail}
                         alt={video.title}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 25vw"
                         className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                        unoptimized
                         onError={(e) => {
                           const img = e.target as HTMLImageElement;
                           const currentSrc = img.src;
-                          // If YouTube thumbnail fails, try hqdefault
                           if (currentSrc.includes("maxresdefault")) {
-                            const videoId =
-                              currentSrc.match(/vi\/([^\/]+)\//)?.[1];
+                            const videoId = currentSrc.match(/vi\/([^\/]+)\//)?.[1];
                             if (videoId) {
                               img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                             } else {
@@ -508,6 +522,8 @@ export default function VideoDashboard() {
                   </div>
                 </div>
               </Link>
+                );
+              })()
             ))}
           </div>
         </div>

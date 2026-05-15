@@ -77,9 +77,9 @@ export default function UploadImageModal({
 
     for (const file of files) {
       // Validate file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
       if (!allowedTypes.includes(file.type)) {
-        errors.push(`${file.name}: Only JPG, PNG, and JPEG files are allowed.`);
+        errors.push(`${file.name}: Only JPG, PNG, JPEG, and WEBP files are allowed.`);
         continue;
       }
 
@@ -284,7 +284,7 @@ export default function UploadImageModal({
                     <div className="mt-2 text-xs text-gray-500 space-y-0.5 text-center">
                       <p>Note: The rule of upload content image.</p>
                       <ul className="list-disc list-outside pl-5 inline-block text-left">
-                        <li>The image must be in JPG, PNG, JPEG format.</li>
+                        <li>The image must be in JPG, PNG, JPEG, or WEBP format.</li>
                         <li>The image must be less than 2MB.</li>
                         <li>The image size must be 850px × 450px.</li>
                         <li>You can upload up to 4 images at a time.</li>
@@ -295,7 +295,7 @@ export default function UploadImageModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/jpg,image/png"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
                   onChange={handleFileSelect}
                   multiple
                   className="hidden"

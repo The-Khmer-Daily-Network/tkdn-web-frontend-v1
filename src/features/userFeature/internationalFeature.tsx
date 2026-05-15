@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { News } from "@/types/news";
 import { getInternationalNews } from "@/services/news";
 import { getNewsPath } from "@/utils/newsSlug";
@@ -14,6 +15,7 @@ const EMPTY_NEWS: News[] = [];
 interface InternationalFeatureProps {
   allNews?: News[];
   loading?: boolean;
+  disableFetch?: boolean;
 }
 
 type InternationalResponse = { success: boolean; data: News[] };
@@ -21,6 +23,7 @@ type InternationalResponse = { success: boolean; data: News[] };
 export default function InternationalFeature({
   allNews,
   loading: externalLoading = false,
+  disableFetch = false,
 }: InternationalFeatureProps) {
   const resolvedAllNews = allNews ?? EMPTY_NEWS;
   const [news, setNews] = useState<News[]>([]);
@@ -42,6 +45,8 @@ export default function InternationalFeature({
       setNews(sorted);
       return;
     }
+
+    if (disableFetch) return;
 
     let cancelled = false;
     setInternalLoading(true);
@@ -68,7 +73,7 @@ export default function InternationalFeature({
     return () => {
       cancelled = true;
     };
-  }, [resolvedAllNews]);
+  }, [resolvedAllNews, disableFetch]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -90,8 +95,8 @@ export default function InternationalFeature({
       <div className="w-full">
         <div className="h-7 bg-gray-200 rounded-[10px] w-56 mb-3 animate-pulse"></div>
         <div className="space-y-4">
-          {[...Array(5)].map((_, index) => (
-            <div key={index} className="flex flex-row gap-4 animate-pulse">
+          {Array.from({ length: 5 }, (_, index) => index + 1).map((item) => (
+            <div key={item} className="flex flex-row gap-4 animate-pulse">
               <div className="relative max-[400px]:w-[150px] w-[200px] sm:w-[250px] h-[140px] shrink-0 rounded-[10px] bg-gray-200"></div>
               <div className="hidden sm:flex flex-1 flex-col justify-center space-y-3">
                 <div className="flex flex-row space-x-5">
@@ -140,17 +145,20 @@ export default function InternationalFeature({
         >
             <div className="relative max-[400px]:w-[150px] w-[200px] sm:w-[250px] h-[140px] shrink-0 rounded-xl overflow-hidden bg-gray-200 group">
               {article.cover && (
-                <img
+                <Image
                   src={article.cover}
                   alt={article.title}
+                  fill
+                  sizes="(max-width: 640px) 200px, 250px"
                   className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                  unoptimized
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
               )}
             </div>
-            <div className="flex-1 flex flex-col justify-center space-y-2">
+            <div className="flex-1 min-w-0 flex flex-col justify-center space-y-2">
               <div className="flex flex-row space-x-5 max-[481px]:flex-col max-[481px]:space-x-0 max-[481px]:space-y-1">
                 {article.category && (
                   <span
@@ -170,7 +178,7 @@ export default function InternationalFeature({
                 </p>
               </div>
               <h2
-                className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed"
+                className="w-full text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed break-words"
                 
             >
                 {article.title}

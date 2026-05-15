@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { News } from "@/types/news";
 import { getVideosNews } from "@/services/news";
 import { Play } from "lucide-react";
 import { getNewsPath } from "@/utils/newsSlug";
+import { stripHtmlToText } from "@/utils/text";
 
 const DISPLAY_LIMIT = 15;
 
@@ -14,6 +16,7 @@ const EMPTY_NEWS: News[] = [];
 interface VideoFeatureProps {
   allNews?: News[];
   loading?: boolean;
+  disableFetch?: boolean;
 }
 
 type VideosResponse = { success: boolean; data: News[] };
@@ -21,6 +24,7 @@ type VideosResponse = { success: boolean; data: News[] };
 export default function VideoFeature({
   allNews,
   loading: externalLoading = false,
+  disableFetch = false,
 }: VideoFeatureProps) {
   const resolvedAllNews = allNews ?? EMPTY_NEWS;
   const [videos, setVideos] = useState<News[]>([]);
@@ -42,6 +46,8 @@ export default function VideoFeature({
       setVideos(sorted);
       return;
     }
+
+    if (disableFetch) return;
 
     let cancelled = false;
     setInternalLoading(true);
@@ -70,7 +76,7 @@ export default function VideoFeature({
     return () => {
       cancelled = true;
     };
-  }, [resolvedAllNews]);
+  }, [resolvedAllNews, disableFetch]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -91,15 +97,12 @@ export default function VideoFeature({
     return (
       <div className="w-full">
         <div className="h-7 bg-gray-200 rounded-[10px] w-40 mb-3 animate-pulse"></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg overflow-hidden animate-pulse"
-          >
-              <div className="relative w-full aspect-video bg-gray-200 rounded-lg"></div>
-              <div className="p-4 space-y-2">
-                <div className="flex flex-col space-y-2">
+        <div className="space-y-4">
+          {Array.from({ length: 5 }, (_, index) => index + 1).map((item) => (
+            <div key={item} className="flex flex-row gap-4 animate-pulse">
+              <div className="relative max-[400px]:w-[150px] w-[200px] sm:w-[250px] h-[140px] shrink-0 rounded-[10px] bg-gray-200"></div>
+              <div className="hidden sm:flex flex-1 flex-col justify-center space-y-3">
+                <div className="flex flex-row space-x-5">
                   <div className="h-3 bg-gray-200 rounded-[10px] w-20"></div>
                   <div className="h-3 bg-gray-200 rounded-[10px] w-24"></div>
                 </div>
@@ -145,10 +148,13 @@ export default function VideoFeature({
         >
             <div className="relative w-full aspect-video bg-gray-200 group">
               {video.cover && (
-                <img
+                <Image
                   src={video.cover}
                   alt={video.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 33vw"
                   className="w-full h-full object-cover"
+                  unoptimized
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
@@ -193,7 +199,7 @@ export default function VideoFeature({
                   className="text-sm text-gray-600 line-clamp-2"
                  
               >
-                  {video.content_blocks[0].paragraph}
+                  {stripHtmlToText(video.content_blocks[0].paragraph)}
                 </p>
               )}
             </div>

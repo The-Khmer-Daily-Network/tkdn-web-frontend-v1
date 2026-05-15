@@ -2508,7 +2508,7 @@ function NewsModal({
                 <input
                   ref={inlineImageInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/jpg"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
                   className="hidden"
                   onChange={(e) => handleInlineImageFileChange(e.target.files?.[0])}
                 />
@@ -2729,7 +2729,7 @@ function NewsModal({
                       <input
                         ref={coverFileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/jpg"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
                         className="sr-only"
                         onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
                       />
@@ -3131,7 +3131,7 @@ function NewsModal({
                             endImageFileInputRefs.current[slot] = el;
                           }}
                           type="file"
-                          accept="image/png,image/jpeg,image/jpg"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
                           className="sr-only"
                           onChange={(e) => handleSelectEndImageFile(slot, e.target.files?.[0])}
                         />
