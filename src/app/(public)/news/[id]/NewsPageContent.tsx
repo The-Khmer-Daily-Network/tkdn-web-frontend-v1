@@ -1408,17 +1408,13 @@ const logVideoDebug = (
             </div>
           )}
 
-          {/* Listen (TTS) — under cover + caption, above article body */}
-          {(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl) && (
-            <div className="w-full mt-6">
-              <NewsAudioPlayer
-                src={
-                  (singleNews.tts_audio_url ||
-                    (singleNews as any).ttsAudioUrl) as string
-                }
-              />
-            </div>
-          )}
+          {/* Listen / Share (TTS) — under cover + caption, above article body */}
+          <div className="w-full mt-6">
+            <NewsAudioPlayer
+              src={(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl || "") as string}
+              showListenButton={Boolean(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl)}
+            />
+          </div>
 
           {/* Content Blocks with Middle Media */}
           {singleNews.content_blocks &&
