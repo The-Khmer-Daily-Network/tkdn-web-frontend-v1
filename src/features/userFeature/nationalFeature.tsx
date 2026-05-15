@@ -159,7 +159,7 @@ export default function NationalFeature({
                 />
               )}
             </div>
-            <div className="flex-1 flex flex-col justify-center space-y-2">
+            <div className="flex-1 min-w-0 flex flex-col justify-center space-y-2">
               <div className="flex flex-row space-x-5 max-[481px]:flex-col max-[481px]:space-x-0 max-[481px]:space-y-1">
                 {article.category && (
                   <span
@@ -179,7 +179,7 @@ export default function NationalFeature({
                 </p>
               </div>
               <h2
-                className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed"
+                className="w-full text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-relaxed break-words"
                 
             >
                 {article.title}

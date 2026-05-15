@@ -51,18 +51,6 @@ export default function NewsDashboard({
 }: NewsDashboardProps) {
   const [news, setNews] = useState<News[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
-  const [windowWidth, setWindowWidth] = useState<number | null>(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   useEffect(() => {
     if (allNews.length > 0) {
@@ -71,14 +59,14 @@ export default function NewsDashboard({
         (article) => article.cover !== null,
       );
 
-      // Sort by date_time_post (latest first) and take 6
+      // Sort by date_time_post (latest first) and take 8
       const latestNews = newsWithImages
         .sort(
           (a, b) =>
             new Date(b.date_time_post).getTime() -
             new Date(a.date_time_post).getTime(),
         )
-        .slice(0, 6);
+        .slice(0, 8);
 
       setNews(latestNews);
     }
@@ -119,7 +107,7 @@ export default function NewsDashboard({
               new Date(b.date_time_post).getTime() -
               new Date(a.date_time_post).getTime(),
           )
-          .slice(0, 6);
+          .slice(0, 8);
 
         setNews(latestNews);
       } catch {
@@ -217,111 +205,114 @@ export default function NewsDashboard({
   }
 
   const mainArticle = news[0];
-  const otherArticles = news.slice(1, 6);
+  const otherArticles = news.slice(1);
 
-  const displayedArticles =
-    windowWidth !== null && windowWidth <= 1279
-      ? otherArticles.slice(0, 3)
-      : otherArticles;
+  const displayedArticles = otherArticles.slice(2, 5);
 
   return (
     <div className="w-full space-y-6">
-      {mainArticle && (
-        <Link
-          href={getNewsPath(mainArticle)}
-          onClick={(e) => {
-            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-            e.preventDefault();
-            window.location.href = getNewsPath(mainArticle);
-          }}
-          className="w-full block"
-        >
-          <article className="w-full">
-            <div className="flex flex-col space-y-2 cursor-pointer hover:opacity-90 transition-opacity sm:hidden">
-              <div
-                className="relative w-full rounded-xl overflow-hidden bg-gray-200 group"
-                style={{ height: "200px" }}
-              >
-                {mainArticle.cover && (
-                  <Image
-                    src={mainArticle.cover}
-                    alt={mainArticle.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, 500px"
-                    className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
-                    unoptimized
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                )}
-              </div>
-
-              <div className="flex flex-col space-y-1">
-                {mainArticle.category && (
-                  <span className="text-xs max-[481px]:text-[10px] font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
-                    {mainArticle.category.name}
-                  </span>
-                )}
-                <p className="text-xs text-[#1D2229] font-medium">
-                  {formatDate(mainArticle.date_time_post)}
-                </p>
-                <h1 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
-                  {mainArticle.title}
-                </h1>
-              </div>
-            </div>
-
-            <div className="hidden sm:flex flex-col sm:flex-row gap-4 sm:gap-6 bg-[#273C8F]/10 rounded-[10px] cursor-pointer hover:opacity-90 transition-opacity">
-              <div
-                className="relative rounded-xl overflow-hidden bg-gray-200 group"
-                style={{ width: "500px", height: "275px" }}
-              >
-                {mainArticle.cover && (
-                  <Image
-                    src={mainArticle.cover}
-                    alt={mainArticle.title}
-                    fill
-                    sizes="500px"
-                    className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
-                    unoptimized
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                )}
-              </div>
-
-              <div className="w-full sm:w-1/2 flex flex-col justify-start mt-4 space-y-6">
-                <div>
-                  {mainArticle.category && (
-                    <span className="inline-block text-sm font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-3 underline-offset-5 uppercase">
-                      {mainArticle.category.name}
-                    </span>
+      {/* Top grid: large feature on left, stacked highlights on right */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {mainArticle && (
+          <div className="lg:col-span-2">
+            <Link
+              href={getNewsPath(mainArticle)}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                window.location.href = getNewsPath(mainArticle);
+              }}
+              className="block group"
+            >
+              <article className="relative rounded-[12px] overflow-hidden bg-gray-200">
+                <div className="relative w-full" style={{ height: "520px" }}>
+                  {mainArticle.cover && (
+                    <Image
+                      src={mainArticle.cover}
+                      alt={mainArticle.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 800px"
+                      className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                      unoptimized
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
                   )}
-                  <p className="text-xs text-[#1D2229] mt-2 font-medium">
-                    {formatDate(mainArticle.date_time_post)}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <h1 className="line-clamp-2 text-base lg:text-lg xl:text-xl font-semibold text-[#1D2229] leading-tight">
-                    {mainArticle.title}
-                  </h1>
-                </div>
-                {mainArticle.content_blocks &&
-                  mainArticle.content_blocks.length > 0 && (
-                    <p className="text-xs text-gray-700 line-clamp-3">
-                      {getPlainPreviewText(mainArticle.content_blocks[0].paragraph)}
-                    </p>
-                  )}
-              </div>
-            </div>
-          </article>
-        </Link>
-      )}
 
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
+
+                  <div className="absolute left-6 bottom-6 right-6 text-white">
+                    {mainArticle.category && (
+                      <span className="inline-block text-sm font-semibold uppercase tracking-wider text-[#F3F4F6] mb-2 border-b-2 border-[#E34C33] pb-1">
+                        {mainArticle.category.name}
+                      </span>
+                    )}
+                    <h2 className="mt-3 text-2xl md:text-3xl lg:text-4xl font-extrabold leading-tight">
+                      {mainArticle.title}
+                    </h2>
+                    {mainArticle.content_blocks && mainArticle.content_blocks.length > 0 && (
+                      <p className="mt-3 max-w-2xl text-sm text-white/90 line-clamp-3">
+                        {getPlainPreviewText(mainArticle.content_blocks[0].paragraph)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </article>
+            </Link>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4">
+          <div className="h-[520px] flex flex-col gap-4">
+            {otherArticles.slice(0, 2).map((article) => (
+              <Link
+                key={article.id}
+                href={getNewsPath(article)}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  e.preventDefault();
+                  window.location.href = getNewsPath(article);
+                }}
+                className="block group rounded-[10px] overflow-hidden bg-gray-100 flex-1"
+              >
+                <div className="relative h-full">
+                  {article.cover && (
+                    <Image
+                      src={article.cover}
+                      alt={article.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 300px"
+                      className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                      unoptimized
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute left-4 bottom-4 right-4 text-white">
+                    {article.category && (
+                      <span className="text-xs font-semibold uppercase tracking-wider inline-block mb-1 border-b-2 border-[#E34C33] pb-1">
+                        {article.category.name}
+                      </span>
+                    )}
+                    <h3 className="text-sm font-bold leading-tight line-clamp-2">
+                      {article.title}
+                    </h3>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* two-up cards moved to bottom row; nothing to render here */}
+        </div>
+      </div>
+
+      {/* Bottom row: remaining small thumbnails */}
       {displayedArticles.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayedArticles.map((article) => (
             <Link
               key={article.id}
@@ -331,37 +322,40 @@ export default function NewsDashboard({
                 e.preventDefault();
                 window.location.href = getNewsPath(article);
               }}
-              className="cursor-pointer hover:opacity-90 transition-opacity"
+              className="block group cursor-pointer transition-opacity hover:opacity-95"
             >
-              <div className="flex flex-row gap-3 sm:flex-col sm:space-y-0">
-                <div className="relative max-[400px]:w-[150px] max-[400px]:h-[90px] w-[200px] h-[120px] sm:w-full sm:h-[100px] shrink-0 rounded-xl overflow-hidden bg-gray-200 group">
+              <div className="relative rounded-[12px] overflow-hidden bg-gray-200 shadow-sm h-[210px] sm:h-[240px]">
+                <div className="absolute inset-0 bg-gray-200">
                   {article.cover && (
                     <Image
                       src={article.cover}
                       alt={article.title}
                       fill
-                      sizes="(max-width: 400px) 150px, (max-width: 640px) 200px, 200px"
-                      className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 280px"
+                      className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       unoptimized
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                 </div>
 
-                <div className="flex-1 sm:flex-none flex flex-col justify-center sm:justify-start sm:space-y-1 space-y-1">
-                  {article.category && (
-                    <span className="text-xs font-semibold text-[#1D2229] underline decoration-[#E34C33] decoration-2 underline-offset-5 uppercase">
-                      {article.category.name}
-                    </span>
-                  )}
-                  <p className="text-xs text-[#1D2229] font-regular mb-2">
-                    {formatDate(article.date_time_post)}
-                  </p>
-                  <h2 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">
-                    {article.title}
-                  </h2>
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 text-white">
+                  <div className="relative z-10 space-y-2">
+                    {article.category && (
+                      <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-white/90 border-b-2 border-[#E34C33] pb-1">
+                        {article.category.name}
+                      </span>
+                    )}
+                    <p className="text-xs text-white/75 font-regular">
+                      {formatDate(article.date_time_post)}
+                    </p>
+                    <h2 className="text-sm sm:text-base font-bold leading-tight line-clamp-2">
+                      {article.title}
+                    </h2>
+                  </div>
                 </div>
               </div>
             </Link>

@@ -1448,7 +1448,7 @@ const logVideoDebug = (
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[18px] text-gray-800 leading-relaxed [&_a]:text-current [&_a]:underline [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[18px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[24px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className="text-[18px] text-gray-800 leading-relaxed break-words [&_a]:text-current [&_a]:underline [&_a]:break-words [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[18px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[24px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
                             dangerouslySetInnerHTML={{
                               __html: hasHydrated
                                 ? sanitizeRichText(
@@ -1606,7 +1606,7 @@ const logVideoDebug = (
           {/* End Images */}
           {singleNews.end_images &&
             singleNews.end_images.length > 0 && (
-            <div className="mt-8 grid grid-cols-3 gap-4">
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {singleNews.end_images.map((endImage, index) => (
                 <div key={index} className="w-full">
                   <img
@@ -1648,7 +1648,7 @@ const logVideoDebug = (
         url={seoData.url}
         image={news.length > 0 && news[0].cover ? news[0].cover : undefined}
       />
-      <div className="w-full space-y-6">
+      <div className="w-full space-y-6 px-4 sm:px-6 lg:px-0 mx-auto max-w-7xl">
         {/* Category Header, Latest Header, or Video Header */}
         {category ? (
           <div className="border-b border-gray-200 pb-4">
@@ -1692,10 +1692,10 @@ const logVideoDebug = (
                   key={article.id}
                   href={getNewsPath(article)}
                   onClick={(e) => handleNewsCardNavigate(e, article)}
-                  className="flex flex-row gap-4 cursor-pointer hover:opacity-90 transition-opacity"
+                  className="flex flex-col gap-3 cursor-pointer hover:opacity-90 transition-opacity"
                 >
                   {/* Article Image */}
-                  <div className="relative w-[250px] h-[160px] shrink-0 rounded-lg overflow-hidden bg-gray-200 group">
+                  <div className="relative w-full h-[220px] shrink-0 rounded-lg overflow-hidden bg-gray-200 group">
                     {article.cover && (
                       <img
                         src={article.cover}
@@ -1720,7 +1720,7 @@ const logVideoDebug = (
                   </div>
 
                   {/* Article Info */}
-                  <div className="flex-1 flex flex-col justify-center space-y-2">
+                  <div className="flex-1 min-w-0 flex flex-col justify-center space-y-2">
                     <div className="flex flex-row space-x-5 max-[481px]:flex-col max-[481px]:space-x-0 max-[481px]:space-y-1">
                       {article.category && (
                         <span
@@ -1740,7 +1740,7 @@ const logVideoDebug = (
                       </p>
                     </div>
                     <h2
-                      className="text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
+                        className="w-full text-lg max-[481px]:text-sm font-semibold text-gray-900 line-clamp-2 leading-tight break-words"
                      
                   >
                       {article.title}
