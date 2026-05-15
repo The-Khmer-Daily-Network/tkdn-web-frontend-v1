@@ -3,22 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Headphones, Pause, Share2, Volume2, VolumeX } from "lucide-react";
 
-/** Dark navy — matches reference pill player accent */
 const NAVY = "#1e3a5f";
-
 const SPEEDS = [0.75, 1, 1.5, 2] as const;
 
-function formatSpeedLabel(r: number) {
-  if (Number.isInteger(r)) return `x${r}`;
-  return `x${r}`;
+function formatSpeedLabel(rate: number) {
+  return `x${rate}`;
 }
 
 export interface NewsAudioPlayerProps {
-  src: string;
+  src?: string;
   className?: string;
+  showListenButton?: boolean;
 }
 
-export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayerProps) {
+export default function NewsAudioPlayer({
+  src = "",
+  className = "",
+  showListenButton = true,
+}: NewsAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -27,27 +29,30 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
   const [isMuted, setIsMuted] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
+  const hasAudio = Boolean(src);
+
   useEffect(() => {
     setDuration(0);
     setIsPlaying(false);
     setSpeedIndex(1);
-    const a = audioRef.current;
-    if (a) {
-      a.src = src;
-      a.load();
+    setIsMuted(false);
+    const audio = audioRef.current;
+    if (audio && src) {
+      audio.src = src;
+      audio.load();
     }
   }, [src]);
 
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.playbackRate = SPEEDS[speedIndex];
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.playbackRate = SPEEDS[speedIndex];
   }, [speedIndex]);
 
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.volume = isMuted ? 0 : 1;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = isMuted ? 0 : 1;
   }, [isMuted]);
 
   useEffect(() => {
@@ -62,36 +67,35 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
   }, []);
 
   const togglePlay = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      a.pause();
+      audio.pause();
     } else {
-      void a.play().catch(() => {
+      void audio.play().catch(() => {
         setIsPlaying(false);
       });
     }
   }, [isPlaying]);
 
   const onLoadedMetadata = useCallback(() => {
-    const a = audioRef.current;
-    if (a && Number.isFinite(a.duration)) {
-      setDuration(a.duration);
+    const audio = audioRef.current;
+    if (audio && Number.isFinite(audio.duration)) {
+      setDuration(audio.duration);
     }
   }, []);
 
   const onPlay = useCallback(() => setIsPlaying(true), []);
   const onPause = useCallback(() => setIsPlaying(false), []);
-  const onEnded = useCallback(() => {
-    setIsPlaying(false);
-  }, []);
+  const onEnded = useCallback(() => setIsPlaying(false), []);
 
   const cycleSpeed = useCallback(() => {
-    setSpeedIndex((i) => (i + 1) % SPEEDS.length);
+    setSpeedIndex((index) => (index + 1) % SPEEDS.length);
   }, []);
 
   const toggleMute = useCallback(() => {
-    setIsMuted((m) => !m);
+    setIsMuted((muted) => !muted);
   }, []);
 
   const getShareUrl = useCallback(() => {
@@ -121,9 +125,9 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
   const handleShareOption = useCallback(
     async (service: "facebook" | "instagram" | "linkedin" | "telegram" | "x" | "copy") => {
       const url = getShareUrl();
-      const shortUrl = getShortShareUrl();
       if (!url) return;
 
+      const shortUrl = getShortShareUrl();
       const encodedUrl = encodeURIComponent(url);
       const encodedTitle = encodeURIComponent(shareTitle || url);
 
@@ -169,28 +173,30 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
 
   return (
     <div className={`w-full ${className}`}>
-      <audio
-        ref={audioRef}
-        src={src}
-        preload="metadata"
-        className="hidden"
-        onLoadedMetadata={onLoadedMetadata}
-        onDurationChange={onLoadedMetadata}
-        onPlay={onPlay}
-        onPause={onPause}
-        onEnded={onEnded}
-      >
-        <track
-          kind="captions"
-          label="English"
-          srcLang="en"
-          default
-          src="data:text/vtt;charset=utf-8,WEBVTT%0A%0A00:00:00.000 --> 00:00:01.000%0A%0A"
-        />
-      </audio>
+      {hasAudio && (
+        <audio
+          ref={audioRef}
+          src={src}
+          preload="metadata"
+          className="hidden"
+          onLoadedMetadata={onLoadedMetadata}
+          onDurationChange={onLoadedMetadata}
+          onPlay={onPlay}
+          onPause={onPause}
+          onEnded={onEnded}
+        >
+          <track
+            kind="captions"
+            label="English"
+            srcLang="en"
+            default
+            src="data:text/vtt;charset=utf-8,WEBVTT%0A%0A00:00:00.000 --> 00:00:01.000%0A%0A"
+          />
+        </audio>
+      )}
 
-      <div className="space-y-3" style={{ color: NAVY }}>
-        <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-2" style={{ color: NAVY }}>
+        {showListenButton && hasAudio && (
           <button
             type="button"
             onClick={togglePlay}
@@ -209,100 +215,102 @@ export default function NewsAudioPlayer({ src, className = "" }: NewsAudioPlayer
               {listenLabel}
             </span>
           </button>
+        )}
 
-          <div className="relative" ref={shareMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsShareOpen((open) => !open)}
-              aria-label="Share"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-sm transition-opacity hover:opacity-90"
-              style={{ color: NAVY }}
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: NAVY }}>
-                <Share2 className="h-3 w-3 text-white" aria-hidden />
-              </span>
-              <span className="whitespace-nowrap text-sm font-medium sm:text-[15px]">Share</span>
-            </button>
-
-            {isShareOpen && (
-              <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("facebook")}
-                >
-                  <span>Facebook</span>
-                  <span className="text-xs text-gray-500">Share</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("instagram")}
-                >
-                  <span>Instagram</span>
-                  <span className="text-xs text-gray-500">Open</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("linkedin")}
-                >
-                  <span>LinkedIn</span>
-                  <span className="text-xs text-gray-500">Share</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("telegram")}
-                >
-                  <span>Telegram</span>
-                  <span className="text-xs text-gray-500">Share</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("x")}
-                >
-                  <span>X</span>
-                  <span className="text-xs text-gray-500">Share</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
-                  onClick={() => void handleShareOption("copy")}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Copy className="h-3 w-3" aria-hidden />
-                    Copy link
-                  </span>
-                  <span className="text-xs text-gray-500">Copy</span>
-                </button>
-              </div>
-            )}
-          </div>
-
+        <div className="relative" ref={shareMenuRef}>
           <button
             type="button"
-            onClick={cycleSpeed}
-            className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium tabular-nums shadow-sm transition-opacity hover:opacity-90"
+            onClick={() => setIsShareOpen((open) => !open)}
+            aria-label="Share"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-sm transition-opacity hover:opacity-90"
             style={{ color: NAVY }}
-            aria-label={`Playback speed ${formatSpeedLabel(SPEEDS[speedIndex])}`}
           >
-            {formatSpeedLabel(SPEEDS[speedIndex])}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: NAVY }}>
+              <Share2 className="h-3 w-3 text-white" aria-hidden />
+            </span>
+            <span className="whitespace-nowrap text-sm font-medium sm:text-[15px]">Share</span>
           </button>
 
-          <button
-            type="button"
-            onClick={toggleMute}
-            aria-label={isMuted ? "Unmute" : "Mute"}
-            className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium shadow-sm transition-opacity hover:opacity-90"
-            style={{ color: NAVY }}
-          >
-            {isMuted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
-          </button>
+          {isShareOpen && (
+            <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("facebook")}
+              >
+                <span>Facebook</span>
+                <span className="text-xs text-gray-500">Share</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("instagram")}
+              >
+                <span>Instagram</span>
+                <span className="text-xs text-gray-500">Open</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("linkedin")}
+              >
+                <span>LinkedIn</span>
+                <span className="text-xs text-gray-500">Share</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("telegram")}
+              >
+                <span>Telegram</span>
+                <span className="text-xs text-gray-500">Share</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("x")}
+              >
+                <span>X</span>
+                <span className="text-xs text-gray-500">Share</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                onClick={() => void handleShareOption("copy")}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Copy className="h-3 w-3" aria-hidden />
+                  Copy link
+                </span>
+                <span className="text-xs text-gray-500">Copy</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        
+        {showListenButton && hasAudio && (
+          <>
+            <button
+              type="button"
+              onClick={cycleSpeed}
+              className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium tabular-nums shadow-sm transition-opacity hover:opacity-90"
+              style={{ color: NAVY }}
+              aria-label={`Playback speed ${formatSpeedLabel(SPEEDS[speedIndex])}`}
+            >
+              {formatSpeedLabel(SPEEDS[speedIndex])}
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleMute}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+              className="cursor-pointer shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium shadow-sm transition-opacity hover:opacity-90"
+              style={{ color: NAVY }}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
