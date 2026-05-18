@@ -12,8 +12,7 @@ import { getNewsPath } from "@/utils/newsSlug";
  * Documentation: https://support.google.com/news/publisher-center/answer/9607025
  */
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 900;
 export const runtime = "nodejs";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -48,38 +47,22 @@ async function getRecentNews(): Promise<NewsArticle[]> {
     const baseUrl = apiUrl.replace(/\/$/, "");
     const url = `${baseUrl}/news`;
 
-    console.log("[news-sitemap] Fetching from:", url);
-
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      next: { revalidate: 900 },
     });
 
-    console.log("[news-sitemap] Response status:", response.status);
-
     if (!response.ok) {
-      console.error(
-        "[news-sitemap] Response not OK:",
-        response.status,
-        response.statusText,
-      );
       return [];
     }
 
     const data = await response.json();
-    console.log(
-      "[news-sitemap] Data success:",
-      data.success,
-      "Articles count:",
-      data.data?.length || 0,
-    );
 
     if (!data.success) {
-      console.error("[news-sitemap] API returned success: false");
       return [];
     }
 
@@ -92,7 +75,6 @@ async function getRecentNews(): Promise<NewsArticle[]> {
 
     // Include ALL articles (Google will prioritize recent ones automatically)
     // Limit to 1000 articles (Google sitemap limit)
-    console.log("[news-sitemap] Returning", sortedNews.length, "articles");
     return sortedNews.slice(0, 1000);
   } catch (error) {
     console.error("[news-sitemap] Error fetching news:", error);
@@ -140,13 +122,7 @@ function extractKeywords(article: NewsArticle): string {
 export async function GET() {
   const baseUrl = SITE_URL;
 
-  console.log("[news-sitemap] Starting sitemap generation");
-  console.log("[news-sitemap] SITE_URL:", SITE_URL);
-  console.log("[news-sitemap] API_BASE_URL:", API_BASE_URL);
-
   const recentNews = await getRecentNews();
-
-  console.log("[news-sitemap] Got", recentNews.length, "articles for sitemap");
 
   // Generate Google News Sitemap XML
   // Reference: https://support.google.com/news/publisher-center/answer/9607025

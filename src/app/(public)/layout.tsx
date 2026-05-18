@@ -145,7 +145,7 @@ export default function PublicLayout({
     <AdvertisementProvider images={[]} loading={false}>
       {/* Organization structured data for Google News and Search */}
       <OrganizationStructuredData />
-      <div>
+      <div suppressHydrationWarning>
         <HeaderSponsor images={[]} loading={false} />
         <HeaderSidebar />
         <div className="max-w-7xl mx-auto px-4 py-6">

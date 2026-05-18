@@ -13,8 +13,7 @@ import { getNewsPath } from "@/utils/newsSlug";
  * For Google News specific sitemap, see /news-sitemap.xml
  */
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3600;
 export const runtime = "nodejs";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -29,6 +28,12 @@ interface NewsArticle {
   updated_at: string;
   created_at: string;
   date_time_post: string;
+}
+
+interface SitemapCategory {
+  id: number;
+  name: string;
+  subcategories?: SitemapCategory[];
 }
 
 async function getAllNews(): Promise<NewsArticle[]> {
@@ -46,7 +51,7 @@ async function getAllNews(): Promise<NewsArticle[]> {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
@@ -61,7 +66,7 @@ async function getAllNews(): Promise<NewsArticle[]> {
   }
 }
 
-async function getCategories() {
+async function getCategories(): Promise<SitemapCategory[]> {
   if (!API_BASE_URL) {
     return [];
   }
@@ -76,7 +81,7 @@ async function getCategories() {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      next: { revalidate: 3600 },
     });
 
     if (!response.ok) {
@@ -84,7 +89,7 @@ async function getCategories() {
     }
 
     const data = await response.json();
-    return data.categories || [];
+    return (data.categories || []) as SitemapCategory[];
   } catch (error) {
     console.error("Error fetching categories for sitemap:", error);
     return [];
@@ -164,7 +169,7 @@ export async function GET() {
   }> = [];
 
   // Add main categories
-  categories.forEach((category: any) => {
+  categories.forEach((category: SitemapCategory) => {
     const slug = categoryNameToSlug(category.name);
     categoryPages.push({
       url: `${baseUrl}/${slug}`,
@@ -175,7 +180,7 @@ export async function GET() {
 
     // Add subcategories
     if (category.subcategories && category.subcategories.length > 0) {
-      category.subcategories.forEach((subcategory: any) => {
+      category.subcategories.forEach((subcategory: SitemapCategory) => {
         const subSlug = categoryNameToSlug(subcategory.name);
         categoryPages.push({
           url: `${baseUrl}/${subSlug}`,

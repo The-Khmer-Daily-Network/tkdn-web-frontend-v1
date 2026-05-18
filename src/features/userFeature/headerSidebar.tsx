@@ -166,6 +166,7 @@ export default function HeaderSidebar({
     <header
       // className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[30px]"}`}
       className={`w-full sticky z-50 ${topOffset === 0 ? "top-0" : "top-[0px]"}`}
+      suppressHydrationWarning
   >
       <div className="w-full h-[65px] bg-white border-b border-gray-200 rounded-b-[30px] shadow-sm transition-shadow duration-200 hover:shadow-md">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
@@ -187,6 +188,7 @@ export default function HeaderSidebar({
             <div className="hidden md:block">
               {!isSearchExpanded ? (
                 <button
+                  type="button"
                   onClick={handleSearchClick}
                   className="flex items-center justify-between h-[40px] rounded-[50px] transition-all duration-200 font-poppins cursor-pointer"
                   style={{
@@ -209,8 +211,8 @@ export default function HeaderSidebar({
                   }}
               >
                   <span>Search News "Khmer Daily Network"</span>
-                  <div
-                    className="flex items-center justify-center rounded-full shrink-0"
+                  <span
+                    className="inline-flex items-center justify-center rounded-full shrink-0"
                     style={{
                       backgroundColor: "#E34C33",
                       width: "60px",
@@ -218,7 +220,7 @@ export default function HeaderSidebar({
                     }}
                 >
                     <Search size={14} color="white" />
-                  </div>
+                  </span>
                 </button>
               ) : (
                 <form
@@ -680,6 +682,7 @@ export default function HeaderSidebar({
             {/* Mobile Search */}
             {!isSearchExpanded ? (
               <button
+                type="button"
                 onClick={() => {
                   setIsSearchExpanded(true);
                   setTimeout(() => {
@@ -706,8 +709,8 @@ export default function HeaderSidebar({
                 }}
             >
                 <span>Search News "Khmer Daily Network"</span>
-                <div
-                  className="flex items-center justify-center rounded-full shrink-0"
+                <span
+                  className="inline-flex items-center justify-center rounded-full shrink-0"
                   style={{
                     backgroundColor: "#E34C33",
                     width: "60px",
@@ -715,7 +718,7 @@ export default function HeaderSidebar({
                   }}
               >
                   <Search size={14} color="white" />
-                </div>
+                </span>
               </button>
             ) : (
               <form
