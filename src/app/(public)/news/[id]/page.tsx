@@ -1,10 +1,27 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import NewsPageContent from "./NewsPageContent";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const FETCH_REVALIDATE_SECONDS = 300;
 
-async function getNewsById(id: number) {
+export const revalidate = 300;
+
+interface NewsMetadataModel {
+  title?: string;
+  subtitle?: string | null;
+  author?: string | null;
+  cover?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  date_time_post?: string;
+  category?: {
+    name?: string;
+  } | null;
+}
+
+const getNewsById = cache(async (id: number) => {
   if (!API_BASE_URL) {
     return null;
   }
@@ -19,7 +36,7 @@ async function getNewsById(id: number) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store", // Ensure fresh data for metadata
+      next: { revalidate: FETCH_REVALIDATE_SECONDS },
     });
 
     if (!response.ok) {
@@ -32,9 +49,9 @@ async function getNewsById(id: number) {
     console.error("Error fetching news for metadata:", error);
     return null;
   }
-}
+});
 
-async function getNewsBySlug(slug: string) {
+const getNewsBySlug = cache(async (slug: string) => {
   if (!API_BASE_URL || !slug) {
     return null;
   }
@@ -47,7 +64,7 @@ async function getNewsBySlug(slug: string) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      next: { revalidate: FETCH_REVALIDATE_SECONDS },
     });
 
     if (!response.ok) {
@@ -55,17 +72,20 @@ async function getNewsBySlug(slug: string) {
     }
 
     const data = await response.json();
-    const articles = Array.isArray(data?.data) ? data.data : [];
+    const articles: NewsMetadataModel[] = Array.isArray(data?.data)
+      ? data.data
+      : [];
     return (
       articles.find(
-        (article: any) => slugifyNewsTitle(article?.title || "") === slug,
+        (article: NewsMetadataModel) =>
+          slugifyNewsTitle(article?.title || "") === slug,
       ) || null
     );
   } catch (error) {
     console.error("Error fetching news by slug:", error);
     return null;
   }
-}
+});
 
 // Helper function to strip HTML and truncate text for descriptions
 function createMetaDescription(text: string, maxLength: number = 160): string {
@@ -76,7 +96,7 @@ function createMetaDescription(text: string, maxLength: number = 160): string {
 }
 
 // Helper function to extract keywords from content
-function extractNewsKeywords(news: any): string[] {
+function extractNewsKeywords(news: NewsMetadataModel): string[] {
   const keywords: string[] = [];
 
   // Add title words (important for Google News)

@@ -72,24 +72,9 @@ export function middleware(request: NextRequest) {
     "geolocation=(), microphone=(), camera=()",
   );
 
-  // Only apply rate limiting to API routes and dynamic pages
-  const isApiRoute = pathname.startsWith("/api");
-  const isStaticAsset =
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/assets") ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2)$/);
-
-  // Skip rate limiting for static assets
-  if (isStaticAsset) {
-    return response;
-  }
-
-  // Apply rate limiting to API routes and other dynamic content
-  if (
-    isApiRoute ||
-    pathname.startsWith("/home") ||
-    pathname.startsWith("/news")
-  ) {
+  // Apply rate limiting only on API routes.
+  // Page routes are handled by CDN/page cache and should not pay middleware compute.
+  if (pathname.startsWith("/api")) {
     const ip = getRateLimitKey(request);
     const allowed = checkRateLimit(ip);
 
@@ -129,9 +114,7 @@ export function middleware(request: NextRequest) {
 // Configure which routes the middleware runs on
 export const config = {
   matcher: [
-    // Run middleware only where rate limiting is applied.
+    // Keep middleware off public page traffic to reduce Vercel Fluid CPU usage.
     "/api/:path*",
-    "/home/:path*",
-    "/news/:path*",
   ],
 };
