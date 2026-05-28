@@ -52,9 +52,11 @@ export default function ActivityLogPage() {
   const [total, setTotal] = useState(0);
 
   const [actionDraft, setActionDraft] = useState("");
+  const [actionTypeDraft, setActionTypeDraft] = useState<"login" | "create" | "update" | "delete" | "">("");
   const [filterUserDraft, setFilterUserDraft] = useState<number | "">("");
   const [appliedAction, setAppliedAction] = useState("");
   const [appliedFilterUserId, setAppliedFilterUserId] = useState<number | null>(null);
+  const [appliedActionType, setAppliedActionType] = useState<"login" | "create" | "update" | "delete" | null>(null);
 
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualAction, setManualAction] = useState("");
@@ -77,6 +79,7 @@ export default function ActivityLogPage() {
         perPage,
         filterByUserId: appliedFilterUserId,
         actionContains: appliedAction.trim() || null,
+        actionType: appliedActionType,
       });
       setRows(res.data);
       setTotalPages(res.pagination.last_page);
@@ -94,6 +97,7 @@ export default function ActivityLogPage() {
     perPage,
     appliedAction,
     appliedFilterUserId,
+    appliedActionType,
   ]);
 
   useEffect(() => {
@@ -127,6 +131,7 @@ export default function ActivityLogPage() {
 
   const applyFilters = () => {
     setAppliedAction(actionDraft.trim());
+    setAppliedActionType(actionTypeDraft === "" ? null : (actionTypeDraft as any));
     setAppliedFilterUserId(
       filterUserDraft === "" ? null : Number(filterUserDraft),
     );
@@ -135,9 +140,11 @@ export default function ActivityLogPage() {
 
   const clearFilters = () => {
     setActionDraft("");
+    setActionTypeDraft("");
     setFilterUserDraft("");
     setAppliedAction("");
     setAppliedFilterUserId(null);
+    setAppliedActionType(null);
     setPage(1);
   };
 
@@ -152,6 +159,7 @@ export default function ActivityLogPage() {
       await createActivityLogEntry(user.id, {
         action,
         details,
+        action_type: manualActionType === "" ? undefined : (manualActionType as any),
         user_id:
           manualAttributionUserId === ""
             ? user.id
@@ -168,6 +176,8 @@ export default function ActivityLogPage() {
       setManualSaving(false);
     }
   };
+
+  const [manualActionType, setManualActionType] = useState<"login" | "create" | "update" | "delete" | "">("");
 
   if (!isUserSME) {
     return (
@@ -210,6 +220,20 @@ export default function ActivityLogPage() {
                   maxLength={120}
                   required
                 />
+              </div>
+              <div className="">
+                <label className="block text-xs font-medium text-gray-600">Action type (optional)</label>
+                <select
+                  value={manualActionType}
+                  onChange={(e) => setManualActionType(e.target.value as any)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                >
+                  <option value="">(none)</option>
+                  <option value="login">Login</option>
+                  <option value="create">Create</option>
+                  <option value="update">Update</option>
+                  <option value="delete">Delete</option>
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-gray-600">
@@ -307,6 +331,20 @@ export default function ActivityLogPage() {
                 ))}
               </select>
             </div>
+            <div className="min-w-[160px]">
+              <label className="block text-xs font-medium text-gray-600">Filter by type</label>
+              <select
+                value={actionTypeDraft}
+                onChange={(e) => setActionTypeDraft(e.target.value as any)}
+                className="cursor-pointer mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="">All types</option>
+                <option value="login">Login</option>
+                <option value="create">Create</option>
+                <option value="update">Update</option>
+                <option value="delete">Delete</option>
+              </select>
+            </div>
             <button
               type="button"
               onClick={applyFilters}
@@ -335,6 +373,9 @@ export default function ActivityLogPage() {
                 <span className="ml-1 font-medium text-gray-700">
                   user id {appliedFilterUserId}
                 </span>
+              ) : null}
+              {appliedActionType ? (
+                <span className="ml-1 font-medium text-gray-700">type {appliedActionType}</span>
               ) : null}
             </p>
           )}

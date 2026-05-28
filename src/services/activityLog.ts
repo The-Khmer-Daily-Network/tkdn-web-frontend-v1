@@ -18,6 +18,7 @@ export interface ActivityLogRow {
   user_id: number | null;
   username: string | null;
   action: string;
+  action_type?: 'login' | 'create' | 'update' | 'delete' | null;
   details: string;
   subject_type: string | null;
   subject_id: number | null;
@@ -46,6 +47,8 @@ export interface ActivityLogQueryOptions {
   filterByUserId?: number | null;
   /** Maps to API `action` — substring match */
   actionContains?: string | null;
+  /** Maps to API `action_type` — structured filter: 'login'|'create'|'update'|'delete' */
+  actionType?: 'login' | 'create' | 'update' | 'delete' | null;
 }
 
 /**
@@ -69,6 +72,9 @@ export async function getActivityLogs(
   }
   if (options.actionContains?.trim()) {
     params.set("action", options.actionContains.trim());
+  }
+  if (options.actionType) {
+    params.set("action_type", options.actionType);
   }
 
   const url = `${getApiUrl("/admin/activity-logs")}?${params.toString()}`;
@@ -149,6 +155,7 @@ export async function createActivityLogEntry(
   payload: {
     action: string;
     details: string;
+    action_type?: 'login' | 'create' | 'update' | 'delete';
     user_id?: number;
     subject_type?: string;
     subject_id?: number;
