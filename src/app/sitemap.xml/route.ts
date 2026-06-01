@@ -37,12 +37,9 @@ interface SitemapCategory {
 }
 
 async function getAllNews(): Promise<NewsArticle[]> {
-  if (!API_BASE_URL) {
-    return [];
-  }
-
   try {
-    const baseUrl = API_BASE_URL.replace(/\/$/, "");
+    const apiUrl = API_BASE_URL || "https://api.thekhmerdailynetwork.com/api";
+    const baseUrl = apiUrl.replace(/\/$/, "");
     const url = `${baseUrl}/news`;
 
     const response = await fetch(url, {
@@ -67,12 +64,9 @@ async function getAllNews(): Promise<NewsArticle[]> {
 }
 
 async function getCategories(): Promise<SitemapCategory[]> {
-  if (!API_BASE_URL) {
-    return [];
-  }
-
   try {
-    const baseUrl = API_BASE_URL.replace(/\/$/, "");
+    const apiUrl = API_BASE_URL || "https://api.thekhmerdailynetwork.com/api";
+    const baseUrl = apiUrl.replace(/\/$/, "");
     const url = `${baseUrl}/categories`;
 
     const response = await fetch(url, {
