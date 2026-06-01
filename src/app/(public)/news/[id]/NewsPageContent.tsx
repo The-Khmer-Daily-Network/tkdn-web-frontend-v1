@@ -18,6 +18,8 @@ import { stripHtmlToText } from "@/utils/text";
 
 interface NewsPageContentProps {
   initialNewsData?: News | null;
+  /** When true, article HTML is server-rendered; client only adds audio/sponsor. */
+  serverSeoRendered?: boolean;
 }
 
 const ALLOWED_RICH_TEXT_TAGS = new Set([
@@ -452,6 +454,7 @@ const sanitizeRichText = (html: string): string => {
 
 export default function NewsPageContent({
   initialNewsData = null,
+  serverSeoRendered = false,
 }: NewsPageContentProps = {}) {
   const params = useParams();
   const idParam = params?.id as string;
@@ -1095,6 +1098,27 @@ const logVideoDebug = (
 
   // If it's a news detail page, show the news detail view
   if (isNewsDetail && singleNews) {
+    if (serverSeoRendered) {
+      return (
+        <>
+          <BannerSponsor />
+          <div className="w-full max-w-4xl mx-auto mt-6 px-4 sm:px-0">
+            <NewsAudioPlayer
+              src={
+                (singleNews.tts_audio_url ||
+                  (singleNews as News & { ttsAudioUrl?: string }).ttsAudioUrl ||
+                  "") as string
+              }
+              showListenButton={Boolean(
+                singleNews.tts_audio_url ||
+                  (singleNews as News & { ttsAudioUrl?: string }).ttsAudioUrl,
+              )}
+            />
+          </div>
+        </>
+      );
+    }
+
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const articleUrl = `${baseUrl}${getNewsPath(singleNews)}`;
     const endImageUrlKeys = new Set(
