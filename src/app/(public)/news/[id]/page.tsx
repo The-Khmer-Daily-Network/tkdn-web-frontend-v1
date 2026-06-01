@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import ArticleJsonLd from "./ArticleJsonLd";
 import NewsPageContent from "./NewsPageContent";
+import ServerNewsArticle from "./ServerNewsArticle";
+import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
+import type { News } from "@/types/news";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const SITE_BASE =
+  process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
 const FETCH_REVALIDATE_SECONDS = 300;
 
 export const revalidate = 300;
@@ -16,6 +22,7 @@ interface NewsMetadataModel {
   created_at?: string;
   updated_at?: string;
   date_time_post?: string;
+  content_blocks?: Array<{ subtitle?: string | null; paragraph?: string }> | null;
   category?: {
     name?: string;
   } | null;
@@ -136,8 +143,7 @@ export async function generateMetadata({
 
   if (news) {
       // Get base URL - use environment variable or default
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com";
+      const baseUrl = SITE_BASE;
 
       // Ensure image URL is absolute
       let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`; // Default to logo
@@ -159,13 +165,12 @@ export async function generateMetadata({
       const title = news.title;
       const url = `${baseUrl}${getNewsPath(news)}`;
 
-      // Create optimized description for search engines
-      const description = news.subtitle
-        ? createMetaDescription(`${news.subtitle}`, 160)
-        : createMetaDescription(
-            `${news.title} - Read the latest news on The Khmer Daily Network`,
-            160,
-          );
+      const descriptionFallback =
+        getFirstSentenceFromContent(news.content_blocks) || news.title;
+      const description = createMetaDescription(
+        news.subtitle || descriptionFallback,
+        160,
+      );
 
       // Extract news keywords for Google News
       const newsKeywords = extractNewsKeywords(news);
@@ -366,6 +371,20 @@ export async function generateMetadata({
   };
 }
 
+function resolveArticleImageUrl(baseUrl: string, news: NewsMetadataModel): string {
+  let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
+  if (news.cover) {
+    if (news.cover.startsWith("http://") || news.cover.startsWith("https://")) {
+      imageUrl = news.cover;
+    } else if (news.cover.startsWith("/")) {
+      imageUrl = `${baseUrl}${news.cover}`;
+    } else {
+      imageUrl = `${baseUrl}/${news.cover}`;
+    }
+  }
+  return imageUrl;
+}
+
 export default async function NewsPage({
   params,
 }: {
@@ -373,20 +392,39 @@ export default async function NewsPage({
 }) {
   const { id: idParam } = await params;
 
-  // Pre-fetch news data by numeric ID (legacy) or slug.
-  let initialNewsData = null;
   const resolvedId = getNewsIdFromSlugParam(idParam);
+  let initialNewsData: News | null = null;
+
   try {
     const news = resolvedId
       ? await getNewsById(resolvedId)
       : await getNewsBySlug(idParam);
     if (news) {
-      initialNewsData = news;
+      initialNewsData = news as News;
     }
   } catch (error) {
-    // If fetch fails, let client-side handle it
     console.error("Error pre-fetching news:", error);
   }
 
-  return <NewsPageContent key={idParam} initialNewsData={initialNewsData} />;
+  if (initialNewsData) {
+    const imageUrl = resolveArticleImageUrl(SITE_BASE, initialNewsData);
+
+    return (
+      <>
+        <ArticleJsonLd
+          news={initialNewsData}
+          siteBase={SITE_BASE}
+          imageUrl={imageUrl}
+        />
+        <ServerNewsArticle news={initialNewsData} />
+        <NewsPageContent
+          key={idParam}
+          initialNewsData={initialNewsData}
+          serverSeoRendered
+        />
+      </>
+    );
+  }
+
+  return <NewsPageContent key={idParam} />;
 }
