@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { News } from "@/types/news";
 import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
 
@@ -34,7 +35,14 @@ function toYouTubeEmbedUrl(url?: string | null) {
  * Server-rendered article HTML so Google can index title + body without waiting for client JS.
  * Matches the TKTN approach in Development/tktn-web-frontend-v2.
  */
-export default function ServerNewsArticle({ news }: { news: News }) {
+export default function ServerNewsArticle({
+  news,
+  actions,
+}: {
+  news: News;
+  /** Listen / Share — rendered under cover, above body (client island). */
+  actions?: ReactNode;
+}) {
   const publishedAt = news.date_time_post || news.created_at;
   const formattedDate = publishedAt ? formatDateShort(publishedAt) : "";
   const relativeTime = publishedAt ? getRelativeTime(publishedAt) : "";
@@ -79,6 +87,8 @@ export default function ServerNewsArticle({ news }: { news: News }) {
         </figure>
       )}
 
+      {actions}
+
       {Array.isArray(news.content_blocks) && news.content_blocks.length > 0 && (
         <div className="space-y-8">
           {news.content_blocks.map((block, idx) => (
@@ -113,15 +123,6 @@ export default function ServerNewsArticle({ news }: { news: News }) {
                     allowFullScreen
                   />
                 </div>
-              )}
-              {idx === 0 && !news.middle_video_url && news.middle_image_url && (
-                <figure className="w-full">
-                  <img
-                    src={news.middle_image_url}
-                    alt={news.middle_image_name || news.title}
-                    className="w-full h-auto object-cover rounded-lg"
-                  />
-                </figure>
               )}
             </section>
           ))}
