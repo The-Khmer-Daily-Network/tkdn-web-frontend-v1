@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import ArticleJsonLd from "./ArticleJsonLd";
+import NewsArticleActions from "./NewsArticleActions";
 import NewsPageContent from "./NewsPageContent";
 import ServerNewsArticle from "./ServerNewsArticle";
+import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
@@ -416,11 +418,10 @@ export default async function NewsPage({
           siteBase={SITE_BASE}
           imageUrl={imageUrl}
         />
-        <ServerNewsArticle news={initialNewsData} />
-        <NewsPageContent
-          key={idParam}
-          initialNewsData={initialNewsData}
-          serverSeoRendered
+        <BannerSponsor />
+        <ServerNewsArticle
+          news={initialNewsData}
+          actions={<NewsArticleActions news={initialNewsData} />}
         />
       </>
     );

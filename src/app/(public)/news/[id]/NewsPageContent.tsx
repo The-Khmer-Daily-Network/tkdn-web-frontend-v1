@@ -11,7 +11,7 @@ import type { News } from "@/types/news";
 import type { Category } from "@/types/category";
 import { Play } from "lucide-react";
 import SEO from "@/components/SEO";
-import NewsAudioPlayer from "@/components/NewsAudioPlayer";
+import NewsArticleActions from "./NewsArticleActions";
 import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { stripHtmlToText } from "@/utils/text";
@@ -1047,25 +1047,9 @@ const logVideoDebug = (
 
   // If it's a news detail page, show the news detail view
   if (isNewsDetail && singleNews) {
+    // Article HTML + actions are server-rendered in page.tsx; nothing to mount here.
     if (serverSeoRendered) {
-      return (
-        <>
-          <BannerSponsor />
-          <div className="w-full max-w-4xl mx-auto mt-6 px-4 sm:px-0">
-            <NewsAudioPlayer
-              src={
-                (singleNews.tts_audio_url ||
-                  (singleNews as News & { ttsAudioUrl?: string }).ttsAudioUrl ||
-                  "") as string
-              }
-              showListenButton={Boolean(
-                singleNews.tts_audio_url ||
-                  (singleNews as News & { ttsAudioUrl?: string }).ttsAudioUrl,
-              )}
-            />
-          </div>
-        </>
-      );
+      return null;
     }
 
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -1382,12 +1366,7 @@ const logVideoDebug = (
           )}
 
           {/* Listen / Share (TTS) — under cover + caption, above article body */}
-          <div className="w-full mt-6">
-            <NewsAudioPlayer
-              src={(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl || "") as string}
-              showListenButton={Boolean(singleNews.tts_audio_url || (singleNews as any).ttsAudioUrl)}
-            />
-          </div>
+          <NewsArticleActions news={singleNews} />
 
           {/* Content Blocks with Middle Media */}
           {singleNews.content_blocks &&
