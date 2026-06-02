@@ -1,4 +1,5 @@
 import type { News } from "@/types/news";
+import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
 
 function splitParagraphs(paragraph?: string) {
   const source = (paragraph || "").trim();
@@ -34,12 +35,34 @@ function toYouTubeEmbedUrl(url?: string | null) {
  * Matches the TKTN approach in Development/tktn-web-frontend-v2.
  */
 export default function ServerNewsArticle({ news }: { news: News }) {
+  const publishedAt = news.date_time_post || news.created_at;
+  const formattedDate = publishedAt ? formatDateShort(publishedAt) : "";
+  const relativeTime = publishedAt ? getRelativeTime(publishedAt) : "";
+
   return (
     <article className="w-full max-w-4xl mx-auto space-y-6 mt-6 article-content">
       <header className="space-y-3">
-        {news.category?.name && (
-          <p className="text-sm font-bold text-[#1D2229] uppercase">{news.category.name}</p>
-        )}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1 h-12 rounded-[10px] bg-[#E34C33]" />
+          <div className="flex flex-col">
+            {news.category?.name && (
+              <p className="text-sm font-bold text-[#1D2229] uppercase">{news.category.name}</p>
+            )}
+            {(formattedDate || news.author) && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {formattedDate && (
+                  <span className="text-sm text-gray-600">{formattedDate}</span>
+                )}
+                {relativeTime && (
+                  <span className="text-xs text-gray-500">• {relativeTime}</span>
+                )}
+                {news.author && (
+                  <span className="text-sm text-gray-600">• {news.author}</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#1D2229] leading-relaxed">
           {news.title}
         </h1>
