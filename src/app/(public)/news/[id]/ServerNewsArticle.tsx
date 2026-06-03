@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 import type { News } from "@/types/news";
+import {
+  ARTICLE_BODY_HTML_CLASS,
+  buildArticleImageNameMap,
+  enrichArticleHtmlWithImageCaptions,
+} from "@/utils/articleBodyHtml";
+import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
 import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
+
+const CAPTION_CLASS = "text-sm text-gray-600 mt-2 italic";
 
 function splitParagraphs(paragraph?: string) {
   const source = (paragraph || "").trim();
@@ -31,6 +39,40 @@ function toYouTubeEmbedUrl(url?: string | null) {
   return withProtocol;
 }
 
+function isYouTubeUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /youtube\.com|youtu\.be/i.test(url);
+}
+
+function getArticleInlineMediaFlags(news: News) {
+  const endImageUrlKeys = new Set(
+    (news.end_images || [])
+      .map((img) => normalizeImageUrlKey(img?.url || ""))
+      .filter((key) => key.length > 0),
+  );
+
+  const inlineImageUrls = (news.content_blocks || []).flatMap((block) =>
+    Array.from(
+      (block.paragraph || "").matchAll(/<img[^>]*src="([^"]+)"/gi),
+      (m) => (m[1] || "").trim(),
+    ),
+  );
+
+  const inlineVideoUrls = (news.content_blocks || []).flatMap((block) =>
+    Array.from(
+      (block.paragraph || "").matchAll(/<video[^>]*src="([^"]+)"/gi),
+      (m) => (m[1] || "").trim(),
+    ),
+  );
+
+  return {
+    hasInlineNonEndImages: inlineImageUrls.some(
+      (src) => !endImageUrlKeys.has(normalizeImageUrlKey(src)),
+    ),
+    hasInlineVideos: inlineVideoUrls.length > 0,
+  };
+}
+
 /**
  * Server-rendered article HTML so Google can index title + body without waiting for client JS.
  * Matches the TKTN approach in Development/tktn-web-frontend-v2.
@@ -46,6 +88,15 @@ export default function ServerNewsArticle({
   const publishedAt = news.date_time_post || news.created_at;
   const formattedDate = publishedAt ? formatDateShort(publishedAt) : "";
   const relativeTime = publishedAt ? getRelativeTime(publishedAt) : "";
+  const coverCaption = news.cover
+    ? getCaptionText(news.cover_name, news.cover)
+    : "";
+  const { hasInlineNonEndImages, hasInlineVideos } = getArticleInlineMediaFlags(news);
+  const inlineImageNameByUrl = buildArticleImageNameMap(news);
+  const middleImageCaption = news.middle_image_url
+    ? getCaptionText(news.middle_image_name, news.middle_image_url)
+    : "";
+  const middleVideoCaption = (news.middle_video_name || "").trim();
 
   return (
     <article className="w-full max-w-4xl mx-auto space-y-6 mt-6 article-content">
@@ -82,8 +133,11 @@ export default function ServerNewsArticle({
           <img
             src={news.cover}
             alt={news.title}
-            className="w-full h-auto object-cover rounded-lg"
+            className="w-full h-auto object-cover rounded-lg aspect-[100/53]"
           />
+          {coverCaption && (
+            <figcaption className={CAPTION_CLASS}>{coverCaption}</figcaption>
+          )}
         </figure>
       )}
 
@@ -99,11 +153,15 @@ export default function ServerNewsArticle({
               {splitParagraphs(block.paragraph).map((paragraph, pIdx) => {
                 const hasHtml = /<[^>]+>/.test(paragraph);
                 if (hasHtml) {
+                  const enrichedHtml = enrichArticleHtmlWithImageCaptions(
+                    paragraph,
+                    inlineImageNameByUrl,
+                  );
                   return (
                     <div
                       key={pIdx}
-                      className="text-base text-gray-800 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: paragraph }}
+                      className={ARTICLE_BODY_HTML_CLASS}
+                      dangerouslySetInnerHTML={{ __html: enrichedHtml }}
                     />
                   );
                 }
@@ -113,17 +171,46 @@ export default function ServerNewsArticle({
                   </p>
                 );
               })}
-              {idx === 0 && news.middle_video_url && (
-                <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                  <iframe
-                    src={toYouTubeEmbedUrl(news.middle_video_url) || undefined}
-                    title={news.middle_video_name || news.title}
-                    className="absolute inset-0 w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
+              {idx === 0 && news.middle_video_url && !hasInlineVideos && (
+                <figure className="w-full my-8">
+                  {isYouTubeUrl(news.middle_video_url) ? (
+                    <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <iframe
+                        src={toYouTubeEmbedUrl(news.middle_video_url) || undefined}
+                        title={news.middle_video_name || news.title}
+                        className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      src={news.middle_video_url}
+                      controls
+                      preload="metadata"
+                      className="w-full h-auto rounded-lg aspect-video object-contain bg-gray-100"
+                    />
+                  )}
+                  {middleVideoCaption && (
+                    <figcaption className={CAPTION_CLASS}>{middleVideoCaption}</figcaption>
+                  )}
+                </figure>
               )}
+              {idx === 0 &&
+                !hasInlineNonEndImages &&
+                !news.middle_video_url &&
+                news.middle_image_url && (
+                  <figure className="w-full my-8">
+                    <img
+                      src={news.middle_image_url}
+                      alt={news.middle_image_name || news.title}
+                      className="h-auto w-full object-cover rounded-lg aspect-[100/53]"
+                    />
+                    {middleImageCaption && (
+                      <figcaption className={CAPTION_CLASS}>{middleImageCaption}</figcaption>
+                    )}
+                  </figure>
+                )}
             </section>
           ))}
         </div>
@@ -137,20 +224,21 @@ export default function ServerNewsArticle({
 
       {Array.isArray(news.end_images) && news.end_images.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-          {news.end_images.map((endImage, index) => (
-            <figure key={index} className="w-full">
-              <img
-                src={endImage.url}
-                alt={endImage.name || `End image ${index + 1}`}
-                className="w-full h-auto object-cover rounded-lg"
-              />
-              {endImage.name && (
-                <figcaption className="text-sm text-gray-600 mt-2 italic">
-                  {endImage.name}
-                </figcaption>
-              )}
-            </figure>
-          ))}
+          {news.end_images.map((endImage, index) => {
+            const endCaption = getCaptionText(endImage.name, endImage.url);
+            return (
+              <figure key={index} className="w-full">
+                <img
+                  src={endImage.url}
+                  alt={endImage.name || `End image ${index + 1}`}
+                  className="w-full h-auto object-cover rounded-lg"
+                />
+                {endCaption && (
+                  <figcaption className={CAPTION_CLASS}>{endCaption}</figcaption>
+                )}
+              </figure>
+            );
+          })}
         </div>
       )}
 
