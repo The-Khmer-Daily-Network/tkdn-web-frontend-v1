@@ -99,7 +99,7 @@ export default function ServerNewsArticle({
   const middleVideoCaption = (news.middle_video_name || "").trim();
 
   return (
-    <article className="w-full max-w-4xl mx-auto space-y-6 mt-6 article-content">
+    <article className="w-full max-w-4xl mx-auto space-y-6 mt-6 article-content [&_a]:text-current [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current">
       <header className="space-y-3">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-1 h-12 rounded-[10px] bg-[#E34C33]" />
