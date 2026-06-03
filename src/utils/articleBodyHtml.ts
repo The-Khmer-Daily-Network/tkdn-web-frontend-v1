@@ -82,4 +82,4 @@ export function enrichArticleHtmlWithImageCaptions(
 }
 
 export const ARTICLE_BODY_HTML_CLASS =
-  "text-base text-gray-800 leading-relaxed break-words [&_img]:my-4 [&_img]:w-full [&_img]:aspect-[100/53] [&_img]:h-auto [&_img]:rounded-lg [&_img]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600";
+  "text-base text-gray-800 leading-relaxed break-words [&_a]:text-current [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current [&_a]:break-words [&_img]:my-4 [&_img]:w-full [&_img]:aspect-[100/53] [&_img]:h-auto [&_img]:rounded-lg [&_img]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600";
