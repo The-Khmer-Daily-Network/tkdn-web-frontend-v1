@@ -21,11 +21,19 @@ export async function POST(request: Request) {
   const pathsToRevalidate = Array.from(new Set(normalizePaths(payload.paths)));
 
   for (const path of pathsToRevalidate) {
-    revalidatePath(path);
+    revalidatePath(path, "page");
   }
+
+  // Listings that embed article titles/covers
+  revalidatePath("/home", "page");
+  revalidatePath("/news/latest", "page");
 
   return NextResponse.json({
     success: true,
-    revalidated: pathsToRevalidate,
+    revalidated: [
+      ...pathsToRevalidate,
+      "/home",
+      "/news/latest",
+    ],
   });
 }

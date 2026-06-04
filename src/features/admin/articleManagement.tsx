@@ -1885,14 +1885,17 @@ function NewsModal({
 
       const previousTitle = news?.title ?? null;
 
+      let savedArticleId = news?.id ?? null;
+
       if (news) {
         await updateAdminArticle(news.id, params);
       } else {
-        await createAdminArticle(params);
+        const created = await createAdminArticle(params);
+        savedArticleId = created.data?.id ?? null;
       }
 
-      if (news) {
-        await revalidateArticleAfterSave(news.id, {
+      if (savedArticleId) {
+        await revalidateArticleAfterSave(savedArticleId, {
           newTitle: title.trim(),
           previousTitle,
         });

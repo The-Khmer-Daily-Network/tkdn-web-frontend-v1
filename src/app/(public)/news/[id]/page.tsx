@@ -9,14 +9,13 @@ import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
 import { articlePageFetchInit } from "@/utils/articlePageCache";
-import ArticlePageRefresh from "./ArticlePageRefresh";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const SITE_BASE =
   process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
 
-/** Must be a static literal for Next.js segment config (see articlePageFetchInit for dev no-store). */
-export const revalidate = 300;
+/** ISR fallback (seconds). On-demand revalidate runs on admin save + Laravel SEO hook. */
+export const revalidate = 60;
 
 interface NewsMetadataModel {
   title?: string;
@@ -425,12 +424,6 @@ export default async function NewsPage({
           news={initialNewsData}
           actions={<NewsArticleActions news={initialNewsData} />}
         />
-        {resolvedId && initialNewsData.updated_at && (
-          <ArticlePageRefresh
-            articleId={resolvedId}
-            serverUpdatedAt={initialNewsData.updated_at}
-          />
-        )}
       </>
     );
   }
