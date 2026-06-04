@@ -8,17 +8,15 @@ import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
-import {
-  ARTICLE_PAGE_REVALIDATE_SECONDS,
-  articlePageFetchInit,
-} from "@/utils/articlePageCache";
+import { articlePageFetchInit } from "@/utils/articlePageCache";
 import ArticlePageRefresh from "./ArticlePageRefresh";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const SITE_BASE =
   process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
 
-export const revalidate = ARTICLE_PAGE_REVALIDATE_SECONDS;
+/** Must be a static literal for Next.js segment config (see articlePageFetchInit for dev no-store). */
+export const revalidate = 300;
 
 interface NewsMetadataModel {
   title?: string;
