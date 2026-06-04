@@ -1,7 +1,6 @@
-/** ISR window for public article pages (seconds). Shorter in dev so edits show up immediately. */
-export const ARTICLE_PAGE_REVALIDATE_SECONDS =
-  process.env.NODE_ENV === "development" ? 0 : 300;
+const ARTICLE_PAGE_REVALIDATE_SECONDS = 60;
 
+/** Fetch options for article API calls (no-store in dev; ISR in production). */
 export function articlePageFetchInit(): RequestInit {
   if (process.env.NODE_ENV === "development") {
     return { cache: "no-store" };

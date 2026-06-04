@@ -8,17 +8,14 @@ import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
-import {
-  ARTICLE_PAGE_REVALIDATE_SECONDS,
-  articlePageFetchInit,
-} from "@/utils/articlePageCache";
-import ArticlePageRefresh from "./ArticlePageRefresh";
+import { articlePageFetchInit } from "@/utils/articlePageCache";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const SITE_BASE =
   process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
 
-export const revalidate = ARTICLE_PAGE_REVALIDATE_SECONDS;
+/** ISR fallback (seconds). On-demand revalidate runs on admin save + Laravel SEO hook. */
+export const revalidate = 60;
 
 interface NewsMetadataModel {
   title?: string;
@@ -427,12 +424,6 @@ export default async function NewsPage({
           news={initialNewsData}
           actions={<NewsArticleActions news={initialNewsData} />}
         />
-        {resolvedId && initialNewsData.updated_at && (
-          <ArticlePageRefresh
-            articleId={resolvedId}
-            serverUpdatedAt={initialNewsData.updated_at}
-          />
-        )}
       </>
     );
   }

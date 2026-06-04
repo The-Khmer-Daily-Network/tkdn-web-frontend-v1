@@ -43,8 +43,11 @@ export async function POST(request: Request) {
   );
 
   for (const path of pathsToRevalidate) {
-    revalidatePath(path);
+    revalidatePath(path, "page");
   }
+
+  revalidatePath("/home", "page");
+  revalidatePath("/news/latest", "page");
 
   return NextResponse.json({
     success: true,
