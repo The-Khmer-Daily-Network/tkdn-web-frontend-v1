@@ -81,5 +81,17 @@ export function enrichArticleHtmlWithImageCaptions(
   });
 }
 
-export const ARTICLE_BODY_HTML_CLASS =
-  "text-base text-gray-800 leading-relaxed break-words [&_a]:text-current [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current [&_a]:break-words [&_img]:my-4 [&_img]:w-full [&_img]:aspect-[100/53] [&_img]:h-auto [&_img]:rounded-lg [&_img]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600";
+/** Shared Tailwind selectors for CMS HTML rendered on public article pages. */
+export const ARTICLE_BODY_BLOCKQUOTE_CLASS =
+  "[&_blockquote]:relative [&_blockquote]:my-4 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-xl [&_blockquote]:md:text-2xl [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[48px] [&_blockquote]:before:md:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[48px] [&_blockquote]:after:md:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']";
+
+export const ARTICLE_BODY_HTML_CLASS = [
+  "text-base text-gray-800 leading-relaxed break-words",
+  "[&_a]:text-current [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current [&_a]:break-words",
+  "[&_p]:mb-4 [&_p:last-child]:mb-0",
+  "[&_b]:font-bold [&_strong]:font-bold",
+  "[&_h2]:my-2 [&_h2]:text-xl [&_h2]:md:text-2xl [&_h2]:font-bold [&_h2]:leading-snug",
+  "[&_img]:my-4 [&_img]:w-full [&_img]:aspect-[100/53] [&_img]:h-auto [&_img]:rounded-lg [&_img]:object-cover",
+  "[&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600",
+  ARTICLE_BODY_BLOCKQUOTE_CLASS,
+].join(" ");
