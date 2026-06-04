@@ -15,6 +15,7 @@ import NewsArticleActions from "./NewsArticleActions";
 import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { stripHtmlToText } from "@/utils/text";
+import { ARTICLE_BODY_BLOCKQUOTE_CLASS } from "@/utils/articleBodyHtml";
 import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
 
 interface NewsPageContentProps {
@@ -1396,7 +1397,7 @@ const logVideoDebug = (
                         {paragraphs.map((paragraph, paraIndex) => (
                           <div
                             key={paraIndex}
-                            className="text-[18px] text-gray-800 leading-relaxed break-words [&_a]:text-current [&_a]:underline [&_a]:break-words [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[18px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold [&_blockquote]:relative [&_blockquote]:my-2 [&_blockquote]:py-1 [&_blockquote]:px-8 [&_blockquote]:text-[24px] [&_blockquote]:font-bold [&_blockquote]:italic [&_blockquote]:text-current [&_blockquote]:leading-relaxed [&_blockquote]:text-left [&_blockquote]:[text-align-last:auto] [&_blockquote]:before:absolute [&_blockquote]:before:-left-1 [&_blockquote]:before:top-0 [&_blockquote]:before:font-serif [&_blockquote]:before:font-bold [&_blockquote]:before:not-italic [&_blockquote]:before:text-[60px] [&_blockquote]:before:leading-none [&_blockquote]:before:text-current [&_blockquote]:before:content-['“'] [&_blockquote]:after:absolute [&_blockquote]:after:-right-1 [&_blockquote]:after:-bottom-6 [&_blockquote]:after:font-serif [&_blockquote]:after:font-bold [&_blockquote]:after:not-italic [&_blockquote]:after:text-[60px] [&_blockquote]:after:leading-none [&_blockquote]:after:text-current [&_blockquote]:after:content-['”']"
+                            className={`text-[18px] text-gray-800 leading-relaxed break-words [&_a]:text-current [&_a]:underline [&_a]:break-words [&_section]:mb-8 [&_section:last-child]:mb-0 [&_p]:mb-4 [&_p:last-child]:mb-0 [&_p]:text-[18px] [&_p]:leading-normal [&_p]:text-gray-800 [&_img]:my-4 [&_img]:!w-full [&_img]:!aspect-[100/53] [&_img]:!h-auto [&_img]:rounded-lg [&_img]:!object-cover [&_video]:my-4 [&_video]:w-full [&_video]:aspect-[100/53] [&_video]:h-auto [&_video]:rounded-lg [&_video]:object-cover [&_img+_i]:-mt-1 [&_img+_i]:mb-3 [&_img+_i]:block [&_img+_i]:text-sm [&_img+_i]:italic [&_img+_i]:text-gray-600 [&_b]:font-bold [&_strong]:font-bold [&_h2]:my-2 [&_h2]:text-[24px] [&_h2]:font-bold [&_h2]:leading-snug [&_h2_b]:font-bold [&_h2_strong]:font-bold ${ARTICLE_BODY_BLOCKQUOTE_CLASS}`}
                             dangerouslySetInnerHTML={{
                               __html: hasHydrated
                                 ? sanitizeRichText(
