@@ -8,13 +8,17 @@ import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
+import {
+  ARTICLE_PAGE_REVALIDATE_SECONDS,
+  articlePageFetchInit,
+} from "@/utils/articlePageCache";
+import ArticlePageRefresh from "./ArticlePageRefresh";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const SITE_BASE =
   process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
-const FETCH_REVALIDATE_SECONDS = 300;
 
-export const revalidate = 300;
+export const revalidate = ARTICLE_PAGE_REVALIDATE_SECONDS;
 
 interface NewsMetadataModel {
   title?: string;
@@ -45,7 +49,7 @@ const getNewsById = cache(async (id: number) => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: FETCH_REVALIDATE_SECONDS },
+      ...articlePageFetchInit(),
     });
 
     if (!response.ok) {
@@ -73,7 +77,7 @@ const getNewsBySlug = cache(async (slug: string) => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: FETCH_REVALIDATE_SECONDS },
+      ...articlePageFetchInit(),
     });
 
     if (!response.ok) {
@@ -423,6 +427,12 @@ export default async function NewsPage({
           news={initialNewsData}
           actions={<NewsArticleActions news={initialNewsData} />}
         />
+        {resolvedId && initialNewsData.updated_at && (
+          <ArticlePageRefresh
+            articleId={resolvedId}
+            serverUpdatedAt={initialNewsData.updated_at}
+          />
+        )}
       </>
     );
   }

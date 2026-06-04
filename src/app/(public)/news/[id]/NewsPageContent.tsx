@@ -16,6 +16,7 @@ import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { stripHtmlToText } from "@/utils/text";
 import { ARTICLE_BODY_BLOCKQUOTE_CLASS } from "@/utils/articleBodyHtml";
+import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
 import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
 
 interface NewsPageContentProps {
@@ -127,40 +128,6 @@ const isSafeIframeSrc = (src: string) => {
     return parsed.pathname.startsWith("/embed/");
   } catch {
     return false;
-  }
-};
-
-const getImageCaptionFallback = (src: string) => {
-  if (!src) return "";
-  try {
-    const cleanPath = src.split("?")[0].split("#")[0];
-    const segment = cleanPath.split("/").filter(Boolean).pop() || "";
-    const decoded = decodeURIComponent(segment);
-    const withoutExt = decoded.replace(/\.[a-zA-Z0-9]+$/, "");
-    return withoutExt.replace(/[-_]+/g, " ").trim();
-  } catch {
-    return "";
-  }
-};
-
-const getCaptionText = (preferred?: string | null, src?: string | null) => {
-  const explicit = (preferred || "").trim();
-  if (explicit) return explicit;
-  return getImageCaptionFallback((src || "").trim());
-};
-
-const normalizeImageUrlKey = (url: string) => {
-  const raw = (url || "").trim();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw, "http://localhost");
-    const pathname = decodeURIComponent(parsed.pathname || "");
-    const basename = pathname.split("/").filter(Boolean).pop() || "";
-    return basename.toLowerCase();
-  } catch {
-    const clean = decodeURIComponent(raw.split("?")[0].split("#")[0] || "");
-    const basename = clean.split("/").filter(Boolean).pop() || clean;
-    return basename.toLowerCase();
   }
 };
 
@@ -349,9 +316,7 @@ const sanitizeRichText = (html: string): string => {
         element.setAttribute("alt", "Article image");
       }
       const captionText = (
-        element.getAttribute("title") ||
-        element.getAttribute("alt") ||
-        getImageCaptionFallback(src)
+        element.getAttribute("title") || element.getAttribute("alt") || ""
       ).trim();
       if (
         captionText &&

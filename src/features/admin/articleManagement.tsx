@@ -45,6 +45,7 @@ import type { ContentCover } from "@/types/contentCover";
 import type { ContentImage } from "@/types/contentImage";
 import type { ContentVideo } from "@/types/contentVideo";
 import { useAuth } from "@/contexts/AuthContext";
+import { revalidateArticleAfterSave } from "@/services/articleRevalidate";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
@@ -1882,10 +1883,19 @@ function NewsModal({
       }
       // Do NOT include middle_video_url or middle_video_name in the request
 
+      const previousTitle = news?.title ?? null;
+
       if (news) {
         await updateAdminArticle(news.id, params);
       } else {
         await createAdminArticle(params);
+      }
+
+      if (news) {
+        await revalidateArticleAfterSave(news.id, {
+          newTitle: title.trim(),
+          previousTitle,
+        });
       }
 
       // Delete removed inline images from storage only after successful save.
