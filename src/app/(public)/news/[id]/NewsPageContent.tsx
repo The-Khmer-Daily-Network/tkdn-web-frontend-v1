@@ -16,11 +16,7 @@ import StructuredData from "@/components/StructuredData";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { stripHtmlToText } from "@/utils/text";
 import { ARTICLE_BODY_BLOCKQUOTE_CLASS } from "@/utils/articleBodyHtml";
-import {
-  getCaptionText,
-  getImageCaptionFallback,
-  normalizeImageUrlKey,
-} from "@/utils/imageCaption";
+import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
 import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
 
 interface NewsPageContentProps {
@@ -320,9 +316,7 @@ const sanitizeRichText = (html: string): string => {
         element.setAttribute("alt", "Article image");
       }
       const captionText = (
-        element.getAttribute("title") ||
-        element.getAttribute("alt") ||
-        getImageCaptionFallback(src)
+        element.getAttribute("title") || element.getAttribute("alt") || ""
       ).trim();
       if (
         captionText &&

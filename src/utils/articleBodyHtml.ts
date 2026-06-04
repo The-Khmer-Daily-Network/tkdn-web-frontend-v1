@@ -1,9 +1,5 @@
 import type { News } from "@/types/news";
-import {
-  getCaptionText,
-  getImageCaptionFallback,
-  normalizeImageUrlKey,
-} from "@/utils/imageCaption";
+import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
 
 const GENERIC_CAPTIONS = new Set(["inline image", "article image"]);
 
@@ -36,11 +32,7 @@ function resolveImgCaption(
   const preferred = mapped || title || alt;
   const caption = getCaptionText(preferred, src);
   if (!caption || GENERIC_CAPTIONS.has(caption.toLowerCase())) {
-    const fallbackOnly = getImageCaptionFallback(src);
-    if (!fallbackOnly || GENERIC_CAPTIONS.has(fallbackOnly.toLowerCase())) {
-      return "";
-    }
-    return fallbackOnly;
+    return "";
   }
   return caption;
 }
