@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { SITE_URL } from "@/config/site";
 
 /**
  * Organization Structured Data Component
@@ -16,7 +17,7 @@ export default function OrganizationStructuredData() {
     const baseUrl =
       typeof window !== "undefined"
         ? window.location.origin
-        : "https://thekhmerdailynetwork.com";
+        : SITE_URL;
 
     // Remove existing structured data scripts
     const existingOrgScript = document.querySelector(

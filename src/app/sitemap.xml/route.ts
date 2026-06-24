@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/config/site";
 import { categoryNameToSlug } from "@/utils/slug";
 import { getNewsPath } from "@/utils/newsSlug";
 
@@ -17,8 +18,6 @@ export const revalidate = 3600;
 export const runtime = "nodejs";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com";
 
 interface NewsArticle {
   id: number;

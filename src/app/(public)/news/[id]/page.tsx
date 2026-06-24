@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import ArticleJsonLd from "./ArticleJsonLd";
 import NewsArticleActions from "./NewsArticleActions";
 import NewsPageContent from "./NewsPageContent";
 import ServerNewsArticle from "./ServerNewsArticle";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
+import { SITE_URL } from "@/config/site";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
 import { articlePageFetchInit } from "@/utils/articlePageCache";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const SITE_BASE =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://www.thekhmerdailynetwork.com";
 
 /** ISR fallback (seconds). On-demand revalidate runs on admin save + Laravel SEO hook. */
 export const revalidate = 60;
@@ -146,7 +146,7 @@ export async function generateMetadata({
 
   if (news) {
       // Get base URL - use environment variable or default
-      const baseUrl = SITE_BASE;
+      const baseUrl = SITE_URL;
 
       // Ensure image URL is absolute
       let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`; // Default to logo
@@ -296,8 +296,7 @@ export async function generateMetadata({
   }
 
   // Default metadata for category/list pages
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com";
+  const baseUrl = SITE_URL;
 
   // Handle special routes
   if (idParam?.toLowerCase() === "latest") {
@@ -410,13 +409,18 @@ export default async function NewsPage({
   }
 
   if (initialNewsData) {
-    const imageUrl = resolveArticleImageUrl(SITE_BASE, initialNewsData);
+    const canonicalPath = getNewsPath(initialNewsData);
+    if (idParam !== canonicalPath.replace("/news/", "")) {
+      redirect(canonicalPath);
+    }
+
+    const imageUrl = resolveArticleImageUrl(SITE_URL, initialNewsData);
 
     return (
       <>
         <ArticleJsonLd
           news={initialNewsData}
-          siteBase={SITE_BASE}
+          siteBase={SITE_URL}
           imageUrl={imageUrl}
         />
         <BannerSponsor />
