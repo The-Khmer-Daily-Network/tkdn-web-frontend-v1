@@ -1,20 +1,39 @@
+/** Cambodia (ICT, UTC+7) — all public news dates display in this zone. */
+export const NEWS_TIMEZONE = "Asia/Phnom_Penh";
+
+/** Laravel API datetimes are UTC; normalize before parsing. */
+function parseNewsDate(dateString: string): Date {
+  const trimmed = dateString.trim();
+  if (!trimmed) return new Date(Number.NaN);
+
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed);
+  const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+
+  return new Date(normalized);
+}
+
 export function formatDateShort(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseNewsDate(dateString);
   if (Number.isNaN(date.getTime())) return "";
 
-  const day = date.getDate();
-  const month = date.toLocaleDateString("en-US", { month: "long" });
-  const year = date.getFullYear();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? "PM" : "AM";
-  const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  const displayMinutes = minutes.toString().padStart(2, "0");
-  return `${day} ${month} ${year} ${displayHour}:${displayMinutes} ${period}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: NEWS_TIMEZONE,
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${get("day")} ${get("month")} ${get("year")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
 }
 
 export function getRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseNewsDate(dateString);
   if (Number.isNaN(date.getTime())) return "";
 
   const now = new Date();
