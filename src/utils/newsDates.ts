@@ -1,8 +1,19 @@
 /** Cambodia (ICT, UTC+7) — all public news dates display in this zone. */
 export const NEWS_TIMEZONE = "Asia/Phnom_Penh";
 
+/** Laravel API datetimes are UTC; normalize before parsing. */
+function parseNewsDate(dateString: string): Date {
+  const trimmed = dateString.trim();
+  if (!trimmed) return new Date(Number.NaN);
+
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(trimmed);
+  const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+
+  return new Date(normalized);
+}
+
 export function formatDateShort(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseNewsDate(dateString);
   if (Number.isNaN(date.getTime())) return "";
 
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -22,7 +33,7 @@ export function formatDateShort(dateString: string): string {
 }
 
 export function getRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseNewsDate(dateString);
   if (Number.isNaN(date.getTime())) return "";
 
   const now = new Date();
