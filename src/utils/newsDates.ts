@@ -1,16 +1,24 @@
+/** Cambodia (ICT, UTC+7) — all public news dates display in this zone. */
+export const NEWS_TIMEZONE = "Asia/Phnom_Penh";
+
 export function formatDateShort(dateString: string): string {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return "";
 
-  const day = date.getDate();
-  const month = date.toLocaleDateString("en-US", { month: "long" });
-  const year = date.getFullYear();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? "PM" : "AM";
-  const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
-  const displayMinutes = minutes.toString().padStart(2, "0");
-  return `${day} ${month} ${year} ${displayHour}:${displayMinutes} ${period}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: NEWS_TIMEZONE,
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${get("day")} ${get("month")} ${get("year")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
 }
 
 export function getRelativeTime(dateString: string): string {
