@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import HomePageContent from "./HomePageContent";
+import { SITE_URL } from "@/config/site";
 
 export const metadata: Metadata = {
   title: {
@@ -108,10 +109,10 @@ export const metadata: Metadata = {
     title: "The Khmer Daily Network - Latest News, Articles & Videos",
     description:
       "The Khmer Daily Network is your trusted source for the latest news, articles, and videos. Stay informed with breaking news, in-depth coverage, and video reports from Cambodia and around the world.",
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com"}/home`,
+    url: `${SITE_URL}/home`,
     images: [
       {
-        url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com"}/assets/TKDN_Logo/TKDN_Logo_Square.png`,
+        url: `${SITE_URL}/assets/TKDN_Logo/TKDN_Logo_Square.png`,
         width: 1200,
         height: 1200,
         alt: "The Khmer Daily Network Logo",
@@ -124,11 +125,11 @@ export const metadata: Metadata = {
     description:
       "The Khmer Daily Network is your trusted source for the latest news, articles, and videos. Stay informed with breaking news, in-depth coverage, and video reports from Cambodia and around the world.",
     images: [
-      `${process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com"}/assets/TKDN_Logo/TKDN_Logo_Square.png`,
+      `${SITE_URL}/assets/TKDN_Logo/TKDN_Logo_Square.png`,
     ],
   },
   alternates: {
-    canonical: `${process.env.NEXT_PUBLIC_SITE_URL || "https://thekhmerdailynetwork.com"}/home`,
+    canonical: `${SITE_URL}/home`,
   },
 };
 
