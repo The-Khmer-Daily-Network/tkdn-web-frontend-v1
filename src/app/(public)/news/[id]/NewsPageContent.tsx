@@ -17,7 +17,7 @@ import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { stripHtmlToText } from "@/utils/text";
 import { ARTICLE_BODY_BLOCKQUOTE_CLASS } from "@/utils/articleBodyHtml";
 import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
-import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
+import NewsPublishedMeta from "@/components/NewsPublishedMeta";
 
 interface NewsPageContentProps {
   initialNewsData?: News | null;
@@ -1262,19 +1262,10 @@ const logVideoDebug = (
                   {singleNews.category.name}
                 </span>
               )}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-gray-600">
-                  {formatDateShort(singleNews.date_time_post)}
-                </span>
-                <span className="text-xs text-gray-500">
-                  • {getRelativeTime(singleNews.date_time_post)}
-                </span>
-                {singleNews.author && (
-                  <span className="text-sm text-gray-600">
-                    • {singleNews.author}
-                  </span>
-                )}
-              </div>
+              <NewsPublishedMeta
+                publishedAt={singleNews.date_time_post || singleNews.created_at}
+                author={singleNews.author}
+              />
             </div>
           </div>
 
