@@ -6,7 +6,7 @@ import {
   enrichArticleHtmlWithImageCaptions,
 } from "@/utils/articleBodyHtml";
 import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
-import { formatDateShort, getRelativeTime } from "@/utils/newsDates";
+import NewsPublishedMeta from "@/components/NewsPublishedMeta";
 
 const CAPTION_CLASS = "text-sm text-gray-600 mt-2 italic";
 
@@ -86,8 +86,6 @@ export default function ServerNewsArticle({
   actions?: ReactNode;
 }) {
   const publishedAt = news.date_time_post || news.created_at;
-  const formattedDate = publishedAt ? formatDateShort(publishedAt) : "";
-  const relativeTime = publishedAt ? getRelativeTime(publishedAt) : "";
   const coverCaption = news.cover
     ? getCaptionText(news.cover_name, news.cover)
     : "";
@@ -107,18 +105,14 @@ export default function ServerNewsArticle({
             {news.category?.name && (
               <p className="text-sm font-bold text-[#1D2229] uppercase">{news.category.name}</p>
             )}
-            {(formattedDate || news.author) && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {formattedDate && (
-                  <span className="text-sm text-gray-600">{formattedDate}</span>
-                )}
-                {relativeTime && (
-                  <span className="text-xs text-gray-500">• {relativeTime}</span>
-                )}
-                {news.author && (
-                  <span className="text-sm text-gray-600">• {news.author}</span>
-                )}
-              </div>
+            {publishedAt && (
+              <NewsPublishedMeta
+                publishedAt={publishedAt}
+                author={news.author}
+              />
+            )}
+            {!publishedAt && news.author && (
+              <span className="text-sm text-gray-600">{news.author}</span>
             )}
           </div>
         </div>
