@@ -13,6 +13,9 @@ import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/n
 import type { News } from "@/types/news";
 import { articlePageFetchInit } from "@/utils/articlePageCache";
 
+/** ISR at CDN; cleared immediately on admin save via revalidatePath. */
+export const revalidate = 300;
+
 interface NewsMetadataModel {
   id?: number;
   title?: string;

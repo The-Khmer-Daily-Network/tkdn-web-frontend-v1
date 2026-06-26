@@ -3,6 +3,10 @@ import { SITE_URL } from "@/config/site";
 import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
 import { categoryNameToSlug } from "@/utils/slug";
 import { getNewsPath } from "@/utils/newsSlug";
+import {
+  cachedFetchInit,
+  SITEMAP_REVALIDATE_SECONDS,
+} from "@/utils/articlePageCache";
 
 /**
  * Main Sitemap with Image Extensions
@@ -15,7 +19,7 @@ import { getNewsPath } from "@/utils/newsSlug";
  * For Google News specific sitemap, see /news-sitemap.xml
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 export const runtime = "nodejs";
 
 interface NewsArticle {
@@ -45,7 +49,7 @@ async function getAllNews(): Promise<NewsArticle[]> {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      ...cachedFetchInit(SITEMAP_REVALIDATE_SECONDS),
     });
 
     if (!response.ok) {
@@ -71,7 +75,7 @@ async function getCategories(): Promise<SitemapCategory[]> {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      ...cachedFetchInit(SITEMAP_REVALIDATE_SECONDS),
     });
 
     if (!response.ok) {

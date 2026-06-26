@@ -1,8 +1,14 @@
 import { SITE_URL } from "@/config/site";
 import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
+import {
+  cachedFetchInit,
+  ogImageCacheControl,
+} from "@/utils/articlePageCache";
 import { getNewsIdFromSlugParam } from "@/utils/newsSlug";
 
 const DEFAULT_IMAGE = `${SITE_URL}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
+
+export const revalidate = 3600;
 
 type NewsMeta = {
   cover?: string | null;
@@ -26,7 +32,7 @@ async function fetchNewsCover(idParam: string): Promise<string> {
       headers: {
         Accept: "application/json",
       },
-      cache: "no-store",
+      ...cachedFetchInit(3600),
     });
     if (!response.ok) return DEFAULT_IMAGE;
 
@@ -50,7 +56,9 @@ export async function GET(
   const imageUrl = await fetchNewsCover(id);
 
   try {
-    const imageResponse = await fetch(imageUrl, { cache: "no-store" });
+    const imageResponse = await fetch(imageUrl, {
+      ...cachedFetchInit(3600),
+    });
     if (!imageResponse.ok) {
       return Response.redirect(DEFAULT_IMAGE, 302);
     }
@@ -61,7 +69,7 @@ export async function GET(
     return new Response(bytes, {
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=300, s-maxage=300",
+        "Cache-Control": ogImageCacheControl(),
       },
     });
   } catch {

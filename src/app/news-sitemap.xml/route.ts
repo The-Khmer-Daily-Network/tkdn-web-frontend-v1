@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { SITE_URL } from "@/config/site";
 import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
 import { getNewsPath } from "@/utils/newsSlug";
+import {
+  cachedFetchInit,
+  NEWS_SITEMAP_REVALIDATE_SECONDS,
+} from "@/utils/articlePageCache";
 
 /**
  * Google News Sitemap
@@ -14,7 +18,7 @@ import { getNewsPath } from "@/utils/newsSlug";
  * Documentation: https://support.google.com/news/publisher-center/answer/9607025
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 900;
 export const runtime = "nodejs";
 
 interface NewsArticle {
@@ -48,7 +52,7 @@ async function getRecentNews(): Promise<NewsArticle[]> {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      cache: "no-store",
+      ...cachedFetchInit(NEWS_SITEMAP_REVALIDATE_SECONDS),
     });
 
     if (!response.ok) {
