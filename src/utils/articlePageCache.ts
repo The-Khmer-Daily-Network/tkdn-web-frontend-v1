@@ -1,9 +1,4 @@
-const ARTICLE_PAGE_REVALIDATE_SECONDS = 60;
-
-/** Fetch options for article API calls (no-store in dev; ISR in production). */
+/** SEO-critical article fetches always bypass Next.js data cache (matches TKTN). */
 export function articlePageFetchInit(): RequestInit {
-  if (process.env.NODE_ENV === "development") {
-    return { cache: "no-store" };
-  }
-  return { next: { revalidate: ARTICLE_PAGE_REVALIDATE_SECONDS } };
+  return { cache: "no-store" };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { SITE_URL } from "@/config/site";
+import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
 import { getNewsPath } from "@/utils/newsSlug";
 
 /**
@@ -13,10 +14,8 @@ import { getNewsPath } from "@/utils/newsSlug";
  * Documentation: https://support.google.com/news/publisher-center/answer/9607025
  */
 
-export const revalidate = 900;
+export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface NewsArticle {
   id: number;
@@ -39,20 +38,17 @@ interface NewsArticle {
 }
 
 async function getRecentNews(): Promise<NewsArticle[]> {
-  // Use environment variable or fallback to hardcoded URL
-  const apiUrl = API_BASE_URL || "https://api.thekhmerdailynetwork.com/api";
+  if (!isApiConfigured()) return [];
 
   try {
-    const baseUrl = apiUrl.replace(/\/$/, "");
-    const url = `${baseUrl}/news`;
-
-    const response = await fetch(url, {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/news`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: 900 },
+      cache: "no-store",
     });
 
     if (!response.ok) {

@@ -1,5 +1,17 @@
 # The Khmer Daily Network - robots.txt
-# Updated for Google Search Console and Google News
+
+# Explicit allow for link-preview crawlers
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Facebot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
 
 # All crawlers
 User-agent: *
@@ -32,7 +44,6 @@ Allow: /home
 Allow: /about-us
 Allow: /video
 Allow: /latest
-Crawl-delay: 1
 
 # Googlebot News specific rules
 User-agent: Googlebot-News
