@@ -10,10 +10,20 @@ export function isApiConfigured(): boolean {
   );
 }
 
+function getServerDirectApiBaseUrl(): string {
+  const upstream = (
+    process.env.API_UPSTREAM_ORIGIN ??
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/api\/?$/, "") ??
+    "https://api.thekhmerdailynetwork.com"
+  ).replace(/\/$/, "");
+  return `${upstream}/api`;
+}
+
 /**
  * Base URL for API calls (includes `/api` segment for direct mode, or `/api-proxy` in proxy mode).
  * When `NEXT_PUBLIC_API_PROXY=1`, the browser calls same-origin `/api-proxy/...` and Next.js rewrites
- * to the real API so CORS does not apply. Server-side fetch uses an absolute URL to that proxy path.
+ * to the real API so CORS does not apply. Server-side fetch calls the upstream API directly (not via
+ * VERCEL_URL self-proxy), which breaks on production when SSR fetches its own deployment host.
  */
 export function getApiBaseUrl(): string {
   const useProxy = process.env.NEXT_PUBLIC_API_PROXY === "1";
@@ -22,12 +32,7 @@ export function getApiBaseUrl(): string {
     if (typeof window !== "undefined") {
       return PROXY_PATH;
     }
-    const origin =
-      process.env.VERCEL_URL != null
-        ? `https://${process.env.VERCEL_URL}`
-        : (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-          "http://localhost:3000");
-    return `${origin}${PROXY_PATH}`;
+    return getServerDirectApiBaseUrl();
   }
 
   const base = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
