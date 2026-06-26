@@ -22,11 +22,17 @@ export async function POST(request: Request) {
 
   for (const path of pathsToRevalidate) {
     revalidatePath(path, "page");
+    const slug = path.replace(/^\/news\//, "");
+    if (slug) {
+      revalidatePath(`/api/news/${encodeURIComponent(slug)}/og-image`);
+    }
   }
 
   // Listings that embed article titles/covers
   revalidatePath("/home", "page");
   revalidatePath("/news/latest", "page");
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/news-sitemap.xml");
 
   return NextResponse.json({
     success: true,
@@ -34,6 +40,8 @@ export async function POST(request: Request) {
       ...pathsToRevalidate,
       "/home",
       "/news/latest",
+      "/sitemap.xml",
+      "/news-sitemap.xml",
     ],
   });
 }

@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ArticleJsonLd from "./ArticleJsonLd";
 import NewsArticleActions from "./NewsArticleActions";
 import NewsPageContent from "./NewsPageContent";
 import ServerNewsArticle from "./ServerNewsArticle";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { SITE_URL } from "@/config/site";
+import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
 import { getFirstSentenceFromContent } from "@/utils/article";
 import { getNewsIdFromSlugParam, getNewsPath, slugifyNewsTitle } from "@/utils/newsSlug";
 import type { News } from "@/types/news";
 import { articlePageFetchInit } from "@/utils/articlePageCache";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-/** ISR fallback (seconds). On-demand revalidate runs on admin save + Laravel SEO hook. */
-export const revalidate = 60;
+/** ISR at CDN; cleared immediately on admin save via revalidatePath. */
+export const revalidate = 300;
 
 interface NewsMetadataModel {
+  id?: number;
   title?: string;
   subtitle?: string | null;
   author?: string | null;
@@ -31,16 +31,21 @@ interface NewsMetadataModel {
   } | null;
 }
 
-const getNewsById = cache(async (id: number) => {
-  if (!API_BASE_URL) {
-    return null;
-  }
+const LIST_ROUTES = new Set(["latest", "video"]);
+
+function isListRoute(idParam: string): boolean {
+  return LIST_ROUTES.has(idParam.toLowerCase());
+}
+
+function getArticleOgImageUrl(idParam: string, baseUrl: string): string {
+  return `${baseUrl}/api/news/${encodeURIComponent(idParam)}/og-image`;
+}
+
+async function fetchArticle(apiPath: string): Promise<NewsMetadataModel | null> {
+  if (!isApiConfigured()) return null;
 
   try {
-    const baseUrl = API_BASE_URL.replace(/\/$/, "");
-    const url = `${baseUrl}/news/${id}`;
-
-    const response = await fetch(url, {
+    const response = await fetch(`${getApiBaseUrl()}${apiPath}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -49,87 +54,72 @@ const getNewsById = cache(async (id: number) => {
       ...articlePageFetchInit(),
     });
 
-    if (!response.ok) {
-      return null;
-    }
+    if (!response.ok) return null;
 
     const data = await response.json();
     return data.success ? data.data : null;
   } catch (error) {
-    console.error("Error fetching news for metadata:", error);
+    console.error("Error fetching news for SEO:", error);
     return null;
   }
-});
+}
+
+const getNewsById = cache(async (id: number) => fetchArticle(`/news/${id}`));
 
 const getNewsBySlug = cache(async (slug: string) => {
-  if (!API_BASE_URL || !slug) {
-    return null;
-  }
+  if (!slug || !isApiConfigured()) return null;
 
   try {
-    const baseUrl = API_BASE_URL.replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/news`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      ...articlePageFetchInit(),
-    });
+    const response = await fetch(`${getApiBaseUrl()}/news`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    ...articlePageFetchInit(),
+  });
 
-    if (!response.ok) {
-      return null;
-    }
+  if (!response.ok) return null;
 
-    const data = await response.json();
-    const articles: NewsMetadataModel[] = Array.isArray(data?.data)
-      ? data.data
-      : [];
-    return (
-      articles.find(
-        (article: NewsMetadataModel) =>
-          slugifyNewsTitle(article?.title || "") === slug,
-      ) || null
-    );
-  } catch (error) {
-    console.error("Error fetching news by slug:", error);
+  const data = await response.json();
+  const articles: NewsMetadataModel[] = Array.isArray(data?.data) ? data.data : [];
+  return (
+    articles.find(
+      (article) => slugifyNewsTitle(article?.title || "") === slug,
+    ) || null
+  );
+  } catch {
     return null;
   }
 });
 
-// Helper function to strip HTML and truncate text for descriptions
 function createMetaDescription(text: string, maxLength: number = 160): string {
-  // Strip HTML tags if any
   const stripped = text.replace(/<[^>]*>/g, "").trim();
   if (stripped.length <= maxLength) return stripped;
   return stripped.substring(0, maxLength - 3) + "...";
 }
 
-// Helper function to extract keywords from content
 function extractNewsKeywords(news: NewsMetadataModel): string[] {
   const keywords: string[] = [];
-
-  // Add title words (important for Google News)
-  if (news.title) {
-    keywords.push(news.title);
-  }
-
-  // Add subtitle
-  if (news.subtitle) {
-    keywords.push(news.subtitle);
-  }
-
-  // Add category
-  if (news.category?.name) {
-    keywords.push(news.category.name);
-  }
-
-  // Add author
-  if (news.author) {
-    keywords.push(news.author);
-  }
-
+  if (news.title) keywords.push(news.title);
+  if (news.subtitle) keywords.push(news.subtitle);
+  if (news.category?.name) keywords.push(news.category.name);
+  if (news.author) keywords.push(news.author);
   return keywords.filter(Boolean);
+}
+
+function resolveArticleImageUrl(baseUrl: string, news: NewsMetadataModel): string {
+  let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
+  if (news.cover) {
+    if (news.cover.startsWith("http://") || news.cover.startsWith("https://")) {
+      imageUrl = news.cover;
+    } else if (news.cover.startsWith("/")) {
+      imageUrl = `${baseUrl}${news.cover}`;
+    } else {
+      imageUrl = `${baseUrl}/${news.cover}`;
+    }
+  }
+  return imageUrl;
 }
 
 export async function generateMetadata({
@@ -139,166 +129,131 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id: idParam } = await params;
 
+  if (!isApiConfigured()) {
+    return {
+      title: "The Khmer Daily Network - Latest News, Articles & Videos",
+      description:
+        "The Khmer Daily Network is your trusted source for the latest news, articles, and videos from Cambodia.",
+    };
+  }
+
   const resolvedId = getNewsIdFromSlugParam(idParam);
   const news = resolvedId
     ? await getNewsById(resolvedId)
     : await getNewsBySlug(idParam);
 
   if (news) {
-      // Get base URL - use environment variable or default
-      const baseUrl = SITE_URL;
+    const baseUrl = SITE_URL;
+    const imageUrl = getArticleOgImageUrl(idParam, baseUrl);
+    const title = `${news.title} - The Khmer Daily Network`;
+    const url = resolvedId
+      ? `${baseUrl}${getNewsPath({ id: resolvedId, title: news.title || "" })}`
+      : `${baseUrl}/news/${idParam}`;
 
-      // Ensure image URL is absolute
-      let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`; // Default to logo
+    const descriptionFallback =
+      getFirstSentenceFromContent(news.content_blocks) || news.title || "";
+    const description = createMetaDescription(
+      news.subtitle || descriptionFallback,
+      160,
+    );
 
-      if (news.cover) {
-        if (
-          news.cover.startsWith("http://") ||
-          news.cover.startsWith("https://")
-        ) {
-          imageUrl = news.cover;
-        } else if (news.cover.startsWith("/")) {
-          imageUrl = `${baseUrl}${news.cover}`;
-        } else {
-          imageUrl = `${baseUrl}/${news.cover}`;
-        }
-      }
+    const newsKeywords = extractNewsKeywords(news);
+    const allKeywords = [
+      ...newsKeywords,
+      "The Khmer Daily Network",
+      "TKDN",
+      "Cambodia news",
+      "Khmer news",
+      "latest news",
+      "breaking news",
+      "Cambodian news",
+    ].filter(Boolean);
 
-      // Dynamic SEO - Use the news title for Google to index
-      const title = news.title;
-      const url = `${baseUrl}${getNewsPath(news)}`;
+    const publishedTime = news.date_time_post || news.created_at || "";
+    const modifiedTime =
+      news.updated_at || news.date_time_post || news.created_at || "";
 
-      const descriptionFallback =
-        getFirstSentenceFromContent(news.content_blocks) || news.title;
-      const description = createMetaDescription(
-        news.subtitle || descriptionFallback,
-        160,
-      );
-
-      // Extract news keywords for Google News
-      const newsKeywords = extractNewsKeywords(news);
-
-      // Comprehensive keywords for SEO
-      const allKeywords = [
-        ...newsKeywords,
-        "The Khmer Daily Network",
-        "TKDN",
-        "Cambodia news",
-        "Khmer news",
-        "latest news",
-        "breaking news",
-        "Cambodian news",
-      ].filter(Boolean);
-
-      // Publication dates - critical for Google News freshness
-      const publishedTime = news.date_time_post || news.created_at;
-      const modifiedTime =
-        news.updated_at || news.date_time_post || news.created_at;
-
-      return {
-        // Dynamic title from news article - this is what Google indexes
-        title: title,
-        description,
-        keywords: allKeywords.join(", "),
-        authors: [{ name: news.author || "The Khmer Daily Network" }],
-        creator: news.author || "The Khmer Daily Network",
-        publisher: "The Khmer Daily Network",
-
-        // Robots meta - critical for Google indexing
-        robots: {
+    return {
+      title: { absolute: title },
+      description,
+      keywords: allKeywords.join(", "),
+      authors: [{ name: news.author || "The Khmer Daily Network" }],
+      creator: news.author || "The Khmer Daily Network",
+      publisher: "The Khmer Daily Network",
+      robots: {
+        index: true,
+        follow: true,
+        nocache: false,
+        googleBot: {
           index: true,
           follow: true,
-          nocache: false,
-          googleBot: {
-            index: true,
-            follow: true,
-            noimageindex: false,
-            "max-video-preview": -1,
-            "max-image-preview": "large",
-            "max-snippet": -1,
+          noimageindex: false,
+          "max-video-preview": -1,
+          "max-image-preview": "large",
+          "max-snippet": -1,
+        },
+      },
+      openGraph: {
+        type: "article",
+        locale: "en_US",
+        alternateLocale: ["km_KH"],
+        title,
+        description,
+        url,
+        siteName: "The Khmer Daily Network",
+        images: [
+          {
+            url: imageUrl,
+            width: 1200,
+            height: 630,
+            alt: news.title,
           },
+        ],
+        publishedTime: publishedTime || undefined,
+        modifiedTime: modifiedTime || undefined,
+        authors: [news.author || "The Khmer Daily Network"],
+        ...(news.category && {
+          section: news.category.name,
+          tags: [news.category.name, ...newsKeywords],
+        }),
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [imageUrl],
+        site: "@TheKhmerDaily",
+        creator: "@TheKhmerDaily",
+      },
+      alternates: {
+        canonical: url,
+        languages: {
+          km: url,
+          en: url,
         },
-
-        // Open Graph for social sharing and Google
-        openGraph: {
-          type: "article",
-          title: title,
-          description: description,
-          url,
-          siteName: "The Khmer Daily Network",
-          locale: "km_KH", // Khmer locale for better regional targeting
-          alternateLocale: ["en_US"],
-          images: [
-            {
-              url: imageUrl,
-              width: 1200,
-              height: 630,
-              alt: title,
-              type: "image/jpeg",
-            },
-          ],
-          publishedTime: publishedTime,
-          modifiedTime: modifiedTime,
-          authors: [news.author || "The Khmer Daily Network"],
-          ...(news.category && {
-            section: news.category.name,
-            tags: [news.category.name, ...newsKeywords],
-          }),
-        },
-
-        // Twitter Card for social sharing
-        twitter: {
-          card: "summary_large_image",
-          title: title,
-          description: description,
-          images: [imageUrl],
-          site: "@TheKhmerDaily",
-          creator: "@TheKhmerDaily",
-        },
-
-        // Canonical URL - prevents duplicate content
-        alternates: {
-          canonical: url,
-          languages: {
-            km: url,
-            en: url,
-          },
-        },
-
-        // Additional metadata for Google News and Search
-        other: {
-          // Google News specific meta tags
-          news_keywords: newsKeywords.slice(0, 10).join(", "), // Google News keywords (max 10)
-          "original-source": url,
-          "syndication-source": url,
-
-          // Article metadata
-          "article:published_time": publishedTime,
-          "article:modified_time": modifiedTime,
-          "article:author": news.author || "The Khmer Daily Network",
-          "article:publisher": "https://www.facebook.com/TheKhmerDailyNetwork", // Your Facebook page
-
-          // Category/Section
-          ...(news.category && {
-            "article:section": news.category.name,
-            "article:tag": news.category.name,
-          }),
-
-          // Content freshness signals
-          date: publishedTime,
-          "last-modified": modifiedTime,
-
-          // Google specific
-          "google-site-verification":
-            process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
-        },
-      };
+      },
+      other: {
+        news_keywords: newsKeywords.slice(0, 10).join(", "),
+        "original-source": url,
+        "syndication-source": url,
+        "article:published_time": publishedTime,
+        "article:modified_time": modifiedTime,
+        "article:author": news.author || "The Khmer Daily Network",
+        "article:publisher": "https://www.facebook.com/TheKhmerDailyNetwork",
+        ...(news.category && {
+          "article:section": news.category.name,
+          "article:tag": news.category.name,
+        }),
+        date: publishedTime,
+        "last-modified": modifiedTime,
+        "google-site-verification":
+          process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
+      },
+    };
   }
 
-  // Default metadata for category/list pages
   const baseUrl = SITE_URL;
 
-  // Handle special routes
   if (idParam?.toLowerCase() === "latest") {
     return {
       title: "Latest News - The Khmer Daily Network",
@@ -373,20 +328,6 @@ export async function generateMetadata({
   };
 }
 
-function resolveArticleImageUrl(baseUrl: string, news: NewsMetadataModel): string {
-  let imageUrl = `${baseUrl}/assets/TKDN_Logo/TKDN_Logo_Square.png`;
-  if (news.cover) {
-    if (news.cover.startsWith("http://") || news.cover.startsWith("https://")) {
-      imageUrl = news.cover;
-    } else if (news.cover.startsWith("/")) {
-      imageUrl = `${baseUrl}${news.cover}`;
-    } else {
-      imageUrl = `${baseUrl}/${news.cover}`;
-    }
-  }
-  return imageUrl;
-}
-
 export default async function NewsPage({
   params,
 }: {
@@ -394,21 +335,17 @@ export default async function NewsPage({
 }) {
   const { id: idParam } = await params;
 
-  const resolvedId = getNewsIdFromSlugParam(idParam);
-  let initialNewsData: News | null = null;
-
-  try {
-    const news = resolvedId
-      ? await getNewsById(resolvedId)
-      : await getNewsBySlug(idParam);
-    if (news) {
-      initialNewsData = news as News;
-    }
-  } catch (error) {
-    console.error("Error pre-fetching news:", error);
+  if (isListRoute(idParam)) {
+    return <NewsPageContent key={idParam} />;
   }
 
-  if (initialNewsData) {
+  const resolvedId = getNewsIdFromSlugParam(idParam);
+
+  if (resolvedId) {
+    const news = await getNewsById(resolvedId);
+    if (!news) notFound();
+
+    const initialNewsData = news as News;
     const canonicalPath = getNewsPath(initialNewsData);
     if (idParam !== canonicalPath.replace("/news/", "")) {
       redirect(canonicalPath);

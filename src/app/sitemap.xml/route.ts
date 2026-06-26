@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { SITE_URL } from "@/config/site";
+import { getApiBaseUrl, isApiConfigured } from "@/lib/api-url";
 import { categoryNameToSlug } from "@/utils/slug";
 import { getNewsPath } from "@/utils/newsSlug";
+import {
+  cachedFetchInit,
+  SITEMAP_REVALIDATE_SECONDS,
+} from "@/utils/articlePageCache";
 
 /**
  * Main Sitemap with Image Extensions
@@ -16,8 +21,6 @@ import { getNewsPath } from "@/utils/newsSlug";
 
 export const revalidate = 3600;
 export const runtime = "nodejs";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 interface NewsArticle {
   id: number;
@@ -36,18 +39,17 @@ interface SitemapCategory {
 }
 
 async function getAllNews(): Promise<NewsArticle[]> {
-  try {
-    const apiUrl = API_BASE_URL || "https://api.thekhmerdailynetwork.com/api";
-    const baseUrl = apiUrl.replace(/\/$/, "");
-    const url = `${baseUrl}/news`;
+  if (!isApiConfigured()) return [];
 
-    const response = await fetch(url, {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/news`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: 3600 },
+      ...cachedFetchInit(SITEMAP_REVALIDATE_SECONDS),
     });
 
     if (!response.ok) {
@@ -63,18 +65,17 @@ async function getAllNews(): Promise<NewsArticle[]> {
 }
 
 async function getCategories(): Promise<SitemapCategory[]> {
-  try {
-    const apiUrl = API_BASE_URL || "https://api.thekhmerdailynetwork.com/api";
-    const baseUrl = apiUrl.replace(/\/$/, "");
-    const url = `${baseUrl}/categories`;
+  if (!isApiConfigured()) return [];
 
-    const response = await fetch(url, {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/categories`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: 3600 },
+      ...cachedFetchInit(SITEMAP_REVALIDATE_SECONDS),
     });
 
     if (!response.ok) {

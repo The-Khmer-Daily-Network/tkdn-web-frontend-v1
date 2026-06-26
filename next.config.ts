@@ -1,7 +1,19 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+/** Used when NEXT_PUBLIC_API_PROXY=1: browser hits /api-proxy/*, Next rewrites to upstream /api/*. */
+const API_UPSTREAM_ORIGIN =
+  process.env.API_UPSTREAM_ORIGIN ?? "https://api.thekhmerdailynetwork.com";
+
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/api-proxy/:path*",
+        destination: `${API_UPSTREAM_ORIGIN.replace(/\/$/, "")}/api/:path*`,
+      },
+    ];
+  },
   // Pin Turbopack's workspace root so `next` resolves during HMR (avoids intermittent
   // "Next.js package not found" panics when the inferred root is wrong). See:
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory

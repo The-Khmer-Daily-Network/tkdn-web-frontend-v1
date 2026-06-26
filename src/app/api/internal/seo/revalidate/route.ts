@@ -43,7 +43,15 @@ export async function POST(request: Request) {
   );
 
   for (const path of pathsToRevalidate) {
-    revalidatePath(path, "page");
+    if (path.startsWith("/news/")) {
+      revalidatePath(path, "page");
+      const slug = path.replace(/^\/news\//, "");
+      if (slug) {
+        revalidatePath(`/api/news/${encodeURIComponent(slug)}/og-image`);
+      }
+    } else {
+      revalidatePath(path);
+    }
   }
 
   revalidatePath("/home", "page");

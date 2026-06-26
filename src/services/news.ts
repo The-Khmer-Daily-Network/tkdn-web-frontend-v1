@@ -8,36 +8,17 @@ import type {
   NewsUpdateResponse,
   NewsDeleteResponse,
 } from "@/types/news";
+import { getApiUrl, isApiConfigured } from "@/lib/api-url";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const inFlightAdminArticlesRequests = new Map<string, Promise<NewsResponse>>();
 const inFlightAdminArticleByIdRequests = new Map<string, Promise<NewsSingleResponse>>();
 const inFlightAdminVideosRequests = new Map<string, Promise<NewsResponse>>();
 const inFlightAdminVideoByIdRequests = new Map<string, Promise<NewsSingleResponse>>();
 
-if (!API_BASE_URL) {
+if (!isApiConfigured()) {
   console.warn(
-    "NEXT_PUBLIC_API_BASE_URL is not defined in environment variables",
+    "API is not configured. Set NEXT_PUBLIC_API_BASE_URL or NEXT_PUBLIC_API_PROXY=1.",
   );
-}
-
-/**
- * Get the full API URL with proper path
- */
-function getApiUrl(path: string): string {
-  if (!API_BASE_URL) {
-    throw new Error(
-      "NEXT_PUBLIC_API_BASE_URL is not defined in environment variables",
-    );
-  }
-
-  // Remove trailing slash from API_BASE_URL if present
-  const baseUrl = API_BASE_URL.replace(/\/$/, "");
-  // Ensure path starts with /
-  const apiPath = path.startsWith("/") ? path : `/${path}`;
-
-  // Simply concatenate baseUrl and path since baseUrl already includes /api
-  return `${baseUrl}${apiPath}`;
 }
 
 /**
