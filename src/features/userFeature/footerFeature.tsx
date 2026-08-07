@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Facebook, Youtube, Linkedin, Globe, Instagram, X } from "lucide-react";
 
 // Custom TikTok Icon Component
@@ -166,8 +167,25 @@ export default function FooterFeature() {
           </div>
         </div>
 
-        {/* Copyright Line */}
-        <div className="border-t border-gray-300 pt-4">
+        {/* Legal + Copyright */}
+        <div className="border-t border-gray-300 pt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
+            <Link
+              href="/privacy-policy"
+              className="text-blue-900 font-medium hover:underline underline-offset-2"
+            >
+              Privacy Policy
+            </Link>
+            <span className="text-blue-900/40" aria-hidden>
+              |
+            </span>
+            <Link
+              href="/terms-of-use"
+              className="text-blue-900 font-medium hover:underline underline-offset-2"
+            >
+              Terms of Use
+            </Link>
+          </div>
           <p className="text-center text-sm text-blue-900">
             The Khmer Daily Network 2025
           </p>
