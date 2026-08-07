@@ -137,6 +137,18 @@ export async function GET() {
       priority: "0.8",
     },
     {
+      url: `${baseUrl}/privacy-policy`,
+      lastModified: new Date("2026-08-07"),
+      changeFreq: "yearly",
+      priority: "0.5",
+    },
+    {
+      url: `${baseUrl}/terms-of-use`,
+      lastModified: new Date("2026-08-07"),
+      changeFreq: "yearly",
+      priority: "0.5",
+    },
+    {
       url: `${baseUrl}/video`,
       lastModified: new Date(),
       changeFreq: "daily",
