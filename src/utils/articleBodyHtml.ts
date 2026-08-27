@@ -1,5 +1,9 @@
 import type { News } from "@/types/news";
-import { getCaptionText, normalizeImageUrlKey } from "@/utils/imageCaption";
+import {
+  getCaptionText,
+  isFilenameLikeCaption,
+  normalizeImageUrlKey,
+} from "@/utils/imageCaption";
 
 const GENERIC_CAPTIONS = new Set(["inline image", "article image"]);
 
@@ -29,12 +33,20 @@ function resolveImgCaption(
   const mapped = srcKey ? imageNameByUrl.get(srcKey) : undefined;
   const title = getHtmlAttr(attrs, "title");
   const alt = getHtmlAttr(attrs, "alt");
-  const preferred = mapped || title || alt;
-  const caption = getCaptionText(preferred, src);
-  if (!caption || GENERIC_CAPTIONS.has(caption.toLowerCase())) {
-    return "";
+  const candidates = [mapped, title, alt].filter(
+    (value): value is string => Boolean(value && value.trim()),
+  );
+  for (const preferred of candidates) {
+    const caption = getCaptionText(preferred, src);
+    if (
+      caption &&
+      !GENERIC_CAPTIONS.has(caption.toLowerCase()) &&
+      !isFilenameLikeCaption(caption)
+    ) {
+      return caption;
+    }
   }
-  return caption;
+  return "";
 }
 
 /** Map image basename → caption from middle/end fields (and cover if needed later). */
