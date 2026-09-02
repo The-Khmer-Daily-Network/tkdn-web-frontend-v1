@@ -1587,12 +1587,28 @@ function NewsModal({
     });
   };
 
-  const deleteCoverByUrlIfPresent = async (url: string) => {
+  const deleteCoverByUrlIfPresent = async (url: string): Promise<boolean> => {
     const res = await getContentCovers();
-    const found = res.data.find((c) => c.image_url === url);
+    const targetKey = normalizeMediaUrlKey(url);
+    const found = res.data.find((c) => {
+      if (c.image_url === url) return true;
+      return normalizeMediaUrlKey(c.image_url) === targetKey;
+    });
     if (found) {
       await deleteContentCover(found.id);
+      return true;
     }
+    return false;
+  };
+
+  const isPersistedMediaUrl = (url: string | null | undefined) => {
+    const value = (url || "").trim();
+    if (!value) return false;
+    return (
+      !value.startsWith("blob:") &&
+      !value.startsWith("data:") &&
+      !value.startsWith("about:")
+    );
   };
 
   const normalizeMediaUrlKey = (rawUrl: string) => {
@@ -1929,6 +1945,17 @@ function NewsModal({
 
       // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
       const removedMediaUrls = new Set<string>();
+      const removedCoverUrls = new Set<string>();
+      const oldCover = originalCoverUrlRef.current;
+      const nextCover = finalCover ?? null;
+      if (
+        oldCover &&
+        isPersistedMediaUrl(oldCover) &&
+        oldCover !== nextCover
+      ) {
+        removedCoverUrls.add(oldCover);
+      }
+
       if (news) {
         const oldMiddle = originalMiddleImageUrlRef.current;
         const nextMiddle = finalMiddleImageUrl ?? null;
@@ -2038,6 +2065,17 @@ function NewsModal({
         }
       }
 
+      // Delete replaced cover thumbnails from storage only after successful save.
+      for (const removedUrl of removedCoverUrls) {
+        try {
+          const deleted = await deleteCoverByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete replaced cover image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
+        }
+      }
+
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
         try {
@@ -2060,6 +2098,8 @@ function NewsModal({
       inlinePendingImagesRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       middleImageRemovedFromParagraphRef.current = false;
+      originalCoverUrlRef.current = finalCover ?? null;
+      setCoverPendingFile(null);
       draftBaselineRef.current = buildDraftSignature({
         categoryId: categoryId || null,
         author: author.trim(),
@@ -2311,15 +2351,17 @@ function NewsModal({
                           <span className="leading-none pt-1">Add thumbnail</span>
                         </span>
                       </button>
-                      <input
-                        ref={coverFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                        className="sr-only"
-                        onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                      />
                     </>
                   )}
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                  />
                   <button
                     type="button"
                     onClick={() => setShowCategorySelector((prev) => !prev)}
@@ -2437,7 +2479,10 @@ function NewsModal({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          coverFileInputRef.current?.click();
+                          const input = coverFileInputRef.current;
+                          if (!input) return;
+                          input.value = "";
+                          input.click();
                         }}
                         className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
                         disabled={loading || coverUploading}
