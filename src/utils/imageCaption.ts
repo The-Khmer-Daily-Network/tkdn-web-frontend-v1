@@ -16,6 +16,21 @@ export function isOpaqueImageFilename(basename: string): boolean {
   return false;
 }
 
+/**
+ * Labels that are not editor-written captions (original upload filenames,
+ * library auto-titles, placeholder alts).
+ */
+export function isFilenameLikeCaption(value: string): boolean {
+  const text = (value || "").trim();
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  if (lower === "inline image" || lower === "article image") return true;
+  if (/\.(jpe?g|png|gif|webp|avif|bmp|svg)$/i.test(text)) return true;
+  if (/^(images-content|content-cover|videos-content)-\d+$/i.test(text)) return true;
+  if (isOpaqueImageFilename(text)) return true;
+  return false;
+}
+
 /** Derive caption from URL filename — only when it looks human-written (legacy uploads). */
 export function getImageCaptionFallback(src: string): string {
   if (!src) return "";
@@ -23,7 +38,7 @@ export function getImageCaptionFallback(src: string): string {
     const cleanPath = src.split("?")[0].split("#")[0];
     const segment = cleanPath.split("/").filter(Boolean).pop() || "";
     const decoded = decodeURIComponent(segment);
-    if (isOpaqueImageFilename(decoded)) return "";
+    if (isOpaqueImageFilename(decoded) || isFilenameLikeCaption(decoded)) return "";
     const withoutExt = decoded.replace(/\.[a-zA-Z0-9]+$/, "");
     return withoutExt.replace(/[-_]+/g, " ").trim();
   } catch {
@@ -31,12 +46,14 @@ export function getImageCaptionFallback(src: string): string {
   }
 }
 
-/** Public caption: only the editor-provided Image Name (cover_name, middle_image_name, etc.). */
+/** Public caption: only a real editor-provided Image Name (never raw filenames). */
 export function getCaptionText(
   preferred?: string | null,
   _src?: string | null,
 ): string {
-  return (preferred || "").trim();
+  const text = (preferred || "").trim();
+  if (!text || isFilenameLikeCaption(text)) return "";
+  return text;
 }
 
 export function normalizeImageUrlKey(url: string): string {

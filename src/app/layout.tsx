@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import GoogleAnalytics from "@/components/GoogleTagManager";
 import OrganizationStructuredData from "@/components/OrganizationStructuredData";
 import SuppressConsoleMessages from "@/components/SuppressConsoleMessages";
+import StripExtensionAttributes from "@/components/StripExtensionAttributes";
 import { SITE_URL } from "@/config/site";
 
 const geistSans = Geist({
@@ -173,12 +174,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ backgroundColor: "rgba(29, 34, 41, 0.0314)" }}
         suppressHydrationWarning
-    >
+      >
+        <StripExtensionAttributes />
         <SuppressConsoleMessages />
         <GoogleAnalytics />
         <OrganizationStructuredData />
