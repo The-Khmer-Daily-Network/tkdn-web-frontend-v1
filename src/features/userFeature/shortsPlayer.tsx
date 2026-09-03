@@ -46,6 +46,10 @@ function sendYoutubeCommand(iframe: HTMLIFrameElement | null, func: string) {
   );
 }
 
+type ShortsPlayerProps = {
+  initialId?: number | null;
+};
+
 export default function ShortsPlayer({ initialId = null }: ShortsPlayerProps) {
   const router = useRouter();
   const [shorts, setShorts] = useState<VideoShort[]>([]);
