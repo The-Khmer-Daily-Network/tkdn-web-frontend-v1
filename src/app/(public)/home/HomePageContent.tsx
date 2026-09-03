@@ -76,6 +76,7 @@ export default function HomePageContent() {
           loading={homeLoading}
           disableFetch
         />
+        <HomeShortsFeature />
         <BannerSponsor images={adImages} loading={adLoading} />
 
         <InternationalFeature
@@ -86,9 +87,6 @@ export default function HomePageContent() {
         <BannerSponsor images={adImages} loading={adLoading} />
 
         <VideoFeature allNews={homeSections.video} loading={homeLoading} disableFetch />
-        <BannerSponsor images={adImages} loading={adLoading} />
-
-        <HomeShortsFeature />
         <BannerSponsor images={adImages} loading={adLoading} />
 
         <HomeCategorySection
