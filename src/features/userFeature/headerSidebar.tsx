@@ -331,6 +331,16 @@ export default function HeaderSidebar({
           >
               VIDEO
             </Link>
+            <Link
+              href="/shorts"
+              className={`transition-colors text-base ${
+                isActiveRoute("/shorts")
+                  ? "text-[#E34C33] font-bold"
+                  : "text-[#1D2229] hover:text-[#E34C33] font-bold"
+              }`}
+          >
+              SHORTS
+            </Link>
             <div
               className="relative"
               onMouseEnter={() => {
@@ -819,6 +829,17 @@ export default function HeaderSidebar({
                 }}
             >
                 Video
+              </Link>
+              <Link
+                href="/shorts"
+                className={`transition-colors text-base py-2 ${
+                  isActiveRoute("/shorts")
+                    ? "text-[#E34C33] font-medium"
+                    : "text-[#1D2229] hover:text-[#E34C33] font-medium"
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+            >
+                Shorts
               </Link>
               <Link
                 href="/about-us"

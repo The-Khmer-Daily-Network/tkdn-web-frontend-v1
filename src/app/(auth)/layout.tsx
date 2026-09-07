@@ -21,6 +21,7 @@ export default function AuthLayout({
     "/statistics",
     "/guidelines",
     "/videoManagement",
+    "/shortsManagement",
     "/articleManagement",
     "/activityLog",
   ];

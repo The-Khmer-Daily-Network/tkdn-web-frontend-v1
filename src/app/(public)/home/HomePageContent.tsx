@@ -5,6 +5,7 @@ import NewsDashboard from "@/features/userFeature/newsDashboard";
 import NationalFeature from "@/features/userFeature/nationalFeature";
 import InternationalFeature from "@/features/userFeature/internationalFeature";
 import VideoFeature from "@/features/userFeature/videoFeature";
+import HomeShortsFeature from "@/features/userFeature/homeShortsFeature";
 import HomeCategorySection from "@/features/userFeature/homeCategorySection";
 import BannerSponsor from "@/features/sponsor/bannerSponsor";
 import { useAdvertisement } from "@/contexts/AdvertisementContext";
@@ -75,6 +76,7 @@ export default function HomePageContent() {
           loading={homeLoading}
           disableFetch
         />
+        <HomeShortsFeature />
         <BannerSponsor images={adImages} loading={adLoading} />
 
         <InternationalFeature

@@ -175,6 +175,13 @@ export default function SidebareAdmin() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 9l4 3-4 3V9zM18 10l3-2v8l-3-2v-4z" />
           </svg>
         );
+      case "shorts":
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <rect x="7" y="3" width="10" height="18" rx="2" strokeWidth={1.8} />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 10l4 2.5-4 2.5V10z" />
+          </svg>
+        );
       case "notification":
         return (
           <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,6 +327,15 @@ export default function SidebareAdmin() {
                   <span>Video Management</span>
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/shortsManagement"
+                  className={getLinkClasses("/shortsManagement")}
+              >
+                  {renderMenuIcon("shorts")}
+                  <span>Shorts Management</span>
+                </Link>
+              </li>
             </>
           ) : (
             <>
@@ -403,6 +419,16 @@ export default function SidebareAdmin() {
           >
               {renderMenuIcon("video")}
               <span>Video Management</span>
+            </Link>
+          </li>
+
+          <li>
+            <Link
+              href="/shortsManagement"
+              className={getLinkClasses("/shortsManagement")}
+          >
+              {renderMenuIcon("shorts")}
+              <span>Shorts Management</span>
             </Link>
           </li>
 

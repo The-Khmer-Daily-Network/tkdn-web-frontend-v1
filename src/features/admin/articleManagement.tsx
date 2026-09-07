@@ -46,6 +46,7 @@ import type { ContentImage } from "@/types/contentImage";
 import type { ContentVideo } from "@/types/contentVideo";
 import { useAuth } from "@/contexts/AuthContext";
 import { revalidateArticleAfterSave } from "@/services/articleRevalidate";
+import { isFilenameLikeCaption } from "@/utils/imageCaption";
 
 const PER_PAGE_OPTIONS = [30, 50, 100] as const;
 
@@ -542,6 +543,54 @@ function NewsModal({
     setContentBlocks(updated);
   };
 
+  /** True if HTML still marks a mid image (before save-time attribute stripping). */
+  const htmlHasMiddleImageMarker = (html: string) =>
+    /data-inline-image-kind\s*=\s*["']?middle["']?/i.test(html || "");
+
+  /** True if any content editor still has a mid-image wrapper/img. */
+  const hasMiddleImageInEditors = () => {
+    for (const editor of contentTextareaRefs.current) {
+      if (!editor) continue;
+      if (
+        editor.querySelector(
+          "[data-inline-image-wrapper='true'][data-inline-image-kind='middle'], img[data-inline-image-kind='middle']",
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const contentStillHasMiddleImage = (blocks: ContentBlock[]) =>
+    hasMiddleImageInEditors() ||
+    blocks.some((block) => htmlHasMiddleImageMarker(block.paragraph || ""));
+
+  /**
+   * Keep middle_image_url in sync with the editor.
+   * Keyboard delete can remove the visible mid image without clicking Remove;
+   * without this, the public page still shows middle_image_url.
+   */
+  const syncMiddleImageStateFromEditors = () => {
+    if (hasMiddleImageInEditors()) return;
+
+    const previousUrl = (middleImageUrl || "").trim();
+    if (
+      previousUrl &&
+      !previousUrl.startsWith("blob:") &&
+      !previousUrl.startsWith("data:") &&
+      !previousUrl.startsWith("about:")
+    ) {
+      removedInlineImageUrlsRef.current.add(previousUrl);
+    }
+
+    middleImageRemovedFromParagraphRef.current = true;
+    setMiddleImageUrl(null);
+    setMiddleImageName(null);
+    setMiddleImagePendingFile(null);
+    setMiddleImageUrlInput("");
+  };
+
   const handleContentSelection = (
     index: number,
     e: React.SyntheticEvent<HTMLDivElement>,
@@ -582,48 +631,79 @@ function NewsModal({
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
       const range = selection.getRangeAt(0);
-      const isProtectedWrapper = (node: Node | null) => {
-        if (!node) return false;
+      const getMiddleWrapper = (node: Node | null): Element | null => {
+        if (!node) return null;
         const el =
           node.nodeType === Node.ELEMENT_NODE
             ? (node as Element)
             : node.parentElement;
-        if (!el) return false;
-        return !!el.closest(
+        if (!el) return null;
+        return el.closest(
           "[data-inline-image-wrapper='true'][data-inline-image-kind='middle']",
         );
       };
 
-      // If highlighted selection touches protected middle media, block keyboard removal.
+      // Treat keyboard delete of mid image the same as clicking Remove
+      // (clears middle_image_url so the public reader also drops it).
       if (!range.collapsed) {
         const protectedWrappers = Array.from(
           editor.querySelectorAll(
             "[data-inline-image-wrapper='true'][data-inline-image-kind='middle']",
           ),
         );
-        for (const wrapper of protectedWrappers) {
-          if (range.intersectsNode(wrapper)) {
-            e.preventDefault();
-            return;
+        const intersecting = protectedWrappers.filter((wrapper) => {
+          try {
+            return range.intersectsNode(wrapper);
+          } catch {
+            return false;
           }
+        });
+        // Select-all often skips contentEditable=false mid-image wrappers.
+        // If the selection covers (almost) all editor text, remove every mid image.
+        const editorTextLen = (editor.textContent || "").replace(/\s+/g, "").length;
+        const selectedLen = range.toString().replace(/\s+/g, "").length;
+        const looksLikeSelectAll =
+          editorTextLen > 0 && selectedLen >= Math.max(1, editorTextLen * 0.95);
+        const wrappersToRemove = looksLikeSelectAll
+          ? protectedWrappers
+          : intersecting;
+
+        if (wrappersToRemove.length > 0) {
+          e.preventDefault();
+          for (const wrapper of wrappersToRemove) {
+            const pendingId =
+              wrapper.getAttribute("data-inline-image-id") ||
+              wrapper.querySelector("img")?.getAttribute("data-inline-pending-id") ||
+              null;
+            removeInlineImageFromEditor(index, wrapper, pendingId);
+          }
+          if (looksLikeSelectAll) {
+            // Mid images are contentEditable=false and survive normal select-all.
+            // After removing them, also delete the remaining selected text.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+              sel.getRangeAt(0).deleteContents();
+            }
+            handleUpdateContentBlock(index, "paragraph", editor.innerHTML);
+            syncMiddleImageStateFromEditors();
+          }
+          return;
         }
       } else {
-        // If caret is next to protected middle media, block backspace/delete removal.
         const { startContainer, startOffset } = range;
+        let targetWrapper: Element | null = null;
         if (startContainer.nodeType === Node.TEXT_NODE) {
           const textLength = startContainer.textContent?.length ?? 0;
           const parent = startContainer.parentNode;
           if (e.key === "Backspace" && startOffset === 0 && parent) {
-            if (isProtectedWrapper(startContainer.previousSibling || parent.previousSibling)) {
-              e.preventDefault();
-              return;
-            }
+            targetWrapper = getMiddleWrapper(
+              startContainer.previousSibling || parent.previousSibling,
+            );
           }
           if (e.key === "Delete" && startOffset === textLength && parent) {
-            if (isProtectedWrapper(startContainer.nextSibling || parent.nextSibling)) {
-              e.preventDefault();
-              return;
-            }
+            targetWrapper = getMiddleWrapper(
+              startContainer.nextSibling || parent.nextSibling,
+            );
           }
         } else if (startContainer.nodeType === Node.ELEMENT_NODE) {
           const container = startContainer as Element;
@@ -632,14 +712,19 @@ function NewsModal({
             startOffset < container.childNodes.length
               ? container.childNodes[startOffset]
               : null;
-          if (e.key === "Backspace" && isProtectedWrapper(prevNode)) {
-            e.preventDefault();
-            return;
-          }
-          if (e.key === "Delete" && isProtectedWrapper(nextNode)) {
-            e.preventDefault();
-            return;
-          }
+          if (e.key === "Backspace") targetWrapper = getMiddleWrapper(prevNode);
+          if (e.key === "Delete") targetWrapper = getMiddleWrapper(nextNode);
+        }
+        if (targetWrapper) {
+          e.preventDefault();
+          const pendingId =
+            targetWrapper.getAttribute("data-inline-image-id") ||
+            targetWrapper
+              .querySelector("img")
+              ?.getAttribute("data-inline-pending-id") ||
+            null;
+          removeInlineImageFromEditor(index, targetWrapper, pendingId);
+          return;
         }
       }
     }
@@ -1147,6 +1232,9 @@ function NewsModal({
       };
       const imageKind = inlineImageInsertTypeRef.current;
       const previewUrl = queuePreviewUrl(file);
+      if (imageKind === "middle") {
+        middleImageRemovedFromParagraphRef.current = false;
+      }
 
       const editor = contentTextareaRefs.current[blockIndex];
       if (!editor) return;
@@ -1172,7 +1260,7 @@ function NewsModal({
 
         const img = document.createElement("img");
         img.src = previewUrl;
-        img.alt = file.name || "Inline image";
+        img.alt = "Inline image";
         img.setAttribute("data-inline-pending-id", pendingId);
         img.setAttribute("data-inline-image-kind", imageKind);
         applyInlineImageElementStyle(img, imageKind);
@@ -1203,7 +1291,7 @@ function NewsModal({
 
         const img = document.createElement("img");
         img.src = previewUrl;
-        img.alt = file.name || "Inline image";
+        img.alt = "Inline image";
         img.setAttribute("data-inline-pending-id", pendingId);
         img.setAttribute("data-inline-image-kind", imageKind);
         applyInlineImageElementStyle(img, imageKind);
@@ -1415,7 +1503,8 @@ function NewsModal({
           image.getAttribute("alt") ||
           "";
         const imageName = rawName.trim();
-        if (!imageName || imageName.toLowerCase() === "inline image") continue;
+        // Only keep names the editor explicitly set (never file names / placeholders).
+        if (!imageName || isFilenameLikeCaption(imageName)) continue;
         const pendingId = image.getAttribute("data-inline-pending-id");
         if (pendingId) {
           pendingNameById.set(pendingId, imageName);
@@ -1498,12 +1587,28 @@ function NewsModal({
     });
   };
 
-  const deleteCoverByUrlIfPresent = async (url: string) => {
+  const deleteCoverByUrlIfPresent = async (url: string): Promise<boolean> => {
     const res = await getContentCovers();
-    const found = res.data.find((c) => c.image_url === url);
+    const targetKey = normalizeMediaUrlKey(url);
+    const found = res.data.find((c) => {
+      if (c.image_url === url) return true;
+      return normalizeMediaUrlKey(c.image_url) === targetKey;
+    });
     if (found) {
       await deleteContentCover(found.id);
+      return true;
     }
+    return false;
+  };
+
+  const isPersistedMediaUrl = (url: string | null | undefined) => {
+    const value = (url || "").trim();
+    if (!value) return false;
+    return (
+      !value.startsWith("blob:") &&
+      !value.startsWith("data:") &&
+      !value.startsWith("about:")
+    );
   };
 
   const normalizeMediaUrlKey = (rawUrl: string) => {
@@ -1638,7 +1743,10 @@ function NewsModal({
       let finalCover = cover;
       const finalCoverName = (coverName || "").trim() || null;
       let finalMiddleImageUrl = middleImageUrl;
-      let finalMiddleImageName = middleImageName;
+      let finalMiddleImageName =
+        middleImageName && !isFilenameLikeCaption(middleImageName)
+          ? middleImageName
+          : null;
       let finalEndImages: Array<EndImage | null> = [
         endImages[0] ?? null,
         endImages[1] ?? null,
@@ -1674,13 +1782,8 @@ function NewsModal({
         finalEndImages[i] = { url: imageUrl, name: finalEndImages[i]?.name ?? null };
       }
 
-      if (middleImageRemovedFromParagraphRef.current) {
-        finalMiddleImageUrl = null;
-        finalMiddleImageName = null;
-      }
-
-      // Do not clear middle/end image slots by checking paragraph HTML.
       // End images are managed in the dedicated Image section and may not appear inline.
+      // Mid images must stay in sync with the editor body (keyboard / select-all delete counts as remove).
 
       // Upload inline pending images only on save, then replace temporary preview URLs.
       const pendingInlineIds: string[] = [];
@@ -1706,10 +1809,12 @@ function NewsModal({
         if (!uploadedUrl) {
           throw new Error("Inline image upload succeeded but URL missing");
         }
-        const uploadedName =
-          (typeof uploaded?.title === "string" && uploaded.title.trim()) || null;
         const customName = inlineImageNames.pendingNameById.get(pendingId) || null;
-        const finalInlineName = customName || uploadedName;
+        // Never persist upload library auto-titles or filenames as captions.
+        const finalInlineName =
+          customName && !isFilenameLikeCaption(customName)
+            ? customName
+            : null;
         inlineUploadMap[pendingId] = { url: uploadedUrl, name: finalInlineName };
 
         // Keep backend compatibility: map first image to middle, next up to 3 to end_images.
@@ -1726,6 +1831,22 @@ function NewsModal({
           finalEndImages[emptySlot] = { url: uploadedUrl, name: finalInlineName };
         }
 
+      }
+
+      // Authoritative clear: if mid image is gone from editor/content, null DB fields too.
+      // Keep a URL only when this save still has mid markup or uploaded a new mid image.
+      const uploadedMiddleThisSave =
+        Boolean(middleImagePendingFile) ||
+        pendingInlineIds.some(
+          (id) => inlinePendingImagesRef.current[id]?.type === "middle",
+        );
+      if (
+        !contentStillHasMiddleImage(validBlocks) &&
+        !uploadedMiddleThisSave
+      ) {
+        finalMiddleImageUrl = null;
+        finalMiddleImageName = null;
+        middleImageRemovedFromParagraphRef.current = true;
       }
 
       if (
@@ -1824,6 +1945,17 @@ function NewsModal({
 
       // Compute removed media URLs by set-diff to avoid accidental bulk deletes.
       const removedMediaUrls = new Set<string>();
+      const removedCoverUrls = new Set<string>();
+      const oldCover = originalCoverUrlRef.current;
+      const nextCover = finalCover ?? null;
+      if (
+        oldCover &&
+        isPersistedMediaUrl(oldCover) &&
+        oldCover !== nextCover
+      ) {
+        removedCoverUrls.add(oldCover);
+      }
+
       if (news) {
         const oldMiddle = originalMiddleImageUrlRef.current;
         const nextMiddle = finalMiddleImageUrl ?? null;
@@ -1933,6 +2065,17 @@ function NewsModal({
         }
       }
 
+      // Delete replaced cover thumbnails from storage only after successful save.
+      for (const removedUrl of removedCoverUrls) {
+        try {
+          const deleted = await deleteCoverByUrlIfPresent(removedUrl);
+          if (!deleted) failedStorageDeletes.push(removedUrl);
+        } catch (deleteErr) {
+          console.error("Failed to delete replaced cover image:", removedUrl, deleteErr);
+          failedStorageDeletes.push(removedUrl);
+        }
+      }
+
       // Delete removed middle/end images from storage only after successful save.
       for (const removedUrl of removedMediaUrls) {
         try {
@@ -1955,6 +2098,8 @@ function NewsModal({
       inlinePendingImagesRef.current = {};
       removedInlineImageUrlsRef.current = new Set();
       middleImageRemovedFromParagraphRef.current = false;
+      originalCoverUrlRef.current = finalCover ?? null;
+      setCoverPendingFile(null);
       draftBaselineRef.current = buildDraftSignature({
         categoryId: categoryId || null,
         author: author.trim(),
@@ -2206,15 +2351,17 @@ function NewsModal({
                           <span className="leading-none pt-1">Add thumbnail</span>
                         </span>
                       </button>
-                      <input
-                        ref={coverFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                        className="sr-only"
-                        onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
-                      />
                     </>
                   )}
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={(e) => handleSelectCoverFile(e.target.files?.[0])}
+                  />
                   <button
                     type="button"
                     onClick={() => setShowCategorySelector((prev) => !prev)}
@@ -2332,7 +2479,10 @@ function NewsModal({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          coverFileInputRef.current?.click();
+                          const input = coverFileInputRef.current;
+                          if (!input) return;
+                          input.value = "";
+                          input.click();
                         }}
                         className="cursor-pointer rounded-md border border-gray-300 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-white"
                         disabled={loading || coverUploading}
@@ -2477,13 +2627,14 @@ function NewsModal({
                               onFocus={(e) =>
                                 decorateInlineImagesInEditor(e.currentTarget, index)
                               }
-                              onInput={(e) =>
+                              onInput={(e) => {
                                 handleUpdateContentBlock(
                                   index,
                                   "paragraph",
                                   e.currentTarget.innerHTML,
-                                )
-                              }
+                                );
+                                syncMiddleImageStateFromEditors();
+                              }}
                               onPaste={(e) => handleContentPaste(index, e)}
                               onSelect={(e) => handleContentSelection(index, e)}
                               onMouseUp={(e) => handleContentSelection(index, e)}
